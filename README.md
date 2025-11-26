@@ -1,98 +1,163 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Stallion Backend - Phase 1
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
-
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+A bounty-based contribution platform backend built with NestJS, PostgreSQL, Prisma ORM, Redis, BullMQ, and Soroban (Stellar smart contracts).
 
 ## Description
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+Stallion is a platform that enables:
+- User profiles with skills and reputation
+- Bounty creation, management, and submissions
+- In-app custodial wallet system
+- Points-based reputation system
+- Automated payouts and withdrawals via BullMQ workers
+- On-chain bounty management via Soroban smart contracts
 
-## Project setup
+## Tech Stack
 
+- **NestJS** - Backend framework
+- **PostgreSQL** - Database
+- **Prisma ORM** - Database ORM (v7)
+- **Redis** - Cache and queue backend
+- **BullMQ** - Job queue for async processing
+- **Soroban** - Stellar smart contracts
+- **JWT** - Authentication
+- **class-validator** - Input validation
+
+## Prerequisites
+
+- Node.js (v18+)
+- pnpm
+- PostgreSQL (running locally or remote)
+- Redis (running locally or remote)
+
+## Project Setup
+
+1. **Install dependencies:**
 ```bash
-$ pnpm install
+pnpm install
 ```
 
-## Compile and run the project
+2. **Configure environment variables:**
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your configuration:
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/stallion_db?schema=public"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+SOROBAN_RPC_URL=https://soroban-testnet.stellar.org
+SOROBAN_CONTRACT_ID=
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRES_IN=7d
+PORT=3000
+NODE_ENV=development
+```
+
+3. **Generate Prisma Client:**
+```bash
+npx prisma generate
+```
+
+4. **Run database migrations:**
+```bash
+npx prisma migrate dev --name init
+```
+
+## Compile and Run the Project
 
 ```bash
 # development
-$ pnpm run start
+pnpm run start
 
 # watch mode
-$ pnpm run start:dev
+pnpm run start:dev
 
 # production mode
-$ pnpm run start:prod
+pnpm run start:prod
 ```
 
-## Run tests
+## API Endpoints
 
-```bash
-# unit tests
-$ pnpm run test
+### Users
+- `POST /users` - Create a new user
+- `GET /users/:id` - Get user by ID
+- `PATCH /users/:id` - Update user
 
-# e2e tests
-$ pnpm run test:e2e
+### Auth
+- `POST /auth/login` - Login and get JWT token
 
-# test coverage
-$ pnpm run test:cov
+### Bounties
+- `POST /bounties` - Create a new bounty
+- `GET /bounties` - List all bounties
+- `GET /bounties/:id` - Get bounty by ID
+- `PATCH /bounties/:id` - Update bounty
+- `DELETE /bounties/:id` - Delete bounty
+
+### Submissions
+- `POST /bounties/:id/submissions` - Submit to a bounty
+- `GET /bounties/:id/submissions` - Get submissions for a bounty
+
+### Wallet
+- `GET /wallet` - Get user's wallet
+- `GET /wallet/transactions` - Get wallet transactions
+- `POST /wallet/withdraw` - Create withdrawal request
+
+### Transactions
+- `GET /transactions/:id` - Get transaction by ID
+
+## Project Structure
+
+```
+src/
+├── auth/                 # Authentication module (JWT)
+├── bounties/             # Bounty management
+├── common/               # Shared utilities
+│   ├── decorators/       # Custom decorators
+│   ├── guards/           # Auth guards
+│   ├── prisma/           # Prisma service
+│   └── utils/            # Utility functions
+├── points/               # Points/reputation system
+├── queues/               # BullMQ configuration
+│   └── workers/          # Job workers
+├── soroban/              # Soroban contract integration
+├── submissions/          # Bounty submissions
+├── transactions/         # Transaction management
+├── users/                # User management
+└── wallet/               # Wallet management
 ```
 
-## Deployment
+## Phase 1 Status
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+✅ **Completed:**
+- Full Prisma schema with all models
+- Prisma Client generation
+- All NestJS modules scaffolded
+- REST endpoints with DTOs and validation
+- BullMQ queues and workers (scaffolded)
+- Soroban service (scaffolded)
+- JWT authentication setup
+- Global validation pipes
+- CORS enabled
+- Project compiles successfully
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+⏳ **Pending (Future Phases):**
+- Database migration execution (requires PostgreSQL)
+- Full business logic implementation
+- Soroban smart contract integration
+- MFA implementation (TOTP + passkeys)
+- Admin functionality
+- Unit and E2E tests
+- Production deployment configuration
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
+## Development Notes
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+- All workers and Soroban methods are currently stubs with TODO comments
+- Linting errors are expected for Phase 1 scaffolding
+- Ensure PostgreSQL and Redis are running before starting the application
+- Run `npx prisma migrate dev --name init` to create the database schema
 
 ## License
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+MIT

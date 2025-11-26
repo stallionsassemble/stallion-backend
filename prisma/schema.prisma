@@ -1,0 +1,220 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(CONTRIBUTOR)
+  bio       String?
+  skills    String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  wallet      Wallet?            @relation(fields: [walletId], references: [id])
+  walletId    String?            @unique @map("wallet_id")
+  userPoints  UserPoint?
+  submissions BountySubmission[]
+  winners     BountyWinner[]
+  bounties    Bounty[]
+
+  @@index([role])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model UserPoint {
+  id        String   @id @default(cuid())
+  total     Int      @default(0)
+  points    Point[]
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([total(sort: Desc)])
+  @@map("user_points")
+}
+
+model Point {
+  id        String   @id @default(cuid())
+  amount    Int
+  action    String
+  note      String?
+  meta      Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  userPointId String    @map("user_point_id")
+  userPoint   UserPoint @relation(fields: [userPointId], references: [id])
+
+  @@index([userPointId, createdAt(sort: Desc)])
+  @@index([action])
+  @@map("points")
+}
+
+model Bounty {
+  id                 String       @id @default(cuid())
+  title              String
+  shortDescription   String       @map("short_description")
+  description        String?
+  reward             Decimal      @default(0)
+  rewardCurrency     String       @map("reward_currency")
+  rewardDistribution Json?        @map("reward_distribution")
+  submissionFields   Json?        @map("submission_fields")
+  status             BountyStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userId      String             @map("user_id")
+  user        User               @relation(fields: [userId], references: [id])
+  submissions BountySubmission[]
+  winners     BountyWinner[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("bounties")
+}
+
+model BountySubmission {
+  id         String           @id @default(cuid())
+  submission Json
+  status     SubmissionStatus @default(PENDING)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  userId   String @map("user_id")
+  user     User   @relation(fields: [userId], references: [id])
+  bountyId String @map("bounty_id")
+  bounty   Bounty @relation(fields: [bountyId], references: [id])
+
+  @@index([bountyId, status])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("bounty_submissions")
+}
+
+model BountyWinner {
+  id        String    @id @default(cuid())
+  position  Int
+  awardedAt DateTime? @map("awarded_at")
+
+  // Relations
+  userId   String @map("user_id")
+  user     User   @relation(fields: [userId], references: [id])
+  bountyId String @map("bounty_id")
+  bounty   Bounty @relation(fields: [bountyId], references: [id])
+
+  @@unique([bountyId, userId])
+  @@index([userId])
+  @@index([bountyId])
+  @@map("bounty_winners")
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  memoId    String   @unique @map("memo_id")
+  balance   Decimal  @default(0)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  users        User[]
+  transactions Transaction[]
+
+  @@map("wallets")
+}
+
+model Transaction {
+  id             String   @id @default(cuid())
+  type           TxType
+  amount         Decimal
+  currency       String
+  state          TxState  @default(PENDING)
+  externalTxId   String?  @map("external_tx_id")
+  idempotencyKey String?  @unique @map("idempotency_key")
+  note           String?
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  wallet   Wallet @relation(fields: [walletId], references: [id])
+  walletId String @map("wallet_id")
+
+  @@index([walletId, createdAt(sort: Desc)])
+  @@index([walletId, state, type])
+  @@index([externalTxId, type])
+  @@index([state])
+  @@index([type])
+  @@map("transactions")
+}
+
+model LedgerLock {
+  id        String    @id @default(cuid())
+  walletId  String    @map("wallet_id")
+  reason    String
+  expiresAt DateTime? @map("expires_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([walletId])
+  @@index([expiresAt])
+  @@map("ledger_locks")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id")
+  action    String
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+enum Role {
+  CONTRIBUTOR
+  PROJECT_OWNER
+  ADMIN
+}
+
+enum TxType {
+  DEPOSIT
+  WITHDRAWAL
+  PAYOUT
+  REFUND
+  FEE
+}
+
+enum TxState {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BountyStatus {
+  ACTIVE
+  CLOSED
+  CANCELLED
+}
