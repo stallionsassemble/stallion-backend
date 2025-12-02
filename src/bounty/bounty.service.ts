@@ -1,14 +1,21 @@
 import {
-    BadRequestException,
-    ForbiddenException,
-    Injectable,
-    Logger,
-    NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BountyStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
-import type { Bounty as ContractBounty, Status } from '../soroban/contract-bindings';
-import { Client as SorobanClient, networks } from '../soroban/contract-bindings';
+import type {
+  Bounty as ContractBounty,
+  Status,
+} from '../soroban/contract-bindings';
+import {
+  Client as SorobanClient,
+  networks,
+} from '../soroban/contract-bindings';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 
 export interface CreateBountyDto {
@@ -57,7 +64,8 @@ export class BountyService {
     // Initialize Soroban client
     this.sorobanClient = new SorobanClient({
       contractId: this.contractId,
-      networkPassphrase: networks[network as keyof typeof networks].networkPassphrase,
+      networkPassphrase:
+        networks[network as keyof typeof networks].networkPassphrase,
       rpcUrl,
     });
   }
@@ -99,9 +107,8 @@ export class BountyService {
       }
 
       // Convert distribution to contract format
-      const distribution: Array<readonly [number, number]> = dto.distribution.map(
-        (d) => [d.rank, d.percentage] as const,
-      );
+      const distribution: Array<readonly [number, number]> =
+        dto.distribution.map((d) => [d.rank, d.percentage] as const);
 
       // Validate distribution sums to 100
       const totalPercentage = dto.distribution.reduce(
@@ -121,8 +128,12 @@ export class BountyService {
         token: dto.token,
         reward: BigInt(dto.reward),
         distribution,
-        submission_deadline: BigInt(Math.floor(dto.submissionDeadline.getTime() / 1000)),
-        judging_deadline: BigInt(Math.floor(dto.judgingDeadline.getTime() / 1000)),
+        submission_deadline: BigInt(
+          Math.floor(dto.submissionDeadline.getTime() / 1000),
+        ),
+        judging_deadline: BigInt(
+          Math.floor(dto.judgingDeadline.getTime() / 1000),
+        ),
         title: dto.title,
       });
 
@@ -488,7 +499,7 @@ export class BountyService {
       // Update bounty status in database
       await this.prisma.bounty.update({
         where: { contractBountyId: bountyId },
-        data: { status: 'COMPLETED' },
+        data: { status: BountyStatus.COMPLETED },
       });
 
       // Create winner records
@@ -507,12 +518,15 @@ export class BountyService {
             data: {
               bountyId: dbBounty!.id,
               userId: winner.id,
+              position: dto.winners.indexOf(winnerMemoId) + 1,
             },
           });
         }
       }
 
-      this.logger.log(`Winners selected for bounty ${bountyId}, tx: ${result.hash}`);
+      this.logger.log(
+        `Winners selected for bounty ${bountyId}, tx: ${result.hash}`,
+      );
 
       return { txHash: result.hash };
     } catch (error) {
@@ -524,9 +538,7 @@ export class BountyService {
   /**
    * Get bounty submissions
    */
-  async getBountySubmissions(
-    bountyId: number,
-  ): Promise<Map<string, string>> {
+  async getBountySubmissions(bountyId: number): Promise<Map<string, string>> {
     try {
       const tx = await this.sorobanClient.get_bounty_submissions({
         bounty_id: bountyId,

@@ -12,7 +12,8 @@ export class BountiesService {
     return this.prisma.bounty.create({
       data: {
         ...createBountyDto,
-        userId,
+        ownerId: userId,
+        reward: createBountyDto.reward.toString(),
       },
       include: {
         submissions: true,
@@ -63,7 +64,10 @@ export class BountiesService {
 
     return this.prisma.bounty.update({
       where: { id: bounty.id },
-      data: updateBountyDto,
+      data: {
+        ...updateBountyDto,
+        reward: updateBountyDto.reward?.toString(),
+      },
       include: {
         submissions: true,
         winners: true,

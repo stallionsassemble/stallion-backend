@@ -9,26 +9,50 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  password  String
-  name      String?
-  role      Role     @default(CONTRIBUTOR)
-  bio       String?
+  username  String?  @unique
+  
+  // Profile fields - common
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
+  location  String?
   skills    String[] @default([])
+  profilePicture String? @map("profile_picture")
+  socials   Json?    // { linkedin: 'url', github: 'url', twitter: 'url' }
+  
+  // Role-specific fields
+  role      Role     @default(CONTRIBUTOR)
+  
+  // Project Owner specific
+  companyName     String? @map("company_name")
+  entityName      String? @map("entity_name")
+  phoneNumber     String? @map("phone_number")
+  industry        String?
+  companyBio      String? @map("company_bio")
+  companyLogo     String? @map("company_logo")
+  
+  // Settings
+  emailNotifications Boolean @default(true) @map("email_notifications")
+  
+  // Profile completion status
+  profileCompleted Boolean @default(false) @map("profile_completed")
   
   // MFA fields (required - cannot be disabled)
-  totpSecret      String   @map("totp_secret")
-  totpEnabled     Boolean  @default(true) @map("totp_enabled")
+  totpSecret      String?  @map("totp_secret")
+  totpEnabled     Boolean  @default(false) @map("totp_enabled")
   backupCodes     String[] @default([]) @map("backup_codes")
   
   // Refresh token
   refreshToken    String?  @map("refresh_token")
   
+  // Verification
+  emailVerified   Boolean  @default(false) @map("email_verified")
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  wallet      Wallet             @relation(fields: [walletId], references: [id], onDelete: Restrict)
-  walletId    String             @unique @map("wallet_id")
+  wallet      Wallet?            @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  walletId    String?            @unique @map("wallet_id")
   userPoints  UserPoint?
   submissions BountySubmission[]
   winners     BountyWinner[]
@@ -37,6 +61,8 @@ model User {
 
   @@index([role])
   @@index([createdAt])
+  @@index([username])
+  @@index([emailVerified])
   @@map("users")
 }
 
@@ -256,6 +282,6 @@ enum SubmissionStatus {
 
 enum BountyStatus {
   ACTIVE
-  CLOSED
+  COMPLETED
   CANCELLED
 }

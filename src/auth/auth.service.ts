@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -12,11 +13,15 @@ import * as QRCode from 'qrcode';
 import { sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EncryptionUtil } from '../common/utils/encryption.util';
+import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
-import { LoginMfaDto } from './dto/login-mfa.dto';
+import { CompleteContributorProfileDto } from './dto/complete-contributor-profile.dto';
+import { CompleteOwnerProfileDto } from './dto/complete-owner-profile.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { RegisterDto } from './dto/register.dto';
+import { RequestVerificationDto } from './dto/request-verification.dto';
+import { VerifyCodeDto } from './dto/verify-code.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { VerificationCodeStorageService } from './verification-code-storage.service';
 
 @Injectable()
 export class AuthService {
@@ -24,11 +29,16 @@ export class AuthService {
     private usersService: UsersService,
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private emailService: EmailService,
+    private verificationCodeStorage: VerificationCodeStorageService,
   ) {}
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
+      include: {
+        wallet: true,
+      },
     });
     if (!user) {
       throw new UnauthorizedException('User not found');
@@ -36,151 +46,6 @@ export class AuthService {
 
     const sanitizedUser = sanitizeUser(user);
     return sanitizedUser;
-  }
-
-  async register(registerDto: RegisterDto) {
-    // Check if user already exists
-    const existingUser = await this.usersService.findByEmail(registerDto.email);
-    if (existingUser) {
-      throw new BadRequestException('User with this email already exists');
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-
-    // Generate TOTP secret for MFA (required)
-    const totpSecret = authenticator.generateSecret();
-
-    // Encrypt TOTP secret before storing
-    const encryptedTotpSecret = EncryptionUtil.encrypt(totpSecret);
-
-    // Generate unique memo ID for wallet
-    const memoId = this.generateMemoId();
-
-    // Create user with wallet and encrypted TOTP secret (MFA required, but not verified yet)
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email,
-        password: hashedPassword,
-        name: registerDto.name,
-        role: registerDto.role || 'CONTRIBUTOR',
-        bio: registerDto.bio,
-        skills: registerDto.skills || [],
-        totpSecret: encryptedTotpSecret,
-        totpEnabled: false, // Will be enabled after TOTP verification
-        wallet: {
-          create: {
-            memoId,
-            balance: 0,
-          },
-        },
-      },
-      include: {
-        wallet: true,
-      },
-    });
-
-    // Generate QR code for TOTP setup
-    const otpauth = authenticator.keyuri(user.email, 'Stallion', totpSecret);
-    const qrCode = await QRCode.toDataURL(otpauth);
-
-    return {
-      userId: user.id,
-      totpSecret,
-      qrCode,
-      message:
-        'Registration successful. Please set up your authenticator app to complete registration.',
-    };
-  }
-
-  async verifyTotpSetup(userId: string, code: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    if (!user || !user.totpSecret) {
-      throw new BadRequestException('User not found or TOTP not initialized');
-    }
-
-    // Decrypt TOTP secret for verification
-    const decryptedTotpSecret = EncryptionUtil.decrypt(user.totpSecret);
-
-    const isValid = authenticator.verify({
-      token: code,
-      secret: decryptedTotpSecret,
-    });
-
-    if (!isValid) {
-      throw new BadRequestException('Invalid TOTP code');
-    }
-
-    // Generate backup codes
-    const backupCodes = this.generateBackupCodes();
-    const hashedBackupCodes = await Promise.all(
-      backupCodes.map((code) => bcrypt.hash(code, 10)),
-    );
-
-    // Enable TOTP and generate tokens
-    const updatedUser = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        totpEnabled: true,
-        backupCodes: hashedBackupCodes,
-      },
-    });
-
-    // Generate access and refresh tokens
-    const tokens = await this.generateTokens(updatedUser);
-
-    return {
-      message: 'TOTP setup completed successfully',
-      backupCodes,
-      ...tokens,
-    };
-  }
-
-  async login(loginDto: LoginMfaDto) {
-    const user = await this.usersService.findByEmail(loginDto.email);
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(
-      loginDto.password,
-      user.password,
-    );
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
-    }
-
-    // TOTP is always required (MFA cannot be disabled)
-    if (!user.totpEnabled) {
-      throw new UnauthorizedException(
-        'MFA setup incomplete. Please complete TOTP verification.',
-      );
-    }
-
-    // Decrypt TOTP secret for verification
-    const decryptedTotpSecret = EncryptionUtil.decrypt(user.totpSecret);
-
-    const isValidTotp = authenticator.verify({
-      token: loginDto.totpCode,
-      secret: decryptedTotpSecret,
-    });
-
-    if (!isValidTotp) {
-      // Check backup codes
-      const isValidBackup = await this.verifyBackupCode(
-        user.id,
-        loginDto.totpCode,
-      );
-      if (!isValidBackup) {
-        throw new UnauthorizedException('Invalid TOTP code');
-      }
-    }
-
-    return this.generateToken(user);
   }
 
   async validateUser(email: string): Promise<User | null> {
@@ -194,13 +59,22 @@ export class AuthService {
       role: user.role,
     };
 
+    const fullName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.email;
+
     return {
       access_token: this.jwtService.sign(payload),
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: fullName,
         role: user.role,
+        profileCompleted: user.profileCompleted,
       },
     };
   }
@@ -227,14 +101,23 @@ export class AuthService {
       data: { refreshToken: hashedRefreshToken },
     });
 
+    const fullName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.email;
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: fullName,
         role: user.role,
+        profileCompleted: user.profileCompleted,
       },
     };
   }
@@ -278,6 +161,378 @@ export class AuthService {
     });
 
     return { message: 'Logged out successfully' };
+  }
+
+  /**
+   * Request email verification code
+   */
+  async requestVerification(
+    dto: RequestVerificationDto,
+  ): Promise<{ message: string }> {
+    // Check if user already exists
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    // Generate 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store code in Redis with 10-minute TTL
+    await this.verificationCodeStorage.setVerificationCode(
+      dto.email,
+      code,
+      600, // 10 minutes
+    );
+
+    if (existingUser) {
+      // Update existing user's role if changed
+      await this.prisma.user.update({
+        where: { email: dto.email },
+        data: {
+          role: dto.role,
+        },
+      });
+    } else {
+      // Create barebone user
+      await this.prisma.user.create({
+        data: {
+          email: dto.email,
+          role: dto.role,
+          emailVerified: false,
+        },
+      });
+    }
+
+    // Send verification email
+    await this.emailService.sendVerificationCode(dto.email, code);
+
+    return { message: 'Verification code sent to your email' };
+  }
+
+  /**
+   * Verify email signup code
+   */
+  async verifyCode(
+    dto: VerifyCodeDto,
+  ): Promise<{ userId: string; message: string }> {
+    // Check if user exists
+    const user = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or code');
+    }
+
+    // Verify code from Redis (will delete if valid)
+    const isValid = await this.verificationCodeStorage.verifyAndDeleteCode(
+      dto.email,
+      dto.code,
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+
+    // Mark email as verified
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+      },
+    });
+
+    return {
+      userId: user.id,
+      message: 'Email verified successfully. Please set up MFA.',
+    };
+  }
+
+  /**
+   * Setup MFA
+   */
+  async setupMfa(userId: string): Promise<{
+    totpSecret: string;
+    qrCode: string;
+    message: string;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || !user.emailVerified) {
+      throw new UnauthorizedException('Email not verified');
+    }
+
+    if (user.totpEnabled) {
+      throw new BadRequestException('MFA already set up');
+    }
+
+    // Generate TOTP secret
+    const totpSecret = authenticator.generateSecret();
+    const encryptedTotpSecret = EncryptionUtil.encrypt(totpSecret);
+
+    // Update user
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        totpSecret: encryptedTotpSecret,
+      },
+    });
+
+    // Generate QR code
+    const otpauth = authenticator.keyuri(user.email, 'Stallion', totpSecret);
+    const qrCode = await QRCode.toDataURL(otpauth);
+
+    return {
+      totpSecret,
+      qrCode,
+      message: 'Scan the QR code with your authenticator app',
+    };
+  }
+
+  /**
+   * Verify TOTP setup and return tokens
+   */
+  async verifyTotpSetup(
+    userId: string,
+    totpCode: string,
+  ): Promise<{
+    message: string;
+    backupCodes: string[];
+    access_token: string;
+    refresh_token: string;
+    user: any;
+  }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user || !user.totpSecret) {
+      throw new NotFoundException('User or TOTP secret not found');
+    }
+
+    // Decrypt and verify TOTP
+    const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
+    const isValid = authenticator.verify({
+      token: totpCode,
+      secret: decryptedSecret,
+    });
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid TOTP code');
+    }
+
+    // Generate backup codes
+    const backupCodes = this.generateBackupCodes();
+    const hashedBackupCodes = await Promise.all(
+      backupCodes.map((code) => bcrypt.hash(code, 10)),
+    );
+
+    // Enable TOTP
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        totpEnabled: true,
+        backupCodes: hashedBackupCodes,
+      },
+      include: {
+        wallet: true,
+      },
+    });
+
+    // Generate auth tokens
+    const tokens = await this.generateTokens(updatedUser);
+
+    return {
+      message: 'MFA setup completed successfully',
+      backupCodes,
+      ...tokens,
+    };
+  }
+
+  /**
+   * Complete contributor profile
+   */
+  async completeContributorProfile(
+    userId: string,
+    dto: CompleteContributorProfileDto,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.profileCompleted) {
+      throw new BadRequestException('Profile already completed');
+    }
+
+    // Check username availability
+    if (dto.username) {
+      const existing = await this.prisma.user.findUnique({
+        where: { username: dto.username },
+      });
+      if (existing && existing.id !== userId) {
+        throw new BadRequestException('Username already taken');
+      }
+    }
+
+    // Generate wallet memo ID
+    const memoId = this.generateMemoId();
+
+    // Update user profile and create wallet
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        username: dto.username,
+        location: dto.location,
+        skills: dto.skills,
+        profilePicture: dto.profilePicture,
+        socials: dto.socials,
+        emailNotifications: dto.emailNotifications,
+        profileCompleted: true,
+        wallet: {
+          create: {
+            memoId,
+            balance: 0,
+          },
+        },
+      },
+    });
+
+    // Send welcome email
+    await this.emailService.sendWelcomeEmail(
+      user.email,
+      `${dto.firstName} ${dto.lastName}`,
+    );
+
+    return { message: 'Profile completed successfully' };
+  }
+
+  /**
+   * Complete project owner profile
+   */
+  async completeOwnerProfile(
+    userId: string,
+    dto: CompleteOwnerProfileDto,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.profileCompleted) {
+      throw new BadRequestException('Profile already completed');
+    }
+
+    // Check username availability
+    if (dto.username) {
+      const existing = await this.prisma.user.findUnique({
+        where: { username: dto.username },
+      });
+      if (existing && existing.id !== userId) {
+        throw new BadRequestException('Username already taken');
+      }
+    }
+
+    // Generate wallet memo ID
+    const memoId = this.generateMemoId();
+
+    // Update user profile and create wallet
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        username: dto.username,
+        location: dto.location,
+        skills: dto.skills,
+        profilePicture: dto.profilePicture,
+        socials: dto.socials,
+        companyName: dto.companyName,
+        entityName: dto.entityName,
+        phoneNumber: dto.phoneNumber,
+        industry: dto.industry,
+        companyBio: dto.companyBio,
+        companyLogo: dto.companyLogo,
+        emailNotifications: dto.emailNotifications,
+        profileCompleted: true,
+        wallet: {
+          create: {
+            memoId,
+            balance: 0,
+          },
+        },
+      },
+    });
+
+    // Send welcome email
+    await this.emailService.sendWelcomeEmail(
+      user.email,
+      `${dto.firstName} ${dto.lastName}`,
+    );
+
+    return { message: 'Profile completed successfully' };
+  }
+
+  /**
+   * Check username availability
+   */
+  async checkUsernameAvailability(
+    username: string,
+  ): Promise<{ available: boolean }> {
+    const existing = await this.prisma.user.findUnique({
+      where: { username },
+    });
+
+    return { available: !existing };
+  }
+
+  /**
+   * Login with email + TOTP
+   */
+  async login(email: string, totpCode: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { wallet: true },
+    });
+
+    if (!user || !user.emailVerified) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.totpEnabled || !user.totpSecret) {
+      throw new UnauthorizedException('MFA not set up');
+    }
+
+    if (!user.profileCompleted) {
+      throw new UnauthorizedException('Please complete your profile first');
+    }
+
+    // Verify TOTP
+    const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
+    const isValid = authenticator.verify({
+      token: totpCode,
+      secret: decryptedSecret,
+    });
+
+    if (!isValid) {
+      // Try backup codes
+      const isValidBackup = await this.verifyBackupCode(user.id, totpCode);
+      if (!isValidBackup) {
+        throw new UnauthorizedException('Invalid TOTP code');
+      }
+    }
+
+    return this.generateTokens(user);
   }
 
   private generateBackupCodes(count: number = 10): string[] {

@@ -1,8 +1,8 @@
 import {
-    DecryptCommand,
-    EncryptCommand,
-    GenerateDataKeyCommand,
-    KMSClient,
+  DecryptCommand,
+  EncryptCommand,
+  GenerateDataKeyCommand,
+  KMSClient,
 } from '@aws-sdk/client-kms';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,13 +15,14 @@ import { EncryptionUtil } from '../utils/encryption.util';
 @Injectable()
 export class KmsService {
   private readonly logger = new Logger(KmsService.name);
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   private kmsClient: KMSClient | null = null;
   private readonly useKms: boolean;
   private readonly kmsKeyId: string | null;
 
   constructor(private configService: ConfigService) {
     this.useKms = this.configService.get<string>('NODE_ENV') === 'production';
-    this.kmsKeyId = this.configService.get<string>('AWS_KMS_KEY_ID');
+    this.kmsKeyId = this.configService.get<string>('AWS_KMS_KEY_ID') || null;
 
     if (this.useKms) {
       if (!this.kmsKeyId) {
@@ -59,7 +60,7 @@ export class KmsService {
         });
 
         const response = await this.kmsClient.send(command);
-        return Buffer.from(response.CiphertextBlob!).toString('base64');
+        return Buffer.from(response.CiphertextBlob).toString('base64');
       } catch (error) {
         this.logger.error('KMS encryption failed', error);
         throw new Error('Failed to encrypt data with KMS');
@@ -82,7 +83,7 @@ export class KmsService {
         });
 
         const response = await this.kmsClient.send(command);
-        return Buffer.from(response.Plaintext!).toString('utf-8');
+        return Buffer.from(response.Plaintext).toString('utf-8');
       } catch (error) {
         this.logger.error('KMS decryption failed', error);
         throw new Error('Failed to decrypt data with KMS');
@@ -111,8 +112,8 @@ export class KmsService {
         const response = await this.kmsClient.send(command);
 
         return {
-          plaintext: Buffer.from(response.Plaintext!).toString('hex'),
-          encrypted: Buffer.from(response.CiphertextBlob!).toString('base64'),
+          plaintext: Buffer.from(response.Plaintext).toString('hex'),
+          encrypted: Buffer.from(response.CiphertextBlob).toString('base64'),
         };
       } catch (error) {
         this.logger.error('KMS data key generation failed', error);

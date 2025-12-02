@@ -1,13 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BountyStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
-import {
-  IsEnum,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-} from 'class-validator';
+import { IsNumber, IsObject, IsOptional, IsString } from 'class-validator';
 
 export class CreateBountyDto {
   @ApiProperty({
@@ -55,15 +48,6 @@ export class CreateBountyDto {
   @IsObject()
   @IsOptional()
   rewardDistribution?: any;
-
-  @ApiPropertyOptional({
-    description: 'Bounty status',
-    enum: BountyStatus,
-    example: BountyStatus.ACTIVE,
-  })
-  @IsEnum(BountyStatus)
-  @IsOptional()
-  status?: BountyStatus;
 
   @ApiPropertyOptional({
     description:
