@@ -5,8 +5,10 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BountiesModule } from './bounties/bounties.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { PasskeyModule } from './passkey/passkey.module';
 import { PointsModule } from './points/points.module';
 import { QueueModule } from './queues/queue.module';
+import { SettingsModule } from './settings/settings.module';
 import { SorobanModule } from './soroban/soroban.module';
 import { SubmissionsModule } from './submissions/submissions.module';
 import { TransactionsModule } from './transactions/transactions.module';
@@ -22,6 +24,8 @@ import { WalletModule } from './wallet/wallet.module';
     PrismaModule,
     UsersModule,
     AuthModule,
+    PasskeyModule,
+    SettingsModule,
     BountiesModule,
     SubmissionsModule,
     WalletModule,

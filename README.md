@@ -86,7 +86,19 @@ pnpm run start:prod
 - `PATCH /users/:id` - Update user
 
 ### Auth
-- `POST /auth/login` - Login and get JWT token
+- `POST /auth/register` - Register new user with MFA setup
+- `POST /auth/verify-totp/:userId` - Complete TOTP setup
+- `POST /auth/login` - Login with email, password, and TOTP code
+
+**Authentication Features:**
+- ✅ Email/password registration
+- ✅ Mandatory TOTP (authenticator app) MFA
+- ✅ QR code generation for easy setup
+- ✅ 10 backup codes for account recovery
+- ✅ Role-based access (ADMIN cannot be self-selected)
+- ✅ Passkey support (schema ready)
+
+See [AUTHENTICATION_GUIDE.md](./AUTHENTICATION_GUIDE.md) for complete documentation.
 
 ### Bounties
 - `POST /bounties` - Create a new bounty
@@ -111,7 +123,9 @@ pnpm run start:prod
 
 ```
 src/
-├── auth/                 # Authentication module (JWT)
+├── auth/                 # Authentication module (registration, login, TOTP)
+├── passkey/              # Passkey module (WebAuthn)
+├── settings/             # Settings module (passkey management)
 ├── bounties/             # Bounty management
 ├── common/               # Shared utilities
 │   ├── decorators/       # Custom decorators
@@ -142,11 +156,19 @@ src/
 - CORS enabled
 - Project compiles successfully
 
+✅ **Phase 2 Completed:**
+- User registration with email/password
+- TOTP (authenticator app) MFA implementation
+- Backup codes for account recovery
+- Secure login with password + TOTP verification
+- Database schema for passkeys (WebAuthn)
+- Comprehensive Swagger API documentation
+
 ⏳ **Pending (Future Phases):**
 - Database migration execution (requires PostgreSQL)
 - Full business logic implementation
 - Soroban smart contract integration
-- MFA implementation (TOTP + passkeys)
+- Passkey (WebAuthn) implementation
 - Admin functionality
 - Unit and E2E tests
 - Production deployment configuration

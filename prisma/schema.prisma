@@ -9,25 +9,60 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  password  String
   name      String?
   role      Role     @default(CONTRIBUTOR)
   bio       String?
   skills    String[] @default([])
+  
+  // MFA fields (required - cannot be disabled)
+  totpSecret      String   @map("totp_secret")
+  totpEnabled     Boolean  @default(true) @map("totp_enabled")
+  backupCodes     String[] @default([]) @map("backup_codes")
+  
+  // Refresh token
+  refreshToken    String?  @map("refresh_token")
+  
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  wallet      Wallet?            @relation(fields: [walletId], references: [id])
-  walletId    String?            @unique @map("wallet_id")
+  wallet      Wallet             @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  walletId    String             @unique @map("wallet_id")
   userPoints  UserPoint?
   submissions BountySubmission[]
   winners     BountyWinner[]
   bounties    Bounty[]
+  passkeys    Passkey[]
 
   @@index([role])
   @@index([createdAt])
   @@map("users")
 }
+
+model Passkey {
+  id                String   @id @default(cuid())
+  userId            String   @map("user_id")
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  credentialId      String   @unique @map("credential_id")
+  publicKey         String   @map("public_key")
+  counter           BigInt   @default(0)
+  deviceType        String   @map("device_type")
+  backedUp          Boolean  @default(false) @map("backed_up")
+  transports        String[] @default([])
+  
+  name              String?  // User-friendly name for the passkey
+  lastUsedAt        DateTime? @map("last_used_at")
+  
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([credentialId])
+  @@map("passkeys")
+}
+
 
 model UserPoint {
   id        String   @id @default(cuid())
@@ -37,7 +72,7 @@ model UserPoint {
 
   // Relations
   userId String @unique @map("user_id")
-  user   User   @relation(fields: [userId], references: [id])
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([total(sort: Desc)])
   @@map("user_points")
@@ -53,7 +88,7 @@ model Point {
 
   // Relations
   userPointId String    @map("user_point_id")
-  userPoint   UserPoint @relation(fields: [userPointId], references: [id])
+  userPoint   UserPoint @relation(fields: [userPointId], references: [id], onDelete: Cascade)
 
   @@index([userPointId, createdAt(sort: Desc)])
   @@index([action])
@@ -63,41 +98,47 @@ model Point {
 model Bounty {
   id                 String       @id @default(cuid())
   title              String
-  shortDescription   String       @map("short_description")
+  shortDescription   String?      @map("short_description")
   description        String?
-  reward             Decimal      @default(0)
-  rewardCurrency     String       @map("reward_currency")
+  reward             String       @default("0") // Stored as string for large numbers
+  token              String?      // Token contract address
+  rewardCurrency     String?      @map("reward_currency")
   rewardDistribution Json?        @map("reward_distribution")
   submissionFields   Json?        @map("submission_fields")
   status             BountyStatus @default(ACTIVE)
+  contractBountyId   Int?         @unique @map("contract_bounty_id") // ID from Soroban contract
+  submissionDeadline DateTime?    @map("submission_deadline")
+  judgingDeadline    DateTime?    @map("judging_deadline")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  userId      String             @map("user_id")
-  user        User               @relation(fields: [userId], references: [id])
+  ownerId     String             @map("owner_id")
+  owner       User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   submissions BountySubmission[]
   winners     BountyWinner[]
 
   @@index([status, createdAt(sort: Desc)])
-  @@index([userId])
+  @@index([ownerId])
   @@index([createdAt(sort: Desc)])
+  @@index([contractBountyId])
   @@map("bounties")
 }
 
 model BountySubmission {
-  id         String           @id @default(cuid())
-  submission Json
-  status     SubmissionStatus @default(PENDING)
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
+  id             String           @id @default(cuid())
+  submission     Json?
+  submissionLink String?          @map("submission_link") // Link to submission
+  status         SubmissionStatus @default(PENDING)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
 
   // Relations
   userId   String @map("user_id")
-  user     User   @relation(fields: [userId], references: [id])
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bountyId String @map("bounty_id")
-  bounty   Bounty @relation(fields: [bountyId], references: [id])
+  bounty   Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
 
   @@index([bountyId, status])
   @@index([userId])
@@ -113,9 +154,9 @@ model BountyWinner {
 
   // Relations
   userId   String @map("user_id")
-  user     User   @relation(fields: [userId], references: [id])
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bountyId String @map("bounty_id")
-  bounty   Bounty @relation(fields: [bountyId], references: [id])
+  bounty   Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
 
   @@unique([bountyId, userId])
   @@index([userId])
@@ -151,7 +192,7 @@ model Transaction {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   // Relations
-  wallet   Wallet @relation(fields: [walletId], references: [id])
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
   walletId String @map("wallet_id")
 
   @@index([walletId, createdAt(sort: Desc)])
