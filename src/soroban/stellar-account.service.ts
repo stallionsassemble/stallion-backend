@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Asset,
+  Horizon,
   Keypair,
   Memo,
   Networks,
@@ -9,8 +10,6 @@ import {
   TransactionBuilder,
 } from '@stellar/stellar-sdk';
 import { KmsService } from '../common/kms/kms.service';
-
-import { Server as HorizonServer } from '@stellar/stellar-sdk';
 
 /**
  * Stellar Account Service
@@ -20,7 +19,7 @@ import { Server as HorizonServer } from '@stellar/stellar-sdk';
 @Injectable()
 export class StellarAccountService implements OnModuleInit {
   private readonly logger = new Logger(StellarAccountService.name);
-  private server: InstanceType<typeof HorizonServer>;
+  private server: Horizon.Server;
   private masterKeypair: Keypair | null = null;
   private readonly networkPassphrase: string;
 
@@ -31,7 +30,7 @@ export class StellarAccountService implements OnModuleInit {
     const rpcUrl = this.configService.get<string>('SOROBAN_RPC_URL')!;
     const network = this.configService.get<string>('SOROBAN_NETWORK')!;
 
-    this.server = new HorizonServer(rpcUrl, {
+    this.server = new Horizon.Server(rpcUrl, {
       allowHttp: network === 'testnet',
     });
 
@@ -118,7 +117,7 @@ export class StellarAccountService implements OnModuleInit {
   /**
    * Get Stellar server instance
    */
-  getServer(): InstanceType<typeof HorizonServer> {
+  getServer(): Horizon.Server {
     return this.server;
   }
 
@@ -153,7 +152,8 @@ export class StellarAccountService implements OnModuleInit {
 
       // Find payment with matching memo and amount
       for (const payment of payments.records) {
-        if (payment.type !== 'payment') continue;
+        if (payment.type !== Horizon.HorizonApi.OperationResponseType.payment)
+          continue;
 
         const txResponse = await payment.transaction();
         const memo = txResponse.memo;

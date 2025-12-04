@@ -68,6 +68,9 @@ importers:
       contract:
         specifier: link:@stellar/stellar-sdk/contract
         version: link:@stellar/stellar-sdk/contract
+      horizon:
+        specifier: link:@stellar/stellar-sdk/horizon
+        version: link:@stellar/stellar-sdk/horizon
       ioredis:
         specifier: ^5.8.2
         version: 5.8.2

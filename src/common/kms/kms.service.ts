@@ -60,6 +60,9 @@ export class KmsService {
         });
 
         const response = await this.kmsClient.send(command);
+        if (!response.CiphertextBlob) {
+          throw new Error('KMS encryption returned no ciphertext');
+        }
         return Buffer.from(response.CiphertextBlob).toString('base64');
       } catch (error) {
         this.logger.error('KMS encryption failed', error);
@@ -83,6 +86,9 @@ export class KmsService {
         });
 
         const response = await this.kmsClient.send(command);
+        if (!response.Plaintext) {
+          throw new Error('KMS decryption returned no plaintext');
+        }
         return Buffer.from(response.Plaintext).toString('utf-8');
       } catch (error) {
         this.logger.error('KMS decryption failed', error);
@@ -110,6 +116,10 @@ export class KmsService {
         });
 
         const response = await this.kmsClient.send(command);
+
+        if (!response.Plaintext || !response.CiphertextBlob) {
+          throw new Error('KMS data key generation returned incomplete data');
+        }
 
         return {
           plaintext: Buffer.from(response.Plaintext).toString('hex'),

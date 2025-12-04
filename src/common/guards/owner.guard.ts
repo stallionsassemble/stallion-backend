@@ -27,14 +27,14 @@ export class OwnerGuard implements CanActivate {
     // Check if user is the bounty creator
     const bounty = await this.prisma.bounty.findUnique({
       where: { id: bountyId },
-      select: { userId: true },
+      select: { ownerId: true },
     });
 
     if (!bounty) {
       throw new ForbiddenException('Bounty not found');
     }
 
-    if (bounty.userId !== user.id) {
+    if (bounty.ownerId !== user.id) {
       throw new ForbiddenException('You do not own this bounty');
     }
 

@@ -51,7 +51,7 @@ export class PasskeyService {
       rpName: this.rpName,
       rpID: this.rpID,
       userName: user.email,
-      userDisplayName: user.name || user.email,
+      userDisplayName: user.firstName || user.email,
       attestationType: 'none',
       excludeCredentials: user.passkeys.map((passkey) => ({
         id: passkey.credentialId,

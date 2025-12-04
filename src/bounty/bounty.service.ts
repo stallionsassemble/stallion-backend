@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BountyStatus } from '@prisma/client';
+import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
 import type {
   Bounty as ContractBounty,
@@ -50,7 +51,9 @@ export interface SelectWinnersDto {
 export class BountyService {
   private readonly logger = new Logger(BountyService.name);
   private sorobanClient: SorobanClient;
+  private rpcServer: StellarSDK.rpc.Server;
   private readonly contractId: string;
+  private readonly networkPassphrase: string;
 
   constructor(
     private prisma: PrismaService,
@@ -61,11 +64,15 @@ export class BountyService {
     const network = this.configService.get<string>('SOROBAN_NETWORK')!;
     const rpcUrl = this.configService.get<string>('SOROBAN_RPC_URL')!;
 
+    // Initialize Soroban RPC server
+    this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
+    this.networkPassphrase =
+      networks[network as keyof typeof networks].networkPassphrase;
+
     // Initialize Soroban client
     this.sorobanClient = new SorobanClient({
       contractId: this.contractId,
-      networkPassphrase:
-        networks[network as keyof typeof networks].networkPassphrase,
+      networkPassphrase: this.networkPassphrase,
       rpcUrl,
     });
   }
@@ -137,12 +144,33 @@ export class BountyService {
         title: dto.title,
       });
 
-      // Sign and send transaction
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
+
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
+
+      // Poll for transaction result
+      let getResponse = await this.rpcServer.getTransaction(sendResponse.hash);
+      while (
+        getResponse.status === StellarSDK.rpc.Api.GetTransactionStatus.NOT_FOUND
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        getResponse = await this.rpcServer.getTransaction(sendResponse.hash);
+      }
+
+      if (
+        getResponse.status !== StellarSDK.rpc.Api.GetTransactionStatus.SUCCESS
+      ) {
+        throw new Error('Transaction failed');
+      }
 
       // Get bounty ID from result
-      const bountyId = Number(result.result);
+      const bountyId = Number(getResponse.returnValue);
 
       // Store bounty in database
       await this.prisma.bounty.create({
@@ -159,11 +187,11 @@ export class BountyService {
         },
       });
 
-      this.logger.log(`Bounty created: ${bountyId}, tx: ${result.hash}`);
+      this.logger.log(`Bounty created: ${bountyId}, tx: ${sendResponse.hash}`);
 
       return {
         bountyId,
-        txHash: result.hash,
+        txHash: sendResponse.hash,
       };
     } catch (error) {
       this.logger.error('Failed to create bounty', error);
@@ -278,15 +306,22 @@ export class BountyService {
       const tx = await this.sorobanClient.update_bounty({
         owner: user.wallet.memoId,
         bounty_id: bountyId,
-        new_title: dto.title || null,
+        new_title: dto.title || undefined,
         new_distribution: distribution,
         new_submission_deadline: dto.submissionDeadline
           ? BigInt(Math.floor(dto.submissionDeadline.getTime() / 1000))
-          : null,
+          : undefined,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
+
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
 
       // Update in database
       await this.prisma.bounty.update({
@@ -299,9 +334,9 @@ export class BountyService {
         },
       });
 
-      this.logger.log(`Bounty updated: ${bountyId}, tx: ${result.hash}`);
+      this.logger.log(`Bounty updated: ${bountyId}, tx: ${sendResponse.hash}`);
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to update bounty', error);
       throw error;
@@ -338,17 +373,24 @@ export class BountyService {
         bounty_id: bountyId,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
+
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
 
       // Delete from database
       await this.prisma.bounty.delete({
         where: { contractBountyId: bountyId },
       });
 
-      this.logger.log(`Bounty deleted: ${bountyId}, tx: ${result.hash}`);
+      this.logger.log(`Bounty deleted: ${bountyId}, tx: ${sendResponse.hash}`);
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to delete bounty', error);
       throw error;
@@ -381,8 +423,15 @@ export class BountyService {
         submission_link: dto.submissionLink,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
+
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
 
       // Create submission in database
       await this.prisma.bountySubmission.create({
@@ -396,10 +445,10 @@ export class BountyService {
       });
 
       this.logger.log(
-        `User ${userId} applied to bounty ${bountyId}, tx: ${result.hash}`,
+        `User ${userId} applied to bounty ${bountyId}, tx: ${sendResponse.hash}`,
       );
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to apply to bounty', error);
       throw error;
@@ -432,8 +481,15 @@ export class BountyService {
         new_submission_link: dto.submissionLink,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
+
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
 
       // Update submission in database
       const bounty = await this.prisma.bounty.findUnique({
@@ -451,10 +507,10 @@ export class BountyService {
       });
 
       this.logger.log(
-        `User ${userId} updated submission for bounty ${bountyId}, tx: ${result.hash}`,
+        `User ${userId} updated submission for bounty ${bountyId}, tx: ${sendResponse.hash}`,
       );
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to update submission', error);
       throw error;
@@ -493,8 +549,15 @@ export class BountyService {
         winners: dto.winners,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
+
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
 
       // Update bounty status in database
       await this.prisma.bounty.update({
@@ -525,10 +588,10 @@ export class BountyService {
       }
 
       this.logger.log(
-        `Winners selected for bounty ${bountyId}, tx: ${result.hash}`,
+        `Winners selected for bounty ${bountyId}, tx: ${sendResponse.hash}`,
       );
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to select winners', error);
       throw error;

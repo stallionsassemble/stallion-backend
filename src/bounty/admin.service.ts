@@ -1,5 +1,6 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
   Client as SorobanClient,
@@ -15,8 +16,10 @@ import { StellarAccountService } from '../soroban/stellar-account.service';
 export class AdminService {
   private readonly logger = new Logger(AdminService.name);
   private sorobanClient: SorobanClient;
+  private rpcServer: StellarSDK.rpc.Server;
   private readonly contractId: string;
   private readonly adminUserIds: string[];
+  private readonly networkPassphrase: string;
 
   constructor(
     private prisma: PrismaService,
@@ -27,15 +30,15 @@ export class AdminService {
     const network = this.configService.get<string>('SOROBAN_NETWORK')!;
     const rpcUrl = this.configService.get<string>('SOROBAN_RPC_URL')!;
 
-    // Get admin user IDs from config (comma-separated)
-    const adminIds = this.configService.get<string>('ADMIN_USER_IDS') || '';
-    this.adminUserIds = adminIds.split(',').filter((id) => id.trim());
+    // Initialize Soroban RPC server
+    this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
+    this.networkPassphrase =
+      networks[network as keyof typeof networks].networkPassphrase;
 
     // Initialize Soroban client
     this.sorobanClient = new SorobanClient({
       contractId: this.contractId,
-      networkPassphrase:
-        networks[network as keyof typeof networks].networkPassphrase,
+      networkPassphrase: this.networkPassphrase,
       rpcUrl,
     });
   }
@@ -44,11 +47,6 @@ export class AdminService {
    * Check if user is admin
    */
   private async isAdmin(userId: string): Promise<boolean> {
-    // Check if user ID is in admin list
-    if (this.adminUserIds.includes(userId)) {
-      return true;
-    }
-
     // Check if user has ADMIN role in database
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -83,14 +81,20 @@ export class AdminService {
         new_admin: newAdminAddress,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
 
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
       this.logger.log(
-        `Admin updated to ${newAdminAddress}, tx: ${result.hash}`,
+        `Admin updated to ${newAdminAddress}, tx: ${sendResponse.hash}`,
       );
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to update admin', error);
       throw error;
@@ -113,14 +117,20 @@ export class AdminService {
         new_fee_account: newFeeAccount,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
 
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
       this.logger.log(
-        `Fee account updated to ${newFeeAccount}, tx: ${result.hash}`,
+        `Fee account updated to ${newFeeAccount}, tx: ${sendResponse.hash}`,
       );
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to update fee account', error);
       throw error;
@@ -247,14 +257,20 @@ export class AdminService {
         bounty_id: bountyId,
       });
 
-      tx.sign(masterKeypair);
-      const result = await tx.send();
+      // Prepare, sign and send transaction
+      const preparedTx = await tx.simulate();
+      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
+        preparedTx.toXDR(),
+        this.networkPassphrase,
+      );
+      builtTx.sign(masterKeypair);
 
+      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
       this.logger.log(
-        `Judging checked for bounty ${bountyId}, tx: ${result.hash}`,
+        `Judging checked for bounty ${bountyId}, tx: ${sendResponse.hash}`,
       );
 
-      return { txHash: result.hash };
+      return { txHash: sendResponse.hash };
     } catch (error) {
       this.logger.error('Failed to check judging', error);
       throw error;
