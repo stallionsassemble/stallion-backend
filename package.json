@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.940.0",
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
@@ -61,7 +62,6 @@
     "@swc/core": "^1.10.7",
     "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.0",
-    "@types/ioredis": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/multer": "^2.0.0",
     "@types/node": "^22.10.7",

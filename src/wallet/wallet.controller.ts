@@ -5,7 +5,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { RequestUser } from '../auth/interfaces/jwt-payload.interface';
+import { type RequestUser } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { WithdrawDto } from './dto/withdraw.dto';
@@ -28,6 +28,31 @@ export class WalletController {
   @ApiResponse({ status: 404, description: 'Wallet not found' })
   async getWallet(@CurrentUser() user: RequestUser) {
     return this.walletService.getWalletByUserId(user.id);
+  }
+
+  @Get('balance')
+  @ApiOperation({
+    summary: 'Get wallet balance',
+    description: 'Retrieve wallet balance with available balance',
+  })
+  @ApiResponse({ status: 200, description: 'Wallet balance' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
+  async getBalance(@CurrentUser() user: RequestUser) {
+    const wallet = await this.walletService.getWalletByUserId(user.id);
+    return this.walletService.getWalletBalance(wallet.id);
+  }
+
+  @Get('deposit-address')
+  @ApiOperation({
+    summary: 'Get deposit address',
+    description: 'Get the Stellar address and memo for depositing funds',
+  })
+  @ApiResponse({ status: 200, description: 'Deposit address details' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getDepositAddress(@CurrentUser() user: RequestUser) {
+    const wallet = await this.walletService.getWalletByUserId(user.id);
+    return this.walletService.getDepositAddress(wallet.memoId);
   }
 
   @Get('transactions')
@@ -62,6 +87,7 @@ export class WalletController {
       wallet.id,
       withdrawDto.amount,
       withdrawDto.currency,
+      withdrawDto.destination,
     );
   }
 }

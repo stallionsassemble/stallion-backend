@@ -28,7 +28,7 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestVerificationDto } from './dto/request-verification.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { VerifyTotpDto } from './dto/verify-totp.dto';
-import { RequestUser } from './interfaces/jwt-payload.interface';
+import { type RequestUser } from './interfaces/jwt-payload.interface';
 
 @ApiTags('Authentication')
 @Controller('auth')

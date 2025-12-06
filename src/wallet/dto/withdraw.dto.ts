@@ -19,4 +19,11 @@ export class WithdrawDto {
   })
   @IsString()
   currency: string;
+
+  @ApiProperty({
+    description: 'Destination Stellar address',
+    example: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  })
+  @IsString()
+  destination: string;
 }

@@ -3,104 +3,425 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
-  Patch,
   Post,
-  Query,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { BountyStatus } from '@prisma/client';
-import { RequestUser } from '../auth/interfaces/jwt-payload.interface';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { OwnerGuard } from 'src/common/guards/owner.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { type RequestUser } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { AdminService } from './admin.service';
 import { BountiesService } from './bounties.service';
+import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
+import { SelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateBountyDto } from './dto/update-bounty.dto';
 
 @ApiTags('Bounties')
 @Controller('bounties')
-export class BountiesController {
-  constructor(private readonly bountiesService: BountiesService) {}
+export class BountyController {
+  constructor(
+    private readonly bountyService: BountiesService,
+    private readonly adminService: AdminService,
+  ) {}
 
-  @UseGuards(JwtAuthGuard)
-  @Post()
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Create bounty',
-    description: 'Create a new bounty (requires authentication)',
+  @Get('supported-currencies')
+  @ApiOperation({ summary: 'Get supported currencies' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of supported currencies with token addresses',
+    schema: {
+      example: [
+        {
+          code: 'USDC',
+          name: 'USD Coin',
+          tokenAddress:
+            'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+          decimals: 7,
+        },
+      ],
+    },
   })
-  @ApiResponse({ status: 201, description: 'Bounty created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  create(
-    @Body() createBountyDto: CreateBountyDto,
-    @CurrentUser() user: RequestUser,
-  ) {
-    return this.bountiesService.create(createBountyDto, user.id);
+  async getSupportedCurrencies() {
+    return this.bountyService.getSupportedCurrencies();
   }
 
   @Get()
-  @ApiOperation({
-    summary: 'List bounties',
-    description: 'Get all bounties with optional status filter',
+  @ApiOperation({ summary: 'Get all bounties' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all bounties from database',
   })
-  @ApiQuery({
-    name: 'status',
-    enum: BountyStatus,
-    required: false,
-    description: 'Filter by bounty status',
+  async getAllBounties() {
+    return this.bountyService.getAllBounties();
+  }
+
+  @Get('active')
+  @ApiOperation({ summary: 'Get active bounties' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of active bounty IDs',
   })
-  @ApiResponse({ status: 200, description: 'List of bounties' })
-  findAll(@Query('status') status?: BountyStatus) {
-    return this.bountiesService.findAll(status);
+  async getActiveBounties() {
+    return this.bountyService.getActiveBounties();
+  }
+
+  @Get('my-bounties')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get bounties owned by current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bounty IDs owned by user',
+  })
+  async getMyBounties(@CurrentUser() user: RequestUser) {
+    return this.bountyService.getOwnerBounties(user.id);
   }
 
   @Get(':id')
-  @ApiOperation({
-    summary: 'Get bounty by ID',
-    description: 'Retrieve detailed bounty information',
+  @ApiOperation({ summary: 'Get bounty details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bounty details from contract',
   })
-  @ApiParam({ name: 'id', description: 'Bounty ID' })
-  @ApiResponse({ status: 200, description: 'Bounty found' })
-  @ApiResponse({ status: 404, description: 'Bounty not found' })
-  findOne(@Param('id') id: string) {
-    return this.bountiesService.findOne(id);
+  async getBounty(@Param('id') id: string) {
+    return this.bountyService.getBounty(parseInt(id));
   }
 
+  @Post()
   @UseGuards(JwtAuthGuard)
-  @Patch(':id')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Update bounty',
-    description: 'Update bounty details (creator or admin only)',
+    summary: 'Create a new bounty',
+    description:
+      'Create a bounty on the Soroban contract. User must send funds to master account first.',
   })
-  @ApiParam({ name: 'id', description: 'Bounty ID' })
-  @ApiResponse({ status: 200, description: 'Bounty updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Bounty not found' })
-  update(@Param('id') id: string, @Body() updateBountyDto: UpdateBountyDto) {
-    return this.bountiesService.update(id, updateBountyDto);
+  @ApiResponse({
+    status: 201,
+    description: 'Bounty created successfully',
+    schema: {
+      example: {
+        bountyId: 1,
+        txHash: '0x123...',
+      },
+    },
+  })
+  async createBounty(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: CreateBountyDto,
+  ) {
+    return this.bountyService.createBounty(user.id, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @Put(':id')
+  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Update bounty' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bounty updated successfully',
+    schema: {
+      example: {
+        txHash: '0x123...',
+      },
+    },
+  })
+  async updateBounty(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateBountyDto,
+  ) {
+    return this.bountyService.updateBounty(user.id, parseInt(id), dto);
+  }
+
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, OwnerGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Delete bounty',
-    description: 'Remove bounty from the system (creator or admin only)',
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete bounty' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bounty deleted successfully',
   })
-  @ApiParam({ name: 'id', description: 'Bounty ID' })
-  @ApiResponse({ status: 200, description: 'Bounty deleted successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Bounty not found' })
-  remove(@Param('id') id: string) {
-    return this.bountiesService.remove(id);
+  async deleteBounty(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+  ) {
+    return this.bountyService.deleteBounty(user.id, parseInt(id));
+  }
+
+  @Post(':id/close')
+  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Close a bounty',
+    description:
+      'Close a bounty. Can only be done by the owner before any submissions are made.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bounty closed successfully',
+    schema: {
+      example: {
+        txHash: '0x123...',
+      },
+    },
+  })
+  async closeBounty(@CurrentUser() user: RequestUser, @Param('id') id: string) {
+    return this.bountyService.closeBounty(user.id, parseInt(id));
+  }
+
+  @Post(':id/apply')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Apply to bounty' })
+  @ApiResponse({
+    status: 200,
+    description: 'Application submitted successfully',
+    schema: {
+      example: {
+        txHash: '0x123...',
+      },
+    },
+  })
+  async applyToBounty(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ApplyToBountyDto,
+  ) {
+    return this.bountyService.applyToBounty(user.id, parseInt(id), dto);
+  }
+
+  @Put(':id/submission')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Update submission' })
+  @ApiResponse({
+    status: 200,
+    description: 'Submission updated successfully',
+  })
+  async updateSubmission(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: ApplyToBountyDto,
+  ) {
+    return this.bountyService.updateSubmission(user.id, parseInt(id), dto);
+  }
+
+  @Post(':id/winners')
+  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Select winners' })
+  @ApiResponse({
+    status: 200,
+    description: 'Winners selected successfully',
+    schema: {
+      example: {
+        txHash: '0x123...',
+      },
+    },
+  })
+  async selectWinners(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+    @Body() dto: SelectWinnersDto,
+  ) {
+    return this.bountyService.selectWinners(user.id, parseInt(id), dto);
+  }
+
+  @Get(':id/submissions')
+  @ApiOperation({ summary: 'Get bounty submissions (contract only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Map of user addresses to submission links',
+  })
+  async getBountySubmissions(@Param('id') id: string) {
+    const submissions = await this.bountyService.getBountySubmissions(
+      parseInt(id),
+    );
+    return Object.fromEntries(submissions);
+  }
+
+  @Get(':id/submissions/detailed')
+  @ApiOperation({
+    summary: 'Get detailed bounty submissions',
+    description:
+      'Get submissions with full data including submission fields and user information',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Detailed submissions with user info and submission data',
+    schema: {
+      example: [
+        {
+          id: 'submission-id',
+          submissionLink: 'https://github.com/user/repo',
+          submissionData: {
+            githubRepo: 'https://github.com/user/repo',
+            liveDemo: 'https://demo.example.com',
+            estimatedHours: 40,
+          },
+          status: 'PENDING',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+          user: {
+            id: 'user-id',
+            username: 'username',
+            email: 'user@example.com',
+          },
+        },
+      ],
+    },
+  })
+  async getBountySubmissionsDetailed(@Param('id') id: string) {
+    return this.bountyService.getBountySubmissionsDetailed(parseInt(id));
+  }
+
+  @Get(':id/applicants')
+  @ApiOperation({ summary: 'Get bounty applicants' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of applicant addresses',
+  })
+  async getBountyApplicants(@Param('id') id: string) {
+    return this.bountyService.getBountyApplicants(parseInt(id));
+  }
+
+  @Get(':id/winners')
+  @ApiOperation({ summary: 'Get bounty winners' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of winner addresses',
+  })
+  async getBountyWinners(@Param('id') id: string) {
+    return this.bountyService.getBountyWinners(parseInt(id));
+  }
+
+  @Get(':id/status')
+  @ApiOperation({ summary: 'Get bounty status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bounty status',
+  })
+  async getBountyStatus(@Param('id') id: string) {
+    return this.bountyService.getBountyStatus(parseInt(id));
+  }
+
+  // Admin endpoints
+  @Post('admin/update-admin')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Update contract admin (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Admin updated successfully',
+  })
+  async updateAdmin(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: { newAdminAddress: string },
+  ) {
+    return this.adminService.updateAdmin(user.id, dto.newAdminAddress);
+  }
+
+  @Post('admin/update-fee-account')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Update fee account (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Fee account updated successfully',
+  })
+  async updateFeeAccount(
+    @CurrentUser() user: RequestUser,
+    @Body() dto: { newFeeAccount: string },
+  ) {
+    return this.adminService.updateFeeAccount(user.id, dto.newFeeAccount);
+  }
+
+  @Get('admin/stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get contract statistics (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Contract statistics',
+  })
+  async getContractStats(@CurrentUser() user: RequestUser) {
+    return this.adminService.getContractStats(user.id);
+  }
+
+  @Get('admin/balance')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get master account balance (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Master account balance',
+  })
+  async getMasterAccountBalance(@CurrentUser() user: RequestUser) {
+    return this.adminService.getMasterAccountBalance(user.id);
+  }
+
+  @Post('admin/emergency-withdraw')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Emergency withdraw (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Withdrawal successful',
+  })
+  async emergencyWithdraw(
+    @CurrentUser() user: RequestUser,
+    @Body()
+    dto: {
+      destination: string;
+      amount: string;
+      memo?: string;
+    },
+  ) {
+    return this.adminService.emergencyWithdraw(
+      user.id,
+      dto.destination,
+      dto.amount,
+      dto.memo,
+    );
+  }
+
+  @Post('admin/check-judging/:id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Check judging deadline (Admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Judging checked successfully',
+  })
+  async checkJudging(
+    @CurrentUser() user: RequestUser,
+    @Param('id') id: string,
+  ) {
+    return this.adminService.checkJudging(user.id, parseInt(id));
   }
 }

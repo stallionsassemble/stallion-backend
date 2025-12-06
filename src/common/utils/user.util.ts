@@ -5,3 +5,5 @@ export const sanitizeUser = (user: User) => {
   const { totpSecret, backupCodes, refreshToken, ...sanitizedUser } = user;
   return sanitizedUser;
 };
+
+export type SanitizedUser = ReturnType<typeof sanitizeUser>;

@@ -3,24 +3,27 @@ import { ConfigService } from '@nestjs/config';
 import {
   Asset,
   Horizon,
-  Keypair,
   Memo,
   Networks,
   Operation,
+  Transaction,
   TransactionBuilder,
 } from '@stellar/stellar-sdk';
 import { KmsService } from '../common/kms/kms.service';
 
 /**
  * Stellar Account Service
- * Manages the master account that holds all user funds
- * Uses KMS for secure key management
+ * -----------------------------------------------
+ * - Master private key NEVER leaves Vault
+ * - This service only knows the PUBLIC KEY
+ * - All signatures are produced via Vault Transit Engine (ECDSA-P256)
+ * - Transactions are built → hashed → signed → submitted
  */
 @Injectable()
 export class StellarAccountService implements OnModuleInit {
   private readonly logger = new Logger(StellarAccountService.name);
   private server: Horizon.Server;
-  private masterKeypair: Keypair | null = null;
+  private masterPublicKey: string;
   private readonly networkPassphrase: string;
 
   constructor(
@@ -34,140 +37,98 @@ export class StellarAccountService implements OnModuleInit {
       allowHttp: network === 'testnet',
     });
 
-    // Get network passphrase from config or use default
     this.networkPassphrase =
       this.configService.get<string>('SOROBAN_NETWORK_PASSPHRASE') ||
       (network === 'testnet' ? Networks.TESTNET : Networks.PUBLIC);
+
+    // Only public key is stored in env
+    this.masterPublicKey = this.configService.get<string>('MASTER_PUBLIC_KEY')!;
   }
 
   async onModuleInit() {
-    await this.initializeMasterAccount();
+    await this.verifyMasterAccount();
   }
 
   /**
-   * Initialize master account from encrypted secret key
+   * Verify that master account exists on Stellar network
    */
-  private async initializeMasterAccount() {
+  private async verifyMasterAccount() {
     try {
-      const encryptedSecretKey = this.configService.get<string>(
-        'MASTER_ACCOUNT_SECRET_KEY_ENCRYPTED',
+      const account = await this.server.loadAccount(this.masterPublicKey);
+      this.logger.log(
+        `Master account verified: ${this.masterPublicKey} (seq=${account.sequence})`,
       );
-
-      if (!encryptedSecretKey) {
-        this.logger.warn(
-          'MASTER_ACCOUNT_SECRET_KEY_ENCRYPTED not set - master account unavailable',
-        );
-        return;
-      }
-
-      // Decrypt the secret key using KMS
-      const secretKey = await this.kmsService.decrypt(encryptedSecretKey);
-      this.masterKeypair = Keypair.fromSecret(secretKey);
-
-      const publicKey = this.masterKeypair.publicKey();
-      this.logger.log(`Master account initialized: ${publicKey}`);
-
-      // Verify account exists on network
-      await this.getMasterAccountDetails();
     } catch (error) {
-      this.logger.error('Failed to initialize master account', error);
-      throw error;
+      this.logger.error('Master account verification failed', error);
+      // TODO: Handle this error
+      // throw new Error('Master account not found on Stellar network.');
     }
   }
 
   /**
-   * Get master account details from Stellar network
+   * Build, hash, send to Vault Transit, attach signature, submit tx
    */
-  async getMasterAccountDetails() {
-    if (!this.masterKeypair) {
-      throw new Error('Master account not initialized');
-    }
+  async signTransactionWithVault(tx: Transaction): Promise<Transaction> {
+    // Encode transaction as XDR
+    const txHash = tx.hash(); // raw 32-byte buffer
 
-    try {
-      const account = await this.server.loadAccount(
-        this.masterKeypair.publicKey(),
-      );
-      return account;
-    } catch (error) {
-      this.logger.error('Failed to load master account', error);
-      throw new Error('Master account not found on network');
-    }
+    // Base64 encode hash for vault
+    const txHashB64 = Buffer.from(txHash).toString('base64');
+
+    // Ask Vault to sign
+    const vaultSignature = await this.kmsService.sign(txHashB64);
+
+    // vault:v1:<base64sig>
+    const base64Sig = vaultSignature.split(':').pop();
+
+    const signatureBytes = Buffer.from(base64Sig!, 'base64');
+
+    // Attach signature to transaction
+    tx.addSignature(this.masterPublicKey, signatureBytes.toString('base64'));
+
+    return tx;
   }
 
-  /**
-   * Get master account public key
-   */
   getMasterPublicKey(): string {
-    if (!this.masterKeypair) {
-      throw new Error('Master account not initialized');
-    }
-    return this.masterKeypair.publicKey();
+    return this.masterPublicKey;
   }
 
-  /**
-   * Get master account keypair (for signing transactions)
-   */
-  getMasterKeypair(): Keypair {
-    if (!this.masterKeypair) {
-      throw new Error('Master account not initialized');
-    }
-    return this.masterKeypair;
-  }
-
-  /**
-   * Get Stellar server instance
-   */
   getServer(): Horizon.Server {
     return this.server;
   }
 
-  /**
-   * Get network passphrase
-   */
   getNetworkPassphrase(): string {
     return this.networkPassphrase;
   }
 
   /**
-   * Check if user has sent funds to master account with correct memo
-   * @param memoId User's wallet memo ID
-   * @param expectedAmount Expected amount in stroops
-   * @param asset Asset to check (default: native XLM)
-   * @returns Transaction hash if found, null otherwise
+   * Check if user has sent funds to the master account with correct memo
    */
   async verifyPaymentReceived(
     memoId: string,
     expectedAmount: string,
   ): Promise<string | null> {
     try {
-      const masterPublicKey = this.getMasterPublicKey();
-
-      // Get recent payments to master account
       const payments = await this.server
         .payments()
-        .forAccount(masterPublicKey)
+        .forAccount(this.masterPublicKey)
         .order('desc')
         .limit(100)
         .call();
 
-      // Find payment with matching memo and amount
       for (const payment of payments.records) {
         if (payment.type !== Horizon.HorizonApi.OperationResponseType.payment)
           continue;
 
         const txResponse = await payment.transaction();
-        const memo = txResponse.memo;
+        if (txResponse.memo !== memoId) continue;
 
-        // Check if memo matches
-        if (memo && memo === memoId) {
-          // Check if amount matches (convert to stroops)
-          const paymentAmount = BigInt(
-            Math.floor(parseFloat(payment.amount) * 10000000),
-          ).toString();
+        const stroops = BigInt(
+          Math.floor(parseFloat(payment.amount) * 10000000),
+        ).toString();
 
-          if (paymentAmount === expectedAmount) {
-            return payment.transaction_hash;
-          }
+        if (stroops === expectedAmount) {
+          return payment.transaction_hash;
         }
       }
 
@@ -179,12 +140,7 @@ export class StellarAccountService implements OnModuleInit {
   }
 
   /**
-   * Send payment from master account
-   * @param destination Destination public key
-   * @param amount Amount in stroops
-   * @param asset Asset to send (default: native XLM)
-   * @param memo Optional memo
-   * @returns Transaction hash
+   * Send payment (Vault signs the transaction)
    */
   async sendPayment(
     destination: string,
@@ -193,35 +149,31 @@ export class StellarAccountService implements OnModuleInit {
     memo?: string,
   ): Promise<string> {
     try {
-      const masterAccount = await this.getMasterAccountDetails();
-      const masterKeypair = this.getMasterKeypair();
+      const account = await this.server.loadAccount(this.masterPublicKey);
 
-      // Build transaction
-      let txBuilder = new TransactionBuilder(masterAccount, {
-        fee: '100000', // 0.01 XLM
+      let txBuilder = new TransactionBuilder(account, {
+        fee: '100000',
         networkPassphrase: this.networkPassphrase,
       });
 
-      // Add payment operation
       txBuilder = txBuilder.addOperation(
         Operation.payment({
           destination,
           asset,
-          amount: (parseInt(amount) / 10000000).toString(), // Convert from stroops
+          amount: (parseInt(amount) / 10000000).toString(),
         }),
       );
 
-      // Add memo if provided
       if (memo) {
         txBuilder = txBuilder.addMemo(Memo.text(memo));
       }
 
-      // Build and sign transaction
-      const transaction = txBuilder.setTimeout(30).build();
-      transaction.sign(masterKeypair);
+      const tx = txBuilder.setTimeout(30).build();
 
-      // Submit transaction
-      const result = await this.server.submitTransaction(transaction);
+      // Sign using Vault Transit Engine
+      const signedTx = await this.signTransactionWithVault(tx);
+
+      const result = await this.server.submitTransaction(signedTx);
 
       this.logger.log(`Payment sent: ${result.hash}`);
       return result.hash;
@@ -232,25 +184,17 @@ export class StellarAccountService implements OnModuleInit {
   }
 
   /**
-   * Get account balance
-   * @param publicKey Account public key
-   * @returns Balance in stroops
+   * Get account balance (returns stroops)
    */
   async getAccountBalance(publicKey: string): Promise<string> {
     try {
       const account = await this.server.loadAccount(publicKey);
-      const nativeBalance = account.balances.find(
-        (b) => b.asset_type === 'native',
-      );
 
-      if (!nativeBalance || nativeBalance.asset_type !== 'native') {
-        return '0';
-      }
+      const bal = account.balances.find((b) => b.asset_type === 'native');
 
-      // Convert to stroops
-      return BigInt(
-        Math.floor(parseFloat(nativeBalance.balance) * 10000000),
-      ).toString();
+      if (!bal) return '0';
+
+      return BigInt(Math.floor(parseFloat(bal.balance) * 10000000)).toString();
     } catch (error) {
       this.logger.error('Failed to get account balance', error);
       return '0';

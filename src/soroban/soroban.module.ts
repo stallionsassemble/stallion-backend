@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { SorobanContract } from './soroban.contract';
-import { SorobanService } from './soroban.service';
+import { KmsModule } from 'src/common/kms/kms.module';
+import { StellarAccountService } from './stellar-account.service';
 
 @Module({
-  imports: [ConfigModule],
-  providers: [SorobanService, SorobanContract],
-  exports: [SorobanService],
+  imports: [ConfigModule, KmsModule],
+  providers: [StellarAccountService],
 })
 export class SorobanModule {}

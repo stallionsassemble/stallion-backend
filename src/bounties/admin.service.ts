@@ -18,7 +18,6 @@ export class AdminService {
   private sorobanClient: SorobanClient;
   private rpcServer: StellarSDK.rpc.Server;
   private readonly contractId: string;
-  private readonly adminUserIds: string[];
   private readonly networkPassphrase: string;
 
   constructor(
@@ -75,21 +74,20 @@ export class AdminService {
     try {
       await this.verifyAdmin(userId);
 
-      const masterKeypair = this.stellarAccount.getMasterKeypair();
-
       const tx = await this.sorobanClient.update_admin({
         new_admin: newAdminAddress,
       });
 
-      // Prepare, sign and send transaction
+      // Prepare, sign with Vault and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
-      );
-      builtTx.sign(masterKeypair);
+      ) as StellarSDK.Transaction;
+      const signedTx =
+        await this.stellarAccount.signTransactionWithVault(builtTx);
 
-      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
+      const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(
         `Admin updated to ${newAdminAddress}, tx: ${sendResponse.hash}`,
       );
@@ -111,21 +109,20 @@ export class AdminService {
     try {
       await this.verifyAdmin(userId);
 
-      const masterKeypair = this.stellarAccount.getMasterKeypair();
-
       const tx = await this.sorobanClient.update_fee_account({
         new_fee_account: newFeeAccount,
       });
 
-      // Prepare, sign and send transaction
+      // Prepare, sign with Vault and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
-      );
-      builtTx.sign(masterKeypair);
+      ) as StellarSDK.Transaction;
+      const signedTx =
+        await this.stellarAccount.signTransactionWithVault(builtTx);
 
-      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
+      const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(
         `Fee account updated to ${newFeeAccount}, tx: ${sendResponse.hash}`,
       );
@@ -251,21 +248,20 @@ export class AdminService {
     try {
       await this.verifyAdmin(userId);
 
-      const masterKeypair = this.stellarAccount.getMasterKeypair();
-
       const tx = await this.sorobanClient.check_judging({
         bounty_id: bountyId,
       });
 
-      // Prepare, sign and send transaction
+      // Prepare, sign with Vault and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
-      );
-      builtTx.sign(masterKeypair);
+      ) as StellarSDK.Transaction;
+      const signedTx =
+        await this.stellarAccount.signTransactionWithVault(builtTx);
 
-      const sendResponse = await this.rpcServer.sendTransaction(builtTx);
+      const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(
         `Judging checked for bounty ${bountyId}, tx: ${sendResponse.hash}`,
       );
