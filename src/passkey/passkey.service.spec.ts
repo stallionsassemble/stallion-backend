@@ -344,7 +344,7 @@ describe('PasskeyService', () => {
       ).mockResolvedValue(mockVerification);
       mockPrismaService.passkey.update.mockResolvedValue(mockPasskey);
       mockAuthService.generateToken.mockReturnValue({
-        access_token: 'jwt-token',
+        accessToken: 'jwt-token',
         user: mockUser,
       });
 
@@ -353,7 +353,7 @@ describe('PasskeyService', () => {
         mockResponse as any,
       );
 
-      expect(result).toHaveProperty('access_token');
+      expect(result).toHaveProperty('accessToken');
       expect(mockPrismaService.passkey.update).toHaveBeenCalledWith({
         where: { id: mockPasskey.id },
         data: {

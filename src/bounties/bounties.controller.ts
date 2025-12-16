@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { OwnerGuard } from 'src/common/guards/owner.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -187,10 +188,10 @@ export class BountyController {
   }
 
   @Post(':id/apply')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, MFAGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Apply to bounty' })
+  @ApiOperation({ summary: 'Apply to bounty (requires MFA)' })
   @ApiResponse({
     status: 200,
     description: 'Application submitted successfully',
@@ -200,6 +201,7 @@ export class BountyController {
       },
     },
   })
+  @ApiResponse({ status: 403, description: 'MFA required' })
   async applyToBounty(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,

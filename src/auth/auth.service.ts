@@ -52,33 +52,6 @@ export class AuthService {
     return this.usersService.findByEmail(email);
   }
 
-  generateToken(user: User) {
-    const payload: JwtPayload = {
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-    };
-
-    const fullName =
-      user.firstName && user.lastName
-        ? `${user.firstName} ${user.lastName}`
-        : user.email;
-
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        name: fullName,
-        role: user.role,
-        profileCompleted: user.profileCompleted,
-      },
-    };
-  }
-
   async generateTokens(user: User) {
     const payload: JwtPayload = {
       sub: user.id,
@@ -107,8 +80,8 @@ export class AuthService {
         : user.email;
 
     return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         email: user.email,
@@ -214,7 +187,9 @@ export class AuthService {
    */
   async verifyCode(
     dto: VerifyCodeDto,
-  ): Promise<{ userId: string; message: string }> {
+  ): Promise<
+    Awaited<ReturnType<typeof this.generateTokens>> & { message: string }
+  > {
     // Check if user exists
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -243,8 +218,8 @@ export class AuthService {
     });
 
     return {
-      userId: user.id,
-      message: 'Email verified successfully. Please set up MFA.',
+      ...(await this.generateTokens(user)),
+      message: 'Email verified successfully.',
     };
   }
 
@@ -260,7 +235,11 @@ export class AuthService {
       where: { id: userId },
     });
 
-    if (!user || !user.emailVerified) {
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!user.emailVerified) {
       throw new UnauthorizedException('Email not verified');
     }
 
@@ -300,16 +279,13 @@ export class AuthService {
   ): Promise<{
     message: string;
     backupCodes: string[];
-    access_token: string;
-    refresh_token: string;
-    user: any;
   }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user || !user.totpSecret) {
-      throw new NotFoundException('User or TOTP secret not found');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     // Decrypt and verify TOTP
@@ -330,7 +306,7 @@ export class AuthService {
     );
 
     // Enable TOTP
-    const updatedUser = await this.prisma.user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: {
         totpEnabled: true,
@@ -341,13 +317,9 @@ export class AuthService {
       },
     });
 
-    // Generate auth tokens
-    const tokens = await this.generateTokens(updatedUser);
-
     return {
       message: 'MFA setup completed successfully',
       backupCodes,
-      ...tokens,
     };
   }
 
@@ -497,38 +469,45 @@ export class AuthService {
   }
 
   /**
-   * Login with email + TOTP
+   * Login with email + optional TOTP
    */
-  async login(email: string, totpCode: string) {
+  async login(email: string, totpCode?: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
       include: { wallet: true },
     });
 
-    if (!user || !user.emailVerified) {
+    if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    if (!user.totpEnabled || !user.totpSecret) {
-      throw new UnauthorizedException('MFA not set up');
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('Email not verified');
     }
 
     if (!user.profileCompleted) {
       throw new UnauthorizedException('Please complete your profile first');
     }
 
-    // Verify TOTP
-    const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
-    const isValid = authenticator.verify({
-      token: totpCode,
-      secret: decryptedSecret,
-    });
+    // If user has MFA enabled, verify TOTP
+    if (user.totpEnabled && user.totpSecret) {
+      if (!totpCode) {
+        throw new UnauthorizedException('MFA code required');
+      }
 
-    if (!isValid) {
-      // Try backup codes
-      const isValidBackup = await this.verifyBackupCode(user.id, totpCode);
-      if (!isValidBackup) {
-        throw new UnauthorizedException('Invalid TOTP code');
+      // Verify TOTP
+      const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
+      const isValid = authenticator.verify({
+        token: totpCode,
+        secret: decryptedSecret,
+      });
+
+      if (!isValid) {
+        // Try backup codes
+        const isValidBackup = await this.verifyBackupCode(user.id, totpCode);
+        if (!isValidBackup) {
+          throw new UnauthorizedException('Invalid TOTP code');
+        }
       }
     }
 

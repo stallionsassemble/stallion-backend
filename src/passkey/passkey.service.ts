@@ -218,7 +218,7 @@ export class PasskeyService {
       // Challenge already deleted by getAndDeleteChallenge
 
       // Generate JWT token
-      return this.authService.generateToken(user);
+      return this.authService.generateTokens(user);
     } catch (error) {
       throw new UnauthorizedException(
         `Failed to verify passkey authentication: ${error.message}`,

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { HackathonStatus } from '@prisma/client';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OwnerGuard } from '../common/guards/owner.guard';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
@@ -70,7 +71,7 @@ export class HackathonsController {
   }
 
   @Post('submissions')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, MFAGuard)
   createSubmission(
     @CurrentUser('id') userId: string,
     @Body() dto: CreateSubmissionDto,

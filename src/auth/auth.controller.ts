@@ -96,8 +96,19 @@ export class AuthController {
     description: 'Email verified successfully',
     schema: {
       example: {
-        userId: 'clx123...',
-        message: 'Email verified successfully. Please set up MFA.',
+        message: 'Email verified successfully.',
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          id: 'clx123...',
+          email: 'user@example.com',
+          username: 'johndoe',
+          firstName: 'John',
+          lastName: 'Doe',
+          name: 'John Doe',
+          role: 'CONTRIBUTOR',
+          profileCompleted: true,
+        },
       },
     },
   })
@@ -139,28 +150,15 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Verify TOTP and get auth tokens',
-    description:
-      'Complete MFA setup by verifying TOTP code and receive authentication tokens',
+    description: 'Complete MFA setup by verifying TOTP code',
   })
   @ApiResponse({
     status: 200,
-    description: 'TOTP verified and tokens generated',
+    description: 'TOTP verified and backup codes generated',
     schema: {
       example: {
         message: 'MFA setup completed successfully',
         backupCodes: ['A1B2C3D4', 'E5F6G7H8', '...'],
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        user: {
-          id: 'clx123...',
-          email: 'user@example.com',
-          username: null,
-          firstName: null,
-          lastName: null,
-          name: 'user@example.com',
-          role: 'CONTRIBUTOR',
-          profileCompleted: false,
-        },
       },
     },
   })
@@ -251,16 +249,16 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Login with email + TOTP',
-    description: 'Authenticate user with email and TOTP code only',
+    summary: 'Login with email and optional TOTP code',
+    description: 'Authenticate user with email and optional TOTP code',
   })
   @ApiResponse({
     status: 200,
     description: 'Login successful',
     schema: {
       example: {
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 'clx123...',
           email: 'user@example.com',
@@ -357,7 +355,7 @@ export class AuthController {
     description: 'Authentication successful',
     schema: {
       example: {
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 'clx123...',
           email: 'user@example.com',
@@ -386,8 +384,8 @@ export class AuthController {
     description: 'Tokens refreshed successfully',
     schema: {
       example: {
-        access_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        refresh_token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
           id: 'clx123...',
           email: 'user@example.com',

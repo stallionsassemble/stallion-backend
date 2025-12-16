@@ -42,7 +42,7 @@ model User {
   backupCodes     String[] @default([]) @map("backup_codes")
   
   // Refresh token
-  refreshToken    String?  @map("refresh_token")
+  refreshToken    String?  @map("refreshToken")
   
   // Verification
   emailVerified   Boolean  @default(false) @map("email_verified")

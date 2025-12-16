@@ -5,6 +5,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { WithdrawDto } from './dto/withdraw.dto';
@@ -67,9 +68,10 @@ export class WalletController {
   }
 
   @Post('withdraw')
+  @UseGuards(MFAGuard)
   @ApiOperation({
     summary: 'Withdraw funds',
-    description: 'Create a withdrawal request from wallet',
+    description: 'Create a withdrawal request from wallet (requires MFA)',
   })
   @ApiResponse({
     status: 201,
@@ -77,6 +79,7 @@ export class WalletController {
   })
   @ApiResponse({ status: 400, description: 'Insufficient balance' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'MFA required' })
   async withdraw(
     @CurrentUser('id') userId: string,
     @Body() withdrawDto: WithdrawDto,

@@ -111,7 +111,7 @@ describe('AuthController', () => {
       };
 
       const expectedResult = {
-        access_token: 'jwt-token',
+        accessToken: 'jwt-token',
         user: mockUser,
       };
 
@@ -222,7 +222,7 @@ describe('AuthController', () => {
       };
 
       const expectedResult = {
-        access_token: 'jwt-token',
+        accessToken: 'jwt-token',
         user: mockUser,
       };
 

@@ -269,7 +269,7 @@ describe('AuthService', () => {
       const result = await service.login(loginDto);
 
       expect(result).toEqual({
-        access_token: 'jwt-token',
+        accessToken: 'jwt-token',
         user: {
           id: mockUser.id,
           email: mockUser.email,
@@ -294,7 +294,7 @@ describe('AuthService', () => {
 
       const result = await service.login(loginWithBackup);
 
-      expect(result).toHaveProperty('access_token');
+      expect(result).toHaveProperty('accessToken');
       expect(mockPrismaService.user.update).toHaveBeenCalled();
     });
 
@@ -356,7 +356,7 @@ describe('AuthService', () => {
       const result = service.generateToken(mockUser);
 
       expect(result).toEqual({
-        access_token: 'jwt-token',
+        accessToken: 'jwt-token',
         user: {
           id: mockUser.id,
           email: mockUser.email,

@@ -1,13 +1,17 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class MFAGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(private prisma: PrismaService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
@@ -15,9 +19,21 @@ export class MFAGuard implements CanActivate {
       throw new UnauthorizedException('User not authenticated');
     }
 
-    // TODO: Phase 3 - Implement real MFA validation
-    // For now, this is a stub that always passes
-    // In Phase 3, check if user has MFA enabled and validate TOTP/passkey
+    // Check if user has MFA enabled
+    const dbUser = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { totpEnabled: true },
+    });
+
+    if (!dbUser) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (!dbUser.totpEnabled) {
+      throw new ForbiddenException(
+        'MFA is required for this operation. Please set up MFA in your settings.',
+      );
+    }
 
     return true;
   }

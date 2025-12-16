@@ -14,7 +14,6 @@ import { PointsModule } from './points/points.module';
 import { QueueModule } from './queues/queue.module';
 import { SettingsModule } from './settings/settings.module';
 import { SorobanModule } from './soroban/soroban.module';
-import { SubmissionsModule } from './submissions/submissions.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { UsersModule } from './users/users.module';
 import { WalletModule } from './wallet/wallet.module';
@@ -30,7 +29,6 @@ import { WalletModule } from './wallet/wallet.module';
     AuthModule,
     PasskeyModule,
     SettingsModule,
-    SubmissionsModule,
     BountiesModule,
     WalletModule,
     TransactionsModule,
