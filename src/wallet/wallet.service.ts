@@ -7,9 +7,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Prisma, TxState, TxType } from '@prisma/client';
 import { Asset } from '@stellar/stellar-sdk';
+import { getSupportedCurrencies } from 'src/bounties/utils/supported-currencies';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import { StellarAccountService } from '../soroban/stellar-account.service';
+import { SUPPORTED_STELLAR_ASSETS } from './assets.config';
 
 @Injectable()
 export class WalletService {
@@ -348,6 +350,25 @@ export class WalletService {
   }
 
   /**
+   * Map currency code to Stellar Asset
+   */
+  private getAssetFromCurrency(currency: string): Asset {
+    const assetConfig = SUPPORTED_STELLAR_ASSETS[currency];
+
+    if (!assetConfig) {
+      throw new BadRequestException(
+        `Unsupported currency: ${currency}. Supported currencies: ${getSupportedCurrencies().join(', ')}`,
+      );
+    }
+
+    if (assetConfig.issuer === 'native') {
+      return Asset.native();
+    }
+
+    return new Asset(assetConfig.code, assetConfig.issuer);
+  }
+
+  /**
    * Process withdrawal by sending funds via Stellar
    */
   private async processWithdrawal(
@@ -357,9 +378,7 @@ export class WalletService {
     currency: string,
   ) {
     try {
-      // Send payment via Stellar
-      // For now, only support native XLM. In production, map currency to Asset
-      const asset = currency === 'XLM' ? Asset.native() : Asset.native();
+      const asset = this.getAssetFromCurrency(currency);
       const txHash = await this.stellarAccount.sendPayment(
         destination,
         amount.toString(),
