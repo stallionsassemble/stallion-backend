@@ -7,6 +7,7 @@ import { BountiesModule } from './bounties/bounties.module';
 import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { ForumModule } from './forum/forum.module';
+import { HackathonsModule } from './hackathons/hackathons.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PasskeyModule } from './passkey/passkey.module';
 import { PointsModule } from './points/points.module';
@@ -39,6 +40,7 @@ import { WalletModule } from './wallet/wallet.module';
     ForumModule,
     ChatModule,
     NotificationsModule,
+    HackathonsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

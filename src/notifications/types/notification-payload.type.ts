@@ -30,6 +30,7 @@ export enum NotificationCategory {
   WALLET = 'wallet',
   BOUNTY = 'bounty',
   FORUM = 'forum',
+  HACKATHON = 'hackathon',
   SYSTEM = 'system',
 }
 
@@ -59,6 +60,12 @@ export const NotificationTypeToCategory: Record<
   THREAD_REPLY: NotificationCategory.FORUM,
   POST_REACTION: NotificationCategory.FORUM,
   THREAD_MENTION: NotificationCategory.FORUM,
+
+  // Hackathon
+  HACKATHON_CREATED: NotificationCategory.HACKATHON,
+  HACKATHON_STARTING_SOON: NotificationCategory.HACKATHON,
+  HACKATHON_SUBMISSION_RECEIVED: NotificationCategory.HACKATHON,
+  HACKATHON_WINNER_ANNOUNCED: NotificationCategory.HACKATHON,
 
   // System
   SYSTEM_ANNOUNCEMENT: NotificationCategory.SYSTEM,

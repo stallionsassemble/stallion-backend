@@ -245,6 +245,10 @@ export class NotificationsService {
       THREAD_REPLY: 'thread-reply',
       POST_REACTION: 'post-reaction',
       THREAD_MENTION: 'thread-mention',
+      HACKATHON_CREATED: 'hackathon-created',
+      HACKATHON_STARTING_SOON: 'hackathon-starting-soon',
+      HACKATHON_SUBMISSION_RECEIVED: 'hackathon-submission-received',
+      HACKATHON_WINNER_ANNOUNCED: 'hackathon-winner-announced',
       SYSTEM_ANNOUNCEMENT: 'system-announcement',
       ACCOUNT_UPDATE: 'account-update',
     };

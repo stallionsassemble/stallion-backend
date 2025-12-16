@@ -7,10 +7,8 @@ import {
   Post,
   Put,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
-import { type RequestUser } from 'src/auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ChatGateway } from './chat.gateway';
@@ -29,14 +27,14 @@ export class ChatController {
   ) {}
 
   @Post('conversations')
-  async createConversation(@Request() req, @Body() dto: CreateConversationDto) {
-    const conversation = await this.chatService.createConversation(
-      req.user.userId,
-      dto,
-    );
+  async createConversation(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateConversationDto,
+  ) {
+    const conversation = await this.chatService.createConversation(userId, dto);
 
     for (const participant of conversation.participants) {
-      if (participant.userId !== req.user.userId) {
+      if (participant.userId !== userId) {
         this.chatGateway.notifyNewConversation(
           participant.userId,
           conversation,
@@ -48,13 +46,13 @@ export class ChatController {
   }
 
   @Get('conversations')
-  getConversations(@CurrentUser() user: RequestUser) {
-    return this.chatService.getConversations(user.id);
+  getConversations(@CurrentUser('id') userId: string) {
+    return this.chatService.getConversations(userId);
   }
 
   @Get('conversations/:id')
-  getConversation(@Param('id') id: string, @CurrentUser() user: RequestUser) {
-    return this.chatService.getConversation(id, user.id);
+  getConversation(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.chatService.getConversation(id, userId);
   }
 
   @Post('conversations/:id/participants')
@@ -63,56 +61,55 @@ export class ChatController {
   }
 
   @Post('conversations/:id/leave')
-  leaveConversation(@Param('id') id: string, @CurrentUser() user: RequestUser) {
-    return this.chatService.leaveConversation(id, user.id);
+  leaveConversation(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.chatService.leaveConversation(id, userId);
   }
 
   @Post('messages')
-  sendMessage(@CurrentUser() user: RequestUser, @Body() dto: SendMessageDto) {
-    return this.chatService.sendMessage(user.id, dto);
+  sendMessage(@CurrentUser('id') userId: string, @Body() dto: SendMessageDto) {
+    return this.chatService.sendMessage(userId, dto);
   }
 
   @Put('messages/:id')
   updateMessage(
     @Param('id') id: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: UpdateMessageDto,
   ) {
-    return this.chatService.updateMessage(id, user.id, dto);
+    return this.chatService.updateMessage(id, userId, dto);
   }
 
   @Delete('messages/:id')
-  deleteMessage(@Param('id') id: string, @CurrentUser() user: RequestUser) {
-    return this.chatService.deleteMessage(id, user.id);
+  deleteMessage(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.chatService.deleteMessage(id, userId);
   }
 
   @Post('conversations/:id/read')
   markAsRead(
     @Param('id') conversationId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() body?: { messageId?: string },
   ) {
-    return this.chatService.markAsRead(
-      conversationId,
-      user.id,
-      body?.messageId,
-    );
+    return this.chatService.markAsRead(conversationId, userId, body?.messageId);
   }
 
   @Get('conversations/:id/unread-count')
   getUnreadCount(
     @Param('id') conversationId: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
   ) {
-    return this.chatService.getUnreadCount(conversationId, user.id);
+    return this.chatService.getUnreadCount(conversationId, userId);
   }
 
   @Get('conversations/:id/search')
   searchMessages(
     @Param('id') conversationId: string,
     @Query('q') query: string,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
   ) {
-    return this.chatService.searchMessages(conversationId, user.id, query);
+    return this.chatService.searchMessages(conversationId, userId, query);
   }
 }

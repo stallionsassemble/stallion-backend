@@ -7,9 +7,9 @@ import {
   Post,
   Put,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RegisterFcmTokenDto } from './dto/register-fcm-token.dto';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
@@ -22,65 +22,71 @@ export class NotificationsController {
 
   @Get()
   getNotifications(
-    @Request() req,
+    @CurrentUser('id') userId: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
     return this.notificationsService.getNotifications(
-      req.user.userId,
+      userId,
       limit ? parseInt(limit, 10) : 50,
       offset ? parseInt(offset, 10) : 0,
     );
   }
 
   @Get('unread-count')
-  getUnreadCount(@Request() req) {
-    return this.notificationsService.getUnreadCount(req.user.userId);
+  getUnreadCount(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getUnreadCount(userId);
   }
 
   @Put(':id/read')
-  markAsRead(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.markAsRead(id, req.user.userId);
+  markAsRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.notificationsService.markAsRead(id, userId);
   }
 
   @Put('read-all')
-  markAllAsRead(@Request() req) {
-    return this.notificationsService.markAllAsRead(req.user.userId);
+  markAllAsRead(@CurrentUser('id') userId: string) {
+    return this.notificationsService.markAllAsRead(userId);
   }
 
   @Delete(':id')
-  deleteNotification(@Param('id') id: string, @Request() req) {
-    return this.notificationsService.deleteNotification(id, req.user.userId);
+  deleteNotification(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.notificationsService.deleteNotification(id, userId);
   }
 
   @Get('settings')
-  getNotificationSettings(@Request() req) {
-    return this.notificationsService.getNotificationSettings(req.user.userId);
+  getNotificationSettings(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getNotificationSettings(userId);
   }
 
   @Put('settings')
   updateNotificationSettings(
-    @Request() req,
+    @CurrentUser('id') userId: string,
     @Body() dto: UpdateNotificationSettingsDto,
   ) {
-    return this.notificationsService.updateNotificationSettings(
-      req.user.userId,
-      dto,
-    );
+    return this.notificationsService.updateNotificationSettings(userId, dto);
   }
 
   @Post('fcm-token')
-  registerFcmToken(@Request() req, @Body() dto: RegisterFcmTokenDto) {
-    return this.notificationsService.registerFcmToken(req.user.userId, dto);
+  registerFcmToken(
+    @CurrentUser('id') userId: string,
+    @Body() dto: RegisterFcmTokenDto,
+  ) {
+    return this.notificationsService.registerFcmToken(userId, dto);
   }
 
   @Delete('fcm-token/:token')
-  removeFcmToken(@Param('token') token: string, @Request() req) {
-    return this.notificationsService.removeFcmToken(token, req.user.userId);
+  removeFcmToken(
+    @Param('token') token: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.notificationsService.removeFcmToken(token, userId);
   }
 
   @Get('fcm-tokens')
-  getUserFcmTokens(@Request() req) {
-    return this.notificationsService.getUserFcmTokens(req.user.userId);
+  getUserFcmTokens(@CurrentUser('id') userId: string) {
+    return this.notificationsService.getUserFcmTokens(userId);
   }
 }

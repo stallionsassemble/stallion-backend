@@ -28,7 +28,6 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestVerificationDto } from './dto/request-verification.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { VerifyTotpDto } from './dto/verify-totp.dto';
-import { type RequestUser } from './interfaces/jwt-payload.interface';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -57,8 +56,8 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getProfile(@CurrentUser() user: RequestUser) {
-    return this.authService.getProfile(user.id);
+  async getProfile(@CurrentUser('id') userId: string) {
+    return this.authService.getProfile(userId);
   }
 
   @Post('request-verification')
@@ -196,10 +195,10 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async completeContributorProfile(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: CompleteContributorProfileDto,
   ) {
-    return this.authService.completeContributorProfile(user.id, dto);
+    return this.authService.completeContributorProfile(userId, dto);
   }
 
   @Post('complete-profile/owner')
@@ -225,10 +224,10 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async completeOwnerProfile(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: CompleteOwnerProfileDto,
   ) {
-    return this.authService.completeOwnerProfile(user.id, dto);
+    return this.authService.completeOwnerProfile(userId, dto);
   }
 
   @Get('check-username/:username')
@@ -297,8 +296,8 @@ export class AuthController {
     description: 'Registration options generated',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getPasskeyRegistrationOptions(@CurrentUser() user: RequestUser) {
-    return this.passkeyService.generateRegistrationOptions(user.id);
+  async getPasskeyRegistrationOptions(@CurrentUser('id') userId: string) {
+    return this.passkeyService.generateRegistrationOptions(userId);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -322,11 +321,11 @@ export class AuthController {
   @ApiResponse({ status: 400, description: 'Invalid passkey response' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async verifyPasskeyRegistration(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: VerifyPasskeyRegistrationDto,
   ) {
     return this.passkeyService.verifyRegistration(
-      user.id,
+      userId,
       dto.response,
       dto.name,
     );
@@ -420,7 +419,7 @@ export class AuthController {
       },
     },
   })
-  async logout(@CurrentUser() user: RequestUser) {
-    return this.authService.logout(user.id);
+  async logout(@CurrentUser('id') userId: string) {
+    return this.authService.logout(userId);
   }
 }

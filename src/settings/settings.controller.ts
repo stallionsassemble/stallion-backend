@@ -14,7 +14,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { type RequestUser } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PasskeyService } from '../passkey/passkey.service';
@@ -49,8 +48,8 @@ export class SettingsController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async listPasskeys(@CurrentUser() user: RequestUser) {
-    return this.passkeyService.getUserPasskeys(user.id);
+  async listPasskeys(@CurrentUser('id') userId: string) {
+    return this.passkeyService.getUserPasskeys(userId);
   }
 
   @Patch('passkeys/:id')
@@ -66,11 +65,11 @@ export class SettingsController {
   @ApiResponse({ status: 400, description: 'Passkey not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async updatePasskeyName(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body('name') name: string,
   ) {
-    return this.passkeyService.updatePasskeyName(user.id, id, name);
+    return this.passkeyService.updatePasskeyName(userId, id, name);
   }
 
   @Delete('passkeys/:id')
@@ -95,9 +94,9 @@ export class SettingsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deletePasskey(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
   ) {
-    return this.passkeyService.deletePasskey(user.id, id);
+    return this.passkeyService.deletePasskey(userId, id);
   }
 }

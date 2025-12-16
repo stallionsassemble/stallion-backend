@@ -18,7 +18,6 @@ import {
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { OwnerGuard } from 'src/common/guards/owner.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-import { type RequestUser } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AdminService } from './admin.service';
@@ -85,8 +84,8 @@ export class BountyController {
     status: 200,
     description: 'List of bounty IDs owned by user',
   })
-  async getMyBounties(@CurrentUser() user: RequestUser) {
-    return this.bountyService.getOwnerBounties(user.id);
+  async getMyBounties(@CurrentUser('id') userId: string) {
+    return this.bountyService.getOwnerBounties(userId);
   }
 
   @Get(':id')
@@ -118,10 +117,10 @@ export class BountyController {
     },
   })
   async createBounty(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: CreateBountyDto,
   ) {
-    return this.bountyService.createBounty(user.id, dto);
+    return this.bountyService.createBounty(userId, dto);
   }
 
   @Put(':id')
@@ -139,11 +138,11 @@ export class BountyController {
     },
   })
   async updateBounty(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body() dto: UpdateBountyDto,
   ) {
-    return this.bountyService.updateBounty(user.id, parseInt(id), dto);
+    return this.bountyService.updateBounty(userId, parseInt(id), dto);
   }
 
   @Delete(':id')
@@ -156,10 +155,10 @@ export class BountyController {
     description: 'Bounty deleted successfully',
   })
   async deleteBounty(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
   ) {
-    return this.bountyService.deleteBounty(user.id, parseInt(id));
+    return this.bountyService.deleteBounty(userId, parseInt(id));
   }
 
   @Post(':id/close')
@@ -180,8 +179,11 @@ export class BountyController {
       },
     },
   })
-  async closeBounty(@CurrentUser() user: RequestUser, @Param('id') id: string) {
-    return this.bountyService.closeBounty(user.id, parseInt(id));
+  async closeBounty(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.bountyService.closeBounty(userId, parseInt(id));
   }
 
   @Post(':id/apply')
@@ -199,11 +201,11 @@ export class BountyController {
     },
   })
   async applyToBounty(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body() dto: ApplyToBountyDto,
   ) {
-    return this.bountyService.applyToBounty(user.id, parseInt(id), dto);
+    return this.bountyService.applyToBounty(userId, parseInt(id), dto);
   }
 
   @Put(':id/submission')
@@ -216,11 +218,11 @@ export class BountyController {
     description: 'Submission updated successfully',
   })
   async updateSubmission(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body() dto: ApplyToBountyDto,
   ) {
-    return this.bountyService.updateSubmission(user.id, parseInt(id), dto);
+    return this.bountyService.updateSubmission(userId, parseInt(id), dto);
   }
 
   @Post(':id/winners')
@@ -238,11 +240,11 @@ export class BountyController {
     },
   })
   async selectWinners(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
     @Body() dto: SelectWinnersDto,
   ) {
-    return this.bountyService.selectWinners(user.id, parseInt(id), dto);
+    return this.bountyService.selectWinners(userId, parseInt(id), dto);
   }
 
   @Get(':id/submissions')
@@ -334,10 +336,10 @@ export class BountyController {
     description: 'Admin updated successfully',
   })
   async updateAdmin(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: { newAdminAddress: string },
   ) {
-    return this.adminService.updateAdmin(user.id, dto.newAdminAddress);
+    return this.adminService.updateAdmin(userId, dto.newAdminAddress);
   }
 
   @Post('admin/update-fee-account')
@@ -350,10 +352,10 @@ export class BountyController {
     description: 'Fee account updated successfully',
   })
   async updateFeeAccount(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() dto: { newFeeAccount: string },
   ) {
-    return this.adminService.updateFeeAccount(user.id, dto.newFeeAccount);
+    return this.adminService.updateFeeAccount(userId, dto.newFeeAccount);
   }
 
   @Get('admin/stats')
@@ -364,8 +366,8 @@ export class BountyController {
     status: 200,
     description: 'Contract statistics',
   })
-  async getContractStats(@CurrentUser() user: RequestUser) {
-    return this.adminService.getContractStats(user.id);
+  async getContractStats(@CurrentUser('id') userId: string) {
+    return this.adminService.getContractStats(userId);
   }
 
   @Get('admin/balance')
@@ -377,8 +379,8 @@ export class BountyController {
     status: 200,
     description: 'Master account balance',
   })
-  async getMasterAccountBalance(@CurrentUser() user: RequestUser) {
-    return this.adminService.getMasterAccountBalance(user.id);
+  async getMasterAccountBalance(@CurrentUser('id') userId: string) {
+    return this.adminService.getMasterAccountBalance(userId);
   }
 
   @Post('admin/emergency-withdraw')
@@ -392,7 +394,7 @@ export class BountyController {
     description: 'Withdrawal successful',
   })
   async emergencyWithdraw(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body()
     dto: {
       destination: string;
@@ -401,7 +403,7 @@ export class BountyController {
     },
   ) {
     return this.adminService.emergencyWithdraw(
-      user.id,
+      userId,
       dto.destination,
       dto.amount,
       dto.memo,
@@ -419,9 +421,9 @@ export class BountyController {
     description: 'Judging checked successfully',
   })
   async checkJudging(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Param('id') id: string,
   ) {
-    return this.adminService.checkJudging(user.id, parseInt(id));
+    return this.adminService.checkJudging(userId, parseInt(id));
   }
 }

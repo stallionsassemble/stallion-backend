@@ -6,7 +6,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { type RequestUser } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
@@ -31,11 +30,11 @@ export class SubmissionsController {
   create(
     @Param('bountyId') bountyId: string,
     @Body() createSubmissionDto: CreateSubmissionDto,
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
   ) {
     return this.submissionsService.create(
       bountyId,
-      user.id,
+      userId,
       createSubmissionDto,
     );
   }

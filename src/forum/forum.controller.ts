@@ -7,10 +7,8 @@ import {
   Post,
   Put,
   Query,
-  Request,
   UseGuards,
 } from '@nestjs/common';
-import { type RequestUser } from 'src/auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AddReactionDto } from './dto/add-reaction.dto';
@@ -43,8 +41,11 @@ export class ForumController {
 
   @Post('threads')
   @UseGuards(JwtAuthGuard)
-  createThread(@CurrentUser() user: RequestUser, @Body() dto: CreateThreadDto) {
-    return this.forumService.createThread(user.id, dto);
+  createThread(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateThreadDto,
+  ) {
+    return this.forumService.createThread(userId, dto);
   }
 
   @Get('threads/search')
@@ -64,44 +65,44 @@ export class ForumController {
   @UseGuards(JwtAuthGuard)
   updateThread(
     @Param('id') id: string,
-    @Request() req,
+    @CurrentUser('id') userId: string,
     @Body() dto: UpdateThreadDto,
   ) {
-    return this.forumService.updateThread(id, req.user.userId, dto);
+    return this.forumService.updateThread(id, userId, dto);
   }
 
   @Delete('threads/:id')
   @UseGuards(JwtAuthGuard)
-  deleteThread(@Param('id') id: string, @Request() req) {
-    return this.forumService.deleteThread(id, req.user.userId);
+  deleteThread(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.forumService.deleteThread(id, userId);
   }
 
   @Post('posts')
   @UseGuards(JwtAuthGuard)
-  createPost(@Request() req, @Body() dto: CreatePostDto) {
-    return this.forumService.createPost(req.user.userId, dto);
+  createPost(@CurrentUser('id') userId: string, @Body() dto: CreatePostDto) {
+    return this.forumService.createPost(userId, dto);
   }
 
   @Put('posts/:id')
   @UseGuards(JwtAuthGuard)
   updatePost(
     @Param('id') id: string,
-    @Request() req,
+    @CurrentUser('id') userId: string,
     @Body() dto: UpdatePostDto,
   ) {
-    return this.forumService.updatePost(id, req.user.userId, dto);
+    return this.forumService.updatePost(id, userId, dto);
   }
 
   @Delete('posts/:id')
   @UseGuards(JwtAuthGuard)
-  deletePost(@Param('id') id: string, @Request() req) {
-    return this.forumService.deletePost(id, req.user.userId);
+  deletePost(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.forumService.deletePost(id, userId);
   }
 
   @Post('reactions')
   @UseGuards(JwtAuthGuard)
-  addReaction(@CurrentUser() user: RequestUser, @Body() dto: AddReactionDto) {
-    return this.forumService.addReaction(user.id, dto);
+  addReaction(@CurrentUser('id') userId: string, @Body() dto: AddReactionDto) {
+    return this.forumService.addReaction(userId, dto);
   }
 
   @Get('tags')

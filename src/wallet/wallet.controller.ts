@@ -5,7 +5,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { type RequestUser } from '../auth/interfaces/jwt-payload.interface';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { WithdrawDto } from './dto/withdraw.dto';
@@ -26,8 +25,8 @@ export class WalletController {
   @ApiResponse({ status: 200, description: 'Wallet details' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Wallet not found' })
-  async getWallet(@CurrentUser() user: RequestUser) {
-    return this.walletService.getWalletByUserId(user.id);
+  async getWallet(@CurrentUser('id') userId: string) {
+    return this.walletService.getWalletByUserId(userId);
   }
 
   @Get('balance')
@@ -38,8 +37,8 @@ export class WalletController {
   @ApiResponse({ status: 200, description: 'Wallet balance' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Wallet not found' })
-  async getBalance(@CurrentUser() user: RequestUser) {
-    const wallet = await this.walletService.getWalletByUserId(user.id);
+  async getBalance(@CurrentUser('id') userId: string) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.getWalletBalance(wallet.id);
   }
 
@@ -50,8 +49,8 @@ export class WalletController {
   })
   @ApiResponse({ status: 200, description: 'Deposit address details' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getDepositAddress(@CurrentUser() user: RequestUser) {
-    const wallet = await this.walletService.getWalletByUserId(user.id);
+  async getDepositAddress(@CurrentUser('id') userId: string) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.getDepositAddress(wallet.memoId);
   }
 
@@ -62,8 +61,8 @@ export class WalletController {
   })
   @ApiResponse({ status: 200, description: 'List of transactions' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async getTransactions(@CurrentUser() user: RequestUser) {
-    const wallet = await this.walletService.getWalletByUserId(user.id);
+  async getTransactions(@CurrentUser('id') userId: string) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.getTransactions(wallet.id);
   }
 
@@ -79,10 +78,10 @@ export class WalletController {
   @ApiResponse({ status: 400, description: 'Insufficient balance' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async withdraw(
-    @CurrentUser() user: RequestUser,
+    @CurrentUser('id') userId: string,
     @Body() withdrawDto: WithdrawDto,
   ) {
-    const wallet = await this.walletService.getWalletByUserId(user.id);
+    const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.createWithdrawal(
       wallet.id,
       withdrawDto.amount,
