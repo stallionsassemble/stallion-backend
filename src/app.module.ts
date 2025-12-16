@@ -7,6 +7,7 @@ import { BountiesModule } from './bounties/bounties.module';
 import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { ForumModule } from './forum/forum.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { PasskeyModule } from './passkey/passkey.module';
 import { PointsModule } from './points/points.module';
 import { QueueModule } from './queues/queue.module';
@@ -37,6 +38,7 @@ import { WalletModule } from './wallet/wallet.module';
     SorobanModule,
     ForumModule,
     ChatModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

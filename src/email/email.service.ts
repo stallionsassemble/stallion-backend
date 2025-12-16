@@ -90,6 +90,98 @@ export class EmailService {
   }
 
   /**
+   * Send generic email with template
+   * Used by notification system
+   */
+  async sendEmail(
+    to: string,
+    subject: string,
+    template: string,
+    context: any,
+  ): Promise<void> {
+    try {
+      const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
+      const appUrl =
+        this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+
+      // Generate HTML based on template and context
+      const html = this.generateEmailHtml(template, context, appName, appUrl);
+
+      await this.transporter.sendMail({
+        from: `"${appName}" <${this.configService.get<string>('SMTP_FROM')}>`,
+        to,
+        subject,
+        html,
+      });
+
+      this.logger.log(`Email sent to ${to} with template: ${template}`);
+    } catch (error) {
+      this.logger.error(`Failed to send email to ${to}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate email HTML from template and context
+   */
+  private generateEmailHtml(
+    template: string,
+    context: any,
+    appName: string,
+    appUrl: string,
+  ): string {
+    // For now, use a simple template system
+    // In production, you might want to use a proper template engine like Handlebars
+    const { name, title, message, data } = context;
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>${title || 'Notification'}</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">${appName}</h1>
+          </div>
+          
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Hi ${name || 'there'}! 👋</h2>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="color: #667eea; margin-top: 0;">${title}</h3>
+              <p style="color: #555; margin: 0;">${message}</p>
+            </div>
+            
+            ${
+              data
+                ? `
+            <div style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <p style="color: #666; font-size: 14px; margin: 0;">Additional details available in your dashboard.</p>
+            </div>
+            `
+                : ''
+            }
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${appUrl}/notifications" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View in Dashboard</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              © ${new Date().getFullYear()} ${appName}. All rights reserved.<br>
+              <a href="${appUrl}/notifications/settings" style="color: #667eea; text-decoration: none;">Manage notification preferences</a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
    * Verification code email template
    */
   private getVerificationEmailTemplate(

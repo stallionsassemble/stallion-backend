@@ -16,7 +16,10 @@ import { UpdateMessageDto } from './dto/update-message.dto';
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService?: any,
+  ) {}
 
   async createConversation(userId: string, dto: CreateConversationDto) {
     if (

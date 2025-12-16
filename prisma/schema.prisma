@@ -68,6 +68,11 @@ model User {
   conversationParticipants ConversationParticipant[]
   messages                 Message[]
   messageReadReceipts      MessageReadReceipt[]
+  
+  // Notification relations
+  notifications        Notification[]
+  notificationSettings NotificationSettings?
+  fcmTokens            FcmToken[]
 
   @@index([role])
   @@index([createdAt])
@@ -503,4 +508,105 @@ enum MessageType {
   IMAGE
   FILE
   SYSTEM
+}
+
+// ============================================
+// NOTIFICATION MODELS
+// ============================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  isRead    Boolean          @default(false) @map("is_read")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@index([userId, type])
+  @@map("notifications")
+}
+
+model NotificationSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Chat notifications
+  chatInApp   Boolean @default(true) @map("chat_in_app")
+  chatEmail   Boolean @default(true) @map("chat_email")
+  
+  // Wallet notifications
+  walletInApp Boolean @default(true) @map("wallet_in_app")
+  walletEmail Boolean @default(true) @map("wallet_email")
+  
+  // Bounty notifications
+  bountyInApp Boolean @default(true) @map("bounty_in_app")
+  bountyEmail Boolean @default(true) @map("bounty_email")
+  
+  // Forum notifications
+  forumInApp  Boolean @default(true) @map("forum_in_app")
+  forumEmail  Boolean @default(false) @map("forum_email")
+  
+  // System notifications
+  systemInApp Boolean @default(true) @map("system_in_app")
+  systemEmail Boolean @default(true) @map("system_email")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("notification_settings")
+}
+
+model FcmToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  deviceId  String?  @map("device_id")
+  platform  String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("fcm_tokens")
+}
+
+// ============================================
+// NOTIFICATION ENUMS
+// ============================================
+
+enum NotificationType {
+  // Chat notifications
+  NEW_MESSAGE
+  NEW_CONVERSATION
+  MENTION
+  
+  // Wallet notifications
+  DEPOSIT_RECEIVED
+  WITHDRAWAL_COMPLETED
+  WITHDRAWAL_FAILED
+  
+  // Bounty notifications
+  BOUNTY_CREATED
+  SUBMISSION_RECEIVED
+  SUBMISSION_APPROVED
+  SUBMISSION_REJECTED
+  BOUNTY_WINNER
+  PAYOUT_RECEIVED
+  
+  // Forum notifications
+  THREAD_REPLY
+  POST_REACTION
+  THREAD_MENTION
+  
+  // System notifications
+  SYSTEM_ANNOUNCEMENT
+  ACCOUNT_UPDATE
 }
