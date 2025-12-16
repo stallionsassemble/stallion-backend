@@ -36,7 +36,7 @@ model User {
   // Profile completion status
   profileCompleted Boolean @default(false) @map("profile_completed")
   
-  // MFA fields (required - cannot be disabled)
+  // MFA fields
   totpSecret      String?  @map("totp_secret")
   totpEnabled     Boolean  @default(false) @map("totp_enabled")
   backupCodes     String[] @default([]) @map("backup_codes")
@@ -58,6 +58,16 @@ model User {
   winners     BountyWinner[]
   bounties    Bounty[]
   passkeys    Passkey[]
+  
+  // Forum relations
+  forumThreads   ForumThread[]
+  forumPosts     ForumPost[]
+  forumReactions ForumReaction[]
+  
+  // Chat relations
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
+  messageReadReceipts      MessageReadReceipt[]
 
   @@index([role])
   @@index([createdAt])
@@ -285,4 +295,212 @@ enum BountyStatus {
   ACTIVE
   COMPLETED
   CLOSED
+}
+
+// ============================================
+// FORUM MODELS
+// ============================================
+
+model ForumCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  threads ForumThread[]
+
+  @@index([slug])
+  @@index([order])
+  @@map("forum_categories")
+}
+
+model ForumThread {
+  id          String       @id @default(cuid())
+  title       String
+  slug        String       @unique
+  isPinned    Boolean      @default(false) @map("is_pinned")
+  isLocked    Boolean      @default(false) @map("is_locked")
+  viewCount   Int          @default(0) @map("view_count")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  categoryId  String       @map("category_id")
+  category    ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  authorId    String       @map("author_id")
+  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  posts       ForumPost[]
+  tags        ForumThreadTag[]
+
+  @@index([categoryId, isPinned, updatedAt(sort: Desc)])
+  @@index([authorId])
+  @@index([slug])
+  @@index([createdAt(sort: Desc)])
+  @@map("forum_threads")
+}
+
+model ForumPost {
+  id        String   @id @default(cuid())
+  content   String
+  isEdited  Boolean  @default(false) @map("is_edited")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  threadId  String   @map("thread_id")
+  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  authorId  String   @map("author_id")
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  reactions ForumReaction[]
+
+  @@index([threadId, createdAt])
+  @@index([authorId])
+  @@map("forum_posts")
+}
+
+model ForumReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  postId    String   @map("post_id")
+  post      ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId, emoji])
+  @@index([postId])
+  @@index([userId])
+  @@map("forum_reactions")
+}
+
+model ForumTag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  color     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  threads   ForumThreadTag[]
+
+  @@index([slug])
+  @@map("forum_tags")
+}
+
+model ForumThreadTag {
+  threadId  String      @map("thread_id")
+  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  
+  tagId     String      @map("tag_id")
+  tag       ForumTag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, tagId])
+  @@map("forum_thread_tags")
+}
+
+// ============================================
+// CHAT MODELS
+// ============================================
+
+model Conversation {
+  id            String           @id @default(cuid())
+  type          ConversationType @default(DIRECT)
+  name          String?
+  avatar        String?
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@index([type])
+  @@index([updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  id              String       @id @default(cuid())
+  role            ParticipantRole @default(MEMBER)
+  lastReadAt      DateTime?    @map("last_read_at")
+  joinedAt        DateTime     @default(now()) @map("joined_at")
+  leftAt          DateTime?    @map("left_at")
+  
+  conversationId  String       @map("conversation_id")
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  userId          String       @map("user_id")
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+  @@map("conversation_participants")
+}
+
+model Message {
+  id              String       @id @default(cuid())
+  content         String
+  type            MessageType  @default(TEXT)
+  attachments     Json?
+  isEdited        Boolean      @default(false) @map("is_edited")
+  isDeleted       Boolean      @default(false) @map("is_deleted")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  conversationId  String       @map("conversation_id")
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  senderId        String       @map("sender_id")
+  sender          User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  readReceipts    MessageReadReceipt[]
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(cuid())
+  readAt    DateTime @default(now()) @map("read_at")
+
+  messageId String   @map("message_id")
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("message_read_receipts")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  SYSTEM
 }

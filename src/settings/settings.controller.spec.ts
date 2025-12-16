@@ -58,7 +58,9 @@ describe('SettingsController', () => {
       const result = await controller.listPasskeys(mockUser as any);
 
       expect(result).toEqual(passkeys);
-      expect(mockPasskeyService.getUserPasskeys).toHaveBeenCalledWith(mockUser.id);
+      expect(mockPasskeyService.getUserPasskeys).toHaveBeenCalledWith(
+        mockUser.id,
+      );
     });
 
     it('should return empty array if user has no passkeys', async () => {

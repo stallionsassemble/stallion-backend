@@ -4,7 +4,9 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { BountiesModule } from './bounties/bounties.module';
+import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { ForumModule } from './forum/forum.module';
 import { PasskeyModule } from './passkey/passkey.module';
 import { PointsModule } from './points/points.module';
 import { QueueModule } from './queues/queue.module';
@@ -33,6 +35,8 @@ import { WalletModule } from './wallet/wallet.module';
     PointsModule,
     QueueModule,
     SorobanModule,
+    ForumModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

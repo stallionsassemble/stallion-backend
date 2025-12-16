@@ -357,7 +357,9 @@ export class WalletService {
 
     if (!assetConfig) {
       throw new BadRequestException(
-        `Unsupported currency: ${currency}. Supported currencies: ${getSupportedCurrencies().join(', ')}`,
+        `Unsupported currency: ${currency}. Supported currencies: ${getSupportedCurrencies()
+          .map((c) => c.code)
+          .join(', ')}`,
       );
     }
 
