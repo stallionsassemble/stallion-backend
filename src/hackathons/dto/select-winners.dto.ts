@@ -14,7 +14,7 @@ class WinnerDto {
   userId: string;
 }
 
-export class SelectWinnersDto {
+export class HackathonSelectWinnersDto {
   @IsString()
   trackId: string;
 

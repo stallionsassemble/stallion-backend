@@ -6,5 +6,6 @@ import { StellarAccountService } from './stellar-account.service';
 @Module({
   imports: [ConfigModule, KmsModule],
   providers: [StellarAccountService],
+  exports: [StellarAccountService],
 })
 export class SorobanModule {}

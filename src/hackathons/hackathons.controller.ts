@@ -17,7 +17,7 @@ import { OwnerGuard } from '../common/guards/owner.guard';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { JudgeSubmissionDto } from './dto/judge-submission.dto';
-import { SelectWinnersDto } from './dto/select-winners.dto';
+import { HackathonSelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
 import { UpdateSubmissionDto } from './dto/update-submission.dto';
 import { HackathonsService } from './hackathons.service';
@@ -127,7 +127,7 @@ export class HackathonsController {
   selectWinners(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
-    @Body() dto: SelectWinnersDto,
+    @Body() dto: HackathonSelectWinnersDto,
   ) {
     return this.hackathonsService.selectWinners(id, userId, dto);
   }

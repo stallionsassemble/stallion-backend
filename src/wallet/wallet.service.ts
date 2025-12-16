@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, TxState, TxType } from '@prisma/client';
 import { Asset } from '@stellar/stellar-sdk';
 import { getSupportedCurrencies } from 'src/bounties/utils/supported-currencies';
+import { QueueService } from 'src/queues/queue.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import { StellarAccountService } from '../soroban/stellar-account.service';
@@ -22,6 +23,7 @@ export class WalletService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private stellarAccount: StellarAccountService,
+    private queueService: QueueService,
   ) {
     this.masterAccountAddress = this.configService.get<string>(
       'MASTER_ACCOUNT_PUBLIC_KEY',
@@ -95,16 +97,31 @@ export class WalletService {
         `Created withdrawal transaction ${transaction.id} with lock ${lock.id}`,
       );
 
-      // Process withdrawal immediately (in production, queue this in BullMQ)
-      await this.processWithdrawal(
-        transaction.id,
-        destination,
-        amount,
-        currency,
-      );
-
       return transaction;
     });
+  }
+
+  async queueWithdrawal(
+    transactionId: string,
+    destination: string,
+    amount: number,
+    currency: string,
+    walletId: string,
+    lockId?: string,
+  ) {
+    // Queue withdrawal for processing
+    await this.queueService.addWithdrawalJob(
+      transactionId,
+      destination,
+      amount,
+      currency,
+      walletId,
+      lockId,
+    );
+
+    this.logger.log(`Queued withdrawal ${transactionId} for processing`);
+
+    return { transactionId, queued: true };
   }
 
   async createWallet(memoId: string) {

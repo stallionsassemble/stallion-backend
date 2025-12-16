@@ -11,23 +11,49 @@ export class QueueService {
     @InjectQueue('notification') private notificationQueue: Queue,
   ) {}
 
-  async addWithdrawalJob(transactionId: string, data: Record<string, unknown>) {
+  async addWithdrawalJob(
+    transactionId: string,
+    destination: string,
+    amount: number,
+    currency: string,
+    walletId: string,
+    lockId?: string,
+  ) {
     return this.withdrawalQueue.add('process-withdrawal', {
       transactionId,
-      ...data,
+      destination,
+      amount,
+      currency,
+      walletId,
+      lockId,
     });
   }
 
-  async addPayoutJob(bountyId: string, winnerId: string, amount: number) {
+  async addPayoutJob(
+    winnerId: string,
+    amount: number,
+    currency: string,
+    position: number,
+    type: 'bounty' | 'hackathon',
+    bountyId?: string,
+    hackathonId?: string,
+  ) {
     return this.payoutQueue.add('process-payout', {
-      bountyId,
       winnerId,
       amount,
+      currency,
+      position,
+      type,
+      bountyId,
+      hackathonId,
     });
   }
 
-  async addDepositReconciliationJob(data: Record<string, unknown>) {
-    return this.depositQueue.add('reconcile-deposit', data);
+  async addDepositReconciliationJob(cursor?: string, limit?: number) {
+    return this.depositQueue.add('reconcile-deposit', {
+      cursor,
+      limit,
+    });
   }
 
   async addNotificationJob(userId: string, message: string, type: string) {

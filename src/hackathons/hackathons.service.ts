@@ -14,7 +14,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { JudgeSubmissionDto } from './dto/judge-submission.dto';
-import { SelectWinnersDto } from './dto/select-winners.dto';
+import { HackathonSelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
 import { UpdateSubmissionDto } from './dto/update-submission.dto';
 
@@ -581,7 +581,7 @@ export class HackathonsService {
   async selectWinners(
     hackathonId: string,
     ownerId: string,
-    dto: SelectWinnersDto,
+    dto: HackathonSelectWinnersDto,
   ) {
     const hackathon = await this.prisma.hackathon.findUnique({
       where: { id: hackathonId },
