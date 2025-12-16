@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ReputationService } from '../reputation/reputation.service';
 import { AddReactionDto } from './dto/add-reaction.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -17,7 +18,10 @@ import { UpdateThreadDto } from './dto/update-thread.dto';
 export class ForumService {
   private readonly logger = new Logger(ForumService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private reputationService: ReputationService,
+  ) {}
 
   async createCategory(dto: CreateCategoryDto) {
     const existing = await this.prisma.forumCategory.findUnique({
@@ -328,6 +332,17 @@ export class ForumService {
       where: { id: dto.threadId },
       data: { updatedAt: new Date() },
     });
+
+    // Award reputation for forum post
+    try {
+      await this.reputationService.addReputation(userId, 'FORUM_POST', {
+        threadId: dto.threadId,
+        threadTitle: thread.title,
+        postId: post.id,
+      });
+    } catch (error) {
+      this.logger.error('Failed to add reputation for forum post', error);
+    }
 
     return post;
   }

@@ -12,6 +12,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PasskeyModule } from './passkey/passkey.module';
 import { PointsModule } from './points/points.module';
 import { QueueModule } from './queues/queue.module';
+import { ReputationModule } from './reputation/reputation.module';
 import { SettingsModule } from './settings/settings.module';
 import { SorobanModule } from './soroban/soroban.module';
 import { TransactionsModule } from './transactions/transactions.module';
@@ -34,6 +35,7 @@ import { WalletModule } from './wallet/wallet.module';
     TransactionsModule,
     PointsModule,
     QueueModule,
+    ReputationModule,
     SorobanModule,
     ForumModule,
     ChatModule,

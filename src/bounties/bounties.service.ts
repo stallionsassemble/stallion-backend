@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { BountyStatus, Prisma, type Bounty } from '@prisma/client';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
+import { ReputationService } from 'src/reputation/reputation.service';
 import { PrismaService } from '../common/prisma/prisma.service';
 import type { Status } from '../soroban/contract-bindings';
 import {
@@ -48,6 +49,7 @@ export class BountiesService {
     private stellarAccount: StellarAccountService,
     private configService: ConfigService,
     private walletService: WalletService,
+    private reputationService: ReputationService,
   ) {
     this.contractId = this.configService.get<string>('SOROBAN_CONTRACT_ID')!;
     const network = this.configService.get<string>('SOROBAN_NETWORK')!;
@@ -584,6 +586,23 @@ export class BountiesService {
         },
       });
 
+      // Award reputation for bounty submission
+      try {
+        await this.reputationService.addReputation(
+          userId,
+          'BOUNTY_SUBMISSION',
+          {
+            bountyId: bounty.id,
+            bountyTitle: bounty.title,
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          'Failed to add reputation for bounty submission',
+          error,
+        );
+      }
+
       this.logger.log(
         `User ${userId} applied to bounty ${bountyId}, tx: ${sendResponse.hash}`,
       );
@@ -785,6 +804,30 @@ export class BountiesService {
 
             this.logger.log(
               `Credited ${payoutAmount} ${currency} to winner ${winner.id} (position ${position})`,
+            );
+          }
+
+          // Award reputation based on position
+          try {
+            let reputationAction = 'BOUNTY_WIN_FIRST';
+            if (position === 2) reputationAction = 'BOUNTY_WIN_SECOND';
+            else if (position === 3) reputationAction = 'BOUNTY_WIN_THIRD';
+
+            await this.reputationService.addReputation(
+              winner.id,
+              reputationAction,
+              {
+                bountyId: dbBounty!.id,
+                bountyTitle: dbBounty!.title,
+                position,
+                reward: payoutAmount,
+                currency,
+              },
+            );
+          } catch (error) {
+            this.logger.error(
+              `Failed to add reputation for winner ${winner.id}`,
+              error,
             );
           }
         }

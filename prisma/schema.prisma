@@ -54,6 +54,7 @@ model User {
   wallet      Wallet?            @relation(fields: [walletId], references: [id], onDelete: Restrict)
   walletId    String?            @unique @map("wallet_id")
   userPoints  UserPoint?
+  reputation  UserReputation?
   submissions BountySubmission[]
   winners     BountyWinner[]
   bounties    Bounty[]
@@ -139,6 +140,57 @@ model Point {
   @@index([userPointId, createdAt(sort: Desc)])
   @@index([action])
   @@map("points")
+}
+
+model UserReputation {
+  id                String              @id @default(cuid())
+  score             Int                 @default(0) // Overall reputation score
+  level             ReputationLevel     @default(NEWCOMER)
+  
+  // Reputation breakdown
+  bountyScore       Int                 @default(0) @map("bounty_score")
+  hackathonScore    Int                 @default(0) @map("hackathon_score")
+  communityScore    Int                 @default(0) @map("community_score")
+  
+  // Statistics
+  totalBounties     Int                 @default(0) @map("total_bounties")
+  wonBounties       Int                 @default(0) @map("won_bounties")
+  totalHackathons   Int                 @default(0) @map("total_hackathons")
+  wonHackathons     Int                 @default(0) @map("won_hackathons")
+  forumPosts        Int                 @default(0) @map("forum_posts")
+  helpfulVotes      Int                 @default(0) @map("helpful_votes")
+  
+  // Badges
+  badges            String[]            @default([])
+  
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  createdAt         DateTime            @default(now()) @map("created_at")
+
+  // Relations
+  userId            String              @unique @map("user_id")
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history           ReputationHistory[]
+
+  @@index([score(sort: Desc)])
+  @@index([level])
+  @@map("user_reputations")
+}
+
+model ReputationHistory {
+  id          String   @id @default(cuid())
+  change      Int      // Positive or negative change
+  reason      String
+  category    ReputationCategory
+  metadata    Json?    // Additional context
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  reputationId String         @map("reputation_id")
+  reputation   UserReputation @relation(fields: [reputationId], references: [id], onDelete: Cascade)
+
+  @@index([reputationId, createdAt(sort: Desc)])
+  @@index([category])
+  @@map("reputation_history")
 }
 
 model Bounty {
@@ -787,4 +839,24 @@ enum HackathonSubmissionStatus {
   APPROVED
   REJECTED
   DISQUALIFIED
+}
+
+enum ReputationLevel {
+  NEWCOMER      // 0-99
+  CONTRIBUTOR   // 100-499
+  REGULAR       // 500-999
+  VETERAN       // 1000-2499
+  EXPERT        // 2500-4999
+  MASTER        // 5000-9999
+  LEGEND        // 10000+
+}
+
+enum ReputationCategory {
+  BOUNTY
+  HACKATHON
+  COMMUNITY
+  FORUM
+  QUALITY
+  CONSISTENCY
+  BADGE
 }

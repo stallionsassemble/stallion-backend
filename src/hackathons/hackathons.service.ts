@@ -11,6 +11,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ReputationService } from '../reputation/reputation.service';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { JudgeSubmissionDto } from './dto/judge-submission.dto';
@@ -22,7 +23,10 @@ import { UpdateSubmissionDto } from './dto/update-submission.dto';
 export class HackathonsService {
   private readonly logger = new Logger(HackathonsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private reputationService: ReputationService,
+  ) {}
 
   async createHackathon(ownerId: string, dto: CreateHackathonDto) {
     // Validate dates
@@ -415,6 +419,25 @@ export class HackathonsService {
       },
     });
 
+    // Award reputation for hackathon submission
+    try {
+      await this.reputationService.addReputation(
+        userId,
+        'HACKATHON_SUBMISSION',
+        {
+          hackathonId: dto.hackathonId,
+          hackathonTitle: hackathon.title,
+          trackId: dto.trackId,
+          trackName: track.name,
+        },
+      );
+    } catch (error) {
+      this.logger.error(
+        'Failed to add reputation for hackathon submission',
+        error,
+      );
+    }
+
     this.logger.log(
       `Submission created: ${submission.id} by ${userId} for hackathon ${dto.hackathonId}`,
     );
@@ -667,6 +690,31 @@ export class HackathonsService {
           submission: true,
         },
       });
+
+      // Award reputation based on position
+      try {
+        let reputationAction = 'HACKATHON_WIN_FIRST';
+        if (i + 1 === 2) reputationAction = 'HACKATHON_WIN_SECOND';
+        else if (i + 1 === 3) reputationAction = 'HACKATHON_WIN_THIRD';
+
+        await this.reputationService.addReputation(
+          winnerData.userId,
+          reputationAction,
+          {
+            hackathonId,
+            hackathonTitle: hackathon.title,
+            trackId: dto.trackId,
+            trackName: track.name,
+            position: i + 1,
+            prizeAmount,
+          },
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to add reputation for winner ${winnerData.userId}`,
+          error,
+        );
+      }
 
       winners.push(winner);
     }
