@@ -4,23 +4,49 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
-  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RegisterFcmTokenDto } from './dto/register-fcm-token.dto';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { NotificationsService } from './notifications.service';
 
+@ApiTags('Notifications')
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth('JWT-auth')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Get notifications',
+    description: 'Retrieve user notifications with pagination',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of notifications to retrieve (default: 50)',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Offset for pagination (default: 0)',
+  })
+  @ApiResponse({ status: 200, description: 'List of notifications' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getNotifications(
     @CurrentUser('id') userId: string,
     @Query('limit') limit?: string,
@@ -34,21 +60,52 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
+  @ApiOperation({
+    summary: 'Get unread count',
+    description: 'Get the number of unread notifications',
+  })
+  @ApiResponse({ status: 200, description: 'Unread notification count' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUnreadCount(userId);
   }
 
-  @Put(':id/read')
+  @Patch(':id/read')
+  @ApiOperation({
+    summary: 'Mark as read',
+    description: 'Mark a notification as read',
+  })
+  @ApiParam({ name: 'id', description: 'Notification ID' })
+  @ApiResponse({ status: 200, description: 'Notification marked as read' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Notification not found' })
   markAsRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.notificationsService.markAsRead(id, userId);
   }
 
-  @Put('read-all')
+  @Patch('read-all')
+  @ApiOperation({
+    summary: 'Mark all as read',
+    description: 'Mark all notifications as read',
+  })
+  @ApiResponse({ status: 200, description: 'All notifications marked as read' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   markAllAsRead(@CurrentUser('id') userId: string) {
     return this.notificationsService.markAllAsRead(userId);
   }
 
   @Delete(':id')
+  @ApiOperation({
+    summary: 'Delete notification',
+    description: 'Delete a specific notification',
+  })
+  @ApiParam({ name: 'id', description: 'Notification ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification deleted successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Notification not found' })
   deleteNotification(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
@@ -57,11 +114,23 @@ export class NotificationsController {
   }
 
   @Get('settings')
+  @ApiOperation({
+    summary: 'Get notification settings',
+    description: 'Retrieve user notification preferences',
+  })
+  @ApiResponse({ status: 200, description: 'Notification settings' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getNotificationSettings(@CurrentUser('id') userId: string) {
     return this.notificationsService.getNotificationSettings(userId);
   }
 
-  @Put('settings')
+  @Patch('settings')
+  @ApiOperation({
+    summary: 'Update notification settings',
+    description: 'Update user notification preferences',
+  })
+  @ApiResponse({ status: 200, description: 'Settings updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateNotificationSettings(
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateNotificationSettingsDto,
@@ -70,6 +139,16 @@ export class NotificationsController {
   }
 
   @Post('fcm-token')
+  @ApiOperation({
+    summary: 'Register FCM token',
+    description:
+      'Register a Firebase Cloud Messaging token for push notifications',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'FCM token registered successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   registerFcmToken(
     @CurrentUser('id') userId: string,
     @Body() dto: RegisterFcmTokenDto,
@@ -78,6 +157,13 @@ export class NotificationsController {
   }
 
   @Delete('fcm-token/:token')
+  @ApiOperation({
+    summary: 'Remove FCM token',
+    description: 'Remove a Firebase Cloud Messaging token',
+  })
+  @ApiParam({ name: 'token', description: 'FCM token to remove' })
+  @ApiResponse({ status: 200, description: 'FCM token removed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   removeFcmToken(
     @Param('token') token: string,
     @CurrentUser('id') userId: string,
@@ -86,6 +172,12 @@ export class NotificationsController {
   }
 
   @Get('fcm-tokens')
+  @ApiOperation({
+    summary: 'Get FCM tokens',
+    description: 'Retrieve all registered FCM tokens for the user',
+  })
+  @ApiResponse({ status: 200, description: 'List of FCM tokens' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getUserFcmTokens(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUserFcmTokens(userId);
   }

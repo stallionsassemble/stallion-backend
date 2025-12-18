@@ -5,8 +5,8 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
-  Put,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -124,7 +124,7 @@ export class BountyController {
     return this.bountyService.createBounty(userId, dto);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
@@ -210,7 +210,7 @@ export class BountyController {
     return this.bountyService.applyToBounty(userId, parseInt(id), dto);
   }
 
-  @Put(':id/submission')
+  @Patch(':id/submission')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
