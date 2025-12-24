@@ -27,6 +27,7 @@ import {
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestVerificationDto } from './dto/request-verification.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
+import { VerifyLoginCodeDto } from './dto/verify-login-code.dto';
 import { VerifyTotpDto } from './dto/verify-totp.dto';
 
 @ApiTags('Authentication')
@@ -60,10 +61,10 @@ export class AuthController {
     return this.authService.getProfile(userId);
   }
 
-  @Post('request-verification')
+  @Post('signup/request-verification')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Request email verification code',
+    summary: 'Request email verification code for signup',
     description:
       'Start registration by requesting a 6-digit verification code sent to email',
   })
@@ -84,12 +85,12 @@ export class AuthController {
     return this.authService.requestVerification(dto);
   }
 
-  @Post('verify-code')
+  @Post('signup/verify-code')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Verify email code',
+    summary: 'Verify email code for signup',
     description:
-      'Verify the 6-digit code sent to email to confirm email ownership',
+      'Verify the 6-digit code sent to email during signup to confirm email ownership',
   })
   @ApiResponse({
     status: 200,
@@ -102,12 +103,8 @@ export class AuthController {
         user: {
           id: 'clx123...',
           email: 'user@example.com',
-          username: 'johndoe',
-          firstName: 'John',
-          lastName: 'Doe',
-          name: 'John Doe',
           role: 'CONTRIBUTOR',
-          profileCompleted: true,
+          profileCompleted: false,
         },
       },
     },
@@ -116,14 +113,14 @@ export class AuthController {
     status: 401,
     description: 'Invalid or expired verification code',
   })
-  async verifyCode(@Body() dto: VerifyCodeDto) {
-    return this.authService.verifyCode(dto);
+  async verifySignupCode(@Body() dto: VerifyCodeDto) {
+    return this.authService.verifySignupCode(dto);
   }
 
-  @Post('setup-mfa/:userId')
+  @Post('signup/setup-mfa/:userId')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Setup MFA',
+    summary: 'Setup MFA during signup',
     description:
       'Generate TOTP secret and QR code for MFA setup after email verification',
   })
@@ -146,11 +143,11 @@ export class AuthController {
     return this.authService.setupMfa(userId);
   }
 
-  @Post('verify-totp/:userId')
+  @Post('signup/verify-totp/:userId')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Verify TOTP and get auth tokens',
-    description: 'Complete MFA setup by verifying TOTP code',
+    summary: 'Verify TOTP during signup',
+    description: 'Complete MFA setup by verifying TOTP code during signup',
   })
   @ApiResponse({
     status: 200,
@@ -170,7 +167,7 @@ export class AuthController {
     return this.authService.verifyTotpSetup(userId, verifyTotpDto.code);
   }
 
-  @Post('complete-profile/contributor')
+  @Post('signup/complete-profile/contributor')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -199,7 +196,7 @@ export class AuthController {
     return this.authService.completeContributorProfile(userId, dto);
   }
 
-  @Post('complete-profile/owner')
+  @Post('signup/complete-profile/owner')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -249,14 +246,41 @@ export class AuthController {
   @Post('login')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Login with email and optional TOTP code',
-    description: 'Authenticate user with email and optional TOTP code',
+    summary: 'Login - Step 1',
+    description:
+      'Initiate login by providing email. A verification code will be sent to your email.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Verification code sent',
+    schema: {
+      example: {
+        message: 'Verification code sent to your email',
+        requiresVerification: true,
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials',
+  })
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto.email);
+  }
+
+  @Post('login/verify-code')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Login - Step 2',
+    description:
+      'Verify email code to complete login. If MFA is enabled, also provide TOTP code.',
   })
   @ApiResponse({
     status: 200,
     description: 'Login successful',
     schema: {
       example: {
+        message: 'Login successful.',
         accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
         user: {
@@ -274,11 +298,10 @@ export class AuthController {
   })
   @ApiResponse({
     status: 401,
-    description:
-      'Invalid credentials, MFA not set up, or profile not completed',
+    description: 'Invalid verification code or TOTP code',
   })
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto.email, loginDto.totpCode);
+  async verifyLoginCode(@Body() dto: VerifyLoginCodeDto) {
+    return this.authService.verifyLoginCode(dto.email, dto.code, dto.totpCode);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -27,148 +27,134 @@ export class DepositReconcilerWorker extends WorkerHost {
   }
 
   async process(job: Job<DepositReconciliationJobData>): Promise<any> {
-    const { cursor, limit = 100 } = job.data;
+    const { cursor, limit = 50 } = job.data;
 
     this.logger.log(
-      `Processing deposit reconciliation (cursor: ${cursor || 'latest'}, limit: ${limit})`,
+      `Processing deposit reconciliation for individual wallets (cursor: ${cursor || 'none'}, limit: ${limit})`,
     );
 
     try {
-      const masterPublicKey = this.stellarAccount.getMasterPublicKey();
       const server = this.stellarAccount.getServer();
 
-      // 1. Query Stellar for incoming payments
-      let paymentsBuilder = server
-        .payments()
-        .forAccount(masterPublicKey)
-        .order('desc')
-        .limit(limit);
+      const wallets = await this.prisma.wallet.findMany({
+        where: {
+          isActivated: true,
+        },
+        include: { users: true },
+        take: limit,
+      });
 
-      if (cursor) {
-        paymentsBuilder = paymentsBuilder.cursor(cursor);
-      }
-
-      const paymentsResponse = await paymentsBuilder.call();
-      const payments = paymentsResponse.records;
-
-      this.logger.log(`Found ${payments.length} payment records`);
+      this.logger.log(`Monitoring ${wallets.length} active wallets`);
 
       let processedCount = 0;
       let skippedCount = 0;
       let errorCount = 0;
+      let lastCursor: string | undefined;
 
-      // 2. Process each payment
-      for (const payment of payments) {
-        // Only process payment operations
-        if (payment.type !== Horizon.HorizonApi.OperationResponseType.payment) {
-          continue;
-        }
-
-        const paymentOp =
-          payment as Horizon.HorizonApi.PaymentOperationResponse;
-
-        // Skip if payment is from master account (outgoing)
-        if (paymentOp.from === masterPublicKey) {
-          continue;
-        }
-
-        // Skip if payment is not to master account
-        if (paymentOp.to !== masterPublicKey) {
-          continue;
-        }
-
+      for (const wallet of wallets) {
         try {
-          // Get transaction details for memo
-          const txResponse = await server
-            .transactions()
-            .transaction(paymentOp.transaction_hash)
-            .call();
-          const memo = txResponse.memo;
+          let paymentsBuilder = server
+            .payments()
+            .forAccount(wallet.publicKey)
+            .order('desc')
+            .limit(10);
 
-          if (!memo) {
-            this.logger.warn(`Payment ${payment.id} has no memo, skipping`);
-            skippedCount++;
-            continue;
+          // Use cursor if provided to continue from last position
+          if (cursor) {
+            paymentsBuilder = paymentsBuilder.cursor(cursor);
           }
 
-          // 3. Match memo to wallet
-          const wallet = await this.prisma.wallet.findUnique({
-            where: { memoId: memo },
-            include: { users: true },
-          });
+          const paymentsResponse = await paymentsBuilder.call();
+          const payments = paymentsResponse.records;
 
-          if (!wallet) {
-            this.logger.warn(
-              `No wallet found for memo ${memo}, skipping payment ${payment.id}`,
-            );
-            skippedCount++;
-            continue;
+          // Track the latest cursor for next run
+          if (payments.length > 0 && !lastCursor) {
+            lastCursor = payments[0].paging_token;
           }
 
-          // Check if already processed
-          const existingTx = await this.prisma.transaction.findFirst({
-            where: {
-              externalTxId: txResponse.hash,
-            },
-          });
+          for (const payment of payments) {
+            if (
+              payment.type !== Horizon.HorizonApi.OperationResponseType.payment
+            ) {
+              continue;
+            }
 
-          if (existingTx) {
-            this.logger.debug(
-              `Payment ${txResponse.hash} already processed, skipping`,
-            );
-            skippedCount++;
-            continue;
-          }
+            const paymentOp =
+              payment as Horizon.HorizonApi.PaymentOperationResponse;
 
-          // 4. Calculate amount (convert from XLM to stroops equivalent)
-          const amount = parseFloat(paymentOp.amount);
-          const currency =
-            paymentOp.asset_type === 'native'
-              ? 'XLM'
-              : paymentOp.asset_code || 'UNKNOWN';
+            if (paymentOp.to !== wallet.publicKey) {
+              continue;
+            }
 
-          // 5. Process deposit
-          const transaction = await this.walletService.processDeposit(
-            txResponse.hash,
-            wallet.id,
-            amount,
-            currency,
-          );
-
-          this.logger.log(
-            `Processed deposit ${txResponse.hash}: ${amount} ${currency} to wallet ${wallet.id}`,
-          );
-
-          // 6. Send notification to user
-          if (wallet.users.length > 0) {
             try {
-              for (const user of wallet.users) {
-                await this.notificationsService.sendNotification({
-                  userId: user.id,
-                  type: 'DEPOSIT_RECEIVED',
-                  title: 'Deposit Received',
-                  message: `You received ${amount} ${currency}`,
-                  data: {
-                    amount: amount.toString(),
-                    currency,
-                    transactionId: transaction.id,
-                    txHash: txResponse.hash,
-                  },
-                });
+              const txResponse = await server
+                .transactions()
+                .transaction(paymentOp.transaction_hash)
+                .call();
+
+              const existingTx = await this.prisma.transaction.findFirst({
+                where: {
+                  externalTxId: txResponse.hash,
+                },
+              });
+
+              if (existingTx) {
+                skippedCount++;
+                continue;
               }
+
+              const amount = parseFloat(paymentOp.amount);
+              const currency =
+                paymentOp.asset_type === 'native'
+                  ? 'XLM'
+                  : paymentOp.asset_code || 'UNKNOWN';
+
+              const transaction = await this.walletService.processDeposit(
+                txResponse.hash,
+                wallet.id,
+                amount,
+                currency,
+              );
+
+              this.logger.log(
+                `Processed deposit ${txResponse.hash}: ${amount} ${currency} to wallet ${wallet.publicKey}`,
+              );
+
+              if (wallet.users.length > 0) {
+                try {
+                  for (const user of wallet.users) {
+                    await this.notificationsService.sendNotification({
+                      userId: user.id,
+                      type: 'DEPOSIT_RECEIVED',
+                      title: 'Deposit Received',
+                      message: `You received ${amount} ${currency}`,
+                      data: {
+                        amount: amount.toString(),
+                        currency,
+                        transactionId: transaction.id,
+                        txHash: txResponse.hash,
+                      },
+                    });
+                  }
+                } catch (error) {
+                  this.logger.error(
+                    `Failed to send notification for deposit ${txResponse.hash}: ${error.message}`,
+                  );
+                }
+              }
+
+              processedCount++;
             } catch (error) {
               this.logger.error(
-                `Failed to send notification for deposit ${txResponse.hash}: ${error.message}`,
+                `Failed to process payment ${payment.id}: ${error.message}`,
+                error.stack,
               );
-              // Don't fail the entire reconciliation if notification fails
+              errorCount++;
             }
           }
-
-          processedCount++;
         } catch (error) {
           this.logger.error(
-            `Failed to process payment ${payment.id}: ${error.message}`,
-            error.stack,
+            `Failed to check wallet ${wallet.publicKey}: ${error.message}`,
           );
           errorCount++;
         }
@@ -178,18 +164,12 @@ export class DepositReconcilerWorker extends WorkerHost {
         `Deposit reconciliation completed: ${processedCount} processed, ${skippedCount} skipped, ${errorCount} errors`,
       );
 
-      // Return the cursor for the next run
-      const nextCursor =
-        payments.length > 0
-          ? payments[payments.length - 1].paging_token
-          : cursor;
-
       return {
         success: true,
         processedCount,
         skippedCount,
         errorCount,
-        nextCursor,
+        nextCursor: lastCursor,
       };
     } catch (error) {
       this.logger.error(

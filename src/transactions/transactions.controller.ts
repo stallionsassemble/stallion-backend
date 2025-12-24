@@ -60,6 +60,41 @@ export class TransactionsController {
   @ApiResponse({
     status: 200,
     description: 'Transaction history retrieved successfully',
+    schema: {
+      example: {
+        transactions: [
+          {
+            id: 'clx123abc...',
+            type: 'DEPOSIT',
+            amount: '100.00',
+            currency: 'USDC',
+            state: 'COMPLETED',
+            externalTxId: 'stellar_tx_hash_123',
+            note: 'Deposit from Stellar wallet',
+            metadata: { source: 'stellar' },
+            createdAt: '2025-01-15T10:30:00.000Z',
+            updatedAt: '2025-01-15T10:31:00.000Z',
+            walletId: 'clx456def...',
+          },
+          {
+            id: 'clx789ghi...',
+            type: 'PAYOUT',
+            amount: '50.00',
+            currency: 'USDC',
+            state: 'COMPLETED',
+            externalTxId: null,
+            note: 'Bounty payout',
+            metadata: { bountyId: 'clx999...' },
+            createdAt: '2025-01-14T15:20:00.000Z',
+            updatedAt: '2025-01-14T15:20:00.000Z',
+            walletId: 'clx456def...',
+          },
+        ],
+        total: 25,
+        limit: 50,
+        offset: 0,
+      },
+    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User wallet not found' })
@@ -91,7 +126,39 @@ export class TransactionsController {
       'Retrieve detailed transaction information (only for transactions in your wallet)',
   })
   @ApiParam({ name: 'id', description: 'Transaction ID' })
-  @ApiResponse({ status: 200, description: 'Transaction found' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transaction found',
+    schema: {
+      example: {
+        id: 'clx123abc...',
+        type: 'DEPOSIT',
+        amount: '100.00',
+        currency: 'USDC',
+        state: 'COMPLETED',
+        externalTxId: 'stellar_tx_hash_123',
+        idempotencyKey: 'unique_key_123',
+        note: 'Deposit from Stellar wallet',
+        metadata: { source: 'stellar' },
+        createdAt: '2025-01-15T10:30:00.000Z',
+        updatedAt: '2025-01-15T10:31:00.000Z',
+        walletId: 'clx456def...',
+        wallet: {
+          id: 'clx456def...',
+          publicKey: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+          balance: '150.00',
+          isActivated: true,
+          createdAt: '2025-01-01T00:00:00.000Z',
+          updatedAt: '2025-01-15T10:31:00.000Z',
+          users: [
+            {
+              id: 'clx789user...',
+            },
+          ],
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - not your transaction' })
   @ApiResponse({ status: 404, description: 'Transaction not found' })

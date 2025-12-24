@@ -16,7 +16,7 @@ import {
   networks,
   Client as SorobanClient,
 } from '../soroban/contract-bindings';
-import { StellarAccountService } from '../soroban/stellar-account.service';
+import { WalletSigningService } from '../wallet/wallet-signing.service';
 import { WalletService } from '../wallet/wallet.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
@@ -46,10 +46,10 @@ export class BountiesService {
 
   constructor(
     private prisma: PrismaService,
-    private stellarAccount: StellarAccountService,
     private configService: ConfigService,
     private walletService: WalletService,
     private reputationService: ReputationService,
+    private walletSigning: WalletSigningService,
   ) {
     this.contractId = this.configService.get<string>('SOROBAN_CONTRACT_ID')!;
     const network = this.configService.get<string>('SOROBAN_NETWORK')!;
@@ -57,6 +57,9 @@ export class BountiesService {
 
     // Initialize Soroban RPC server
     this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
+    this.logger.log(
+      'BountiesService initialized with individual wallet signing',
+    );
     this.networkPassphrase =
       networks[network as keyof typeof networks].networkPassphrase;
 
@@ -124,7 +127,7 @@ export class BountiesService {
       }
 
       const tx = await this.sorobanClient.get_owner_bounties({
-        owner: user.wallet.memoId,
+        owner: user.wallet.publicKey,
       });
 
       const result = await tx.simulate();
@@ -293,17 +296,15 @@ export class BountiesService {
       // Calculate total amount needed (reward + 5% fee)
       const rewardAmount = BigInt(dto.reward);
       const feeAmount = (rewardAmount * BigInt(5)) / BigInt(100);
-      const totalAmount = rewardAmount + feeAmount;
+      const totalRequired = rewardAmount + feeAmount;
 
-      // Verify user has sent funds to master account
-      const paymentTxHash = await this.stellarAccount.verifyPaymentReceived(
-        user.wallet.memoId,
-        totalAmount.toString(),
-      );
+      // Check if user has sufficient balance on Stellar network
+      const balance = await this.walletService.getWalletBalance(user.wallet.id);
+      const balanceInStroops = BigInt(Math.floor(balance.balance * 10000000));
 
-      if (!paymentTxHash) {
+      if (balanceInStroops < totalRequired) {
         throw new BadRequestException(
-          `Please send ${totalAmount.toString()} stroops to master account with memo: ${user.wallet.memoId}`,
+          `Insufficient balance. Required: ${Number(totalRequired) / 10000000} ${dto.rewardCurrency}, Available: ${balance.balance} ${dto.rewardCurrency}`,
         );
       }
 
@@ -326,7 +327,7 @@ export class BountiesService {
 
       // Create bounty on contract
       const tx = await this.sorobanClient.create_bounty({
-        owner: user.wallet.memoId, // Use wallet memo as owner identifier
+        owner: user.wallet.publicKey,
         token: tokenAddress,
         reward: rewardAmount,
         distribution,
@@ -337,14 +338,16 @@ export class BountiesService {
         title: dto.title,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign with user's wallet and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      const signedTx = await this.walletSigning.signTransaction(
+        user.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
 
@@ -433,7 +436,7 @@ export class BountiesService {
         : undefined;
 
       const tx = await this.sorobanClient.update_bounty({
-        owner: user.wallet.memoId,
+        owner: user.wallet.publicKey,
         bounty_id: bountyId,
         new_title: dto.title || undefined,
         new_distribution: distribution,
@@ -442,14 +445,16 @@ export class BountiesService {
           : undefined,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign with user's wallet and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      const signedTx = await this.walletSigning.signTransaction(
+        user.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
 
@@ -497,18 +502,20 @@ export class BountiesService {
       }
 
       const tx = await this.sorobanClient.delete_bounty({
-        owner: user.wallet.memoId,
+        owner: user.wallet.publicKey,
         bounty_id: bountyId,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign with user's wallet and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      const signedTx = await this.walletSigning.signTransaction(
+        user.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
 
@@ -560,19 +567,21 @@ export class BountiesService {
       validateSubmissionData(dto.submissionData, submissionFields);
 
       const tx = await this.sorobanClient.apply_to_bounty({
-        applicant: user.wallet.memoId,
+        applicant: user.wallet.publicKey,
         bounty_id: bountyId,
         submission_link: dto.submissionLink,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign with user's wallet and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      const signedTx = await this.walletSigning.signTransaction(
+        user.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
 
@@ -663,19 +672,21 @@ export class BountiesService {
         existingSubmission?.submissionLink !== dto.submissionLink
       ) {
         const tx = await this.sorobanClient.update_submission({
-          applicant: user.wallet.memoId,
+          applicant: user.wallet.publicKey,
           bounty_id: bountyId,
           new_submission_link: dto.submissionLink,
         });
 
-        // Prepare, sign with Vault and send transaction
+        // Prepare, sign with user's wallet and send transaction
         const preparedTx = await tx.simulate();
         const builtTx = StellarSDK.TransactionBuilder.fromXDR(
           preparedTx.toXDR(),
           this.networkPassphrase,
         ) as StellarSDK.Transaction;
-        const signedTx =
-          await this.stellarAccount.signTransactionWithVault(builtTx);
+        const signedTx = await this.walletSigning.signTransaction(
+          user.wallet.id,
+          builtTx,
+        );
 
         const sendResponse = await this.rpcServer.sendTransaction(signedTx);
         txHash = sendResponse.hash;
@@ -732,20 +743,47 @@ export class BountiesService {
         throw new ForbiddenException('You do not own this bounty');
       }
 
-      const tx = await this.sorobanClient.select_winners({
-        owner: user.wallet.memoId,
-        bounty_id: bountyId,
-        winners: dto.winners,
+      // Fetch winner users and their public keys
+      const winnerUsers = await this.prisma.user.findMany({
+        where: {
+          id: { in: dto.winners },
+        },
+        include: { wallet: true },
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Validate all winners have wallets
+      const missingWallets = dto.winners.filter(
+        (winnerId) => !winnerUsers.find((u) => u.id === winnerId)?.wallet,
+      );
+
+      if (missingWallets.length > 0) {
+        throw new BadRequestException(
+          `Winners with IDs ${missingWallets.join(', ')} do not have wallets`,
+        );
+      }
+
+      // Extract public keys in the same order as winner IDs
+      const winnerPublicKeys = dto.winners.map((winnerId) => {
+        const winner = winnerUsers.find((u) => u.id === winnerId);
+        return winner!.wallet!.publicKey;
+      });
+
+      const tx = await this.sorobanClient.select_winners({
+        owner: user.wallet.publicKey,
+        bounty_id: bountyId,
+        winners: winnerPublicKeys,
+      });
+
+      // Prepare, sign with user's wallet and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      const signedTx = await this.walletSigning.signTransaction(
+        user.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
 
@@ -768,15 +806,12 @@ export class BountiesService {
       const totalReward = Number(dbBounty!.reward);
       const currency = dbBounty!.rewardCurrency || 'XLM';
 
-      for (const winnerMemoId of dto.winners) {
-        // Find user by wallet memo
-        const winner = await this.prisma.user.findFirst({
-          where: { wallet: { memoId: winnerMemoId } },
-          include: { wallet: true },
-        });
+      for (const winnerId of dto.winners) {
+        // Find user from already fetched winners
+        const winner = winnerUsers.find((u) => u.id === winnerId);
 
         if (winner && winner.wallet) {
-          const position = dto.winners.indexOf(winnerMemoId) + 1;
+          const position = dto.winners.indexOf(winnerId) + 1;
 
           // Create winner record
           await this.prisma.bountyWinner.create({
@@ -884,18 +919,20 @@ export class BountiesService {
       }
 
       const tx = await this.sorobanClient.close_bounty({
-        owner: user.wallet.memoId,
+        owner: user.wallet.publicKey,
         bounty_id: bountyId,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign with user's wallet and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      const signedTx = await this.walletSigning.signTransaction(
+        user.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
 

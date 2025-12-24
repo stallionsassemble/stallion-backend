@@ -39,7 +39,7 @@ export class CompleteContributorProfileDto {
   @ApiProperty({ example: ['JavaScript', 'TypeScript', 'React'] })
   skills: string[];
 
-  @IsUrl()
+  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
   @ApiProperty({ example: 'http://localhost:3000/uploads/images/profile.jpg' })
   profilePicture: string;
 

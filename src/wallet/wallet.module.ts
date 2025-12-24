@@ -1,21 +1,30 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { QueueModule } from 'src/queues/queue.module';
+import { BullModule } from '@nestjs/bullmq';
+import { Module } from '@nestjs/common';
 import { KmsModule } from '../common/kms/kms.module';
 import { PrismaModule } from '../common/prisma/prisma.module';
-import { StellarAccountService } from '../soroban/stellar-account.service';
+import { SorobanModule } from '../soroban/soroban.module';
+import { StellarWalletService } from './stellar-wallet.service';
+import { WalletEncryptionService } from './wallet-encryption.service';
+import { WalletSigningService } from './wallet-signing.service';
 import { WalletController } from './wallet.controller';
 import { WalletService } from './wallet.service';
 
 @Module({
   imports: [
     PrismaModule,
-    forwardRef(() => QueueModule),
-    ConfigModule,
+    SorobanModule,
     KmsModule,
+    BullModule.registerQueue({
+      name: 'withdrawal',
+    }),
   ],
   controllers: [WalletController],
-  providers: [WalletService, StellarAccountService],
-  exports: [WalletService],
+  providers: [
+    WalletService,
+    WalletEncryptionService,
+    StellarWalletService,
+    WalletSigningService,
+  ],
+  exports: [WalletService, StellarWalletService, WalletSigningService],
 })
 export class WalletModule {}

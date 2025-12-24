@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import {
   Asset,
   Horizon,
-  Memo,
   Networks,
   Operation,
   Transaction,
@@ -101,43 +100,7 @@ export class StellarAccountService implements OnModuleInit {
     return this.networkPassphrase;
   }
 
-  /**
-   * Check if user has sent funds to the master account with correct memo
-   */
-  async verifyPaymentReceived(
-    memoId: string,
-    expectedAmount: string,
-  ): Promise<string | null> {
-    try {
-      const payments = await this.server
-        .payments()
-        .forAccount(this.masterPublicKey)
-        .order('desc')
-        .limit(100)
-        .call();
-
-      for (const payment of payments.records) {
-        if (payment.type !== Horizon.HorizonApi.OperationResponseType.payment)
-          continue;
-
-        const txResponse = await payment.transaction();
-        if (txResponse.memo !== memoId) continue;
-
-        const stroops = BigInt(
-          Math.floor(parseFloat(payment.amount) * 10000000),
-        ).toString();
-
-        if (stroops === expectedAmount) {
-          return payment.transaction_hash;
-        }
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.error('Failed to verify payment', error);
-      return null;
-    }
-  }
+  // Removed verifyPaymentReceived - no longer needed with individual wallet architecture
 
   /**
    * Send payment (Vault signs the transaction)
@@ -146,7 +109,6 @@ export class StellarAccountService implements OnModuleInit {
     destination: string,
     amount: string,
     asset: Asset = Asset.native(),
-    memo?: string,
   ): Promise<string> {
     try {
       const account = await this.server.loadAccount(this.masterPublicKey);
@@ -163,10 +125,6 @@ export class StellarAccountService implements OnModuleInit {
           amount: (parseInt(amount) / 10000000).toString(),
         }),
       );
-
-      if (memo) {
-        txBuilder = txBuilder.addMemo(Memo.text(memo));
-      }
 
       const tx = txBuilder.setTimeout(30).build();
 

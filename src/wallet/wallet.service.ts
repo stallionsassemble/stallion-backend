@@ -1,34 +1,27 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { Prisma, TxState, TxType } from '@prisma/client';
-import { Asset } from '@stellar/stellar-sdk';
-import { getSupportedCurrencies } from 'src/bounties/utils/supported-currencies';
-import { QueueService } from 'src/queues/queue.service';
+import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import { StellarAccountService } from '../soroban/stellar-account.service';
-import { SUPPORTED_STELLAR_ASSETS } from './assets.config';
+import { StellarWalletService } from './stellar-wallet.service';
 
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
-  private readonly masterAccountAddress: string;
 
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService,
     private stellarAccount: StellarAccountService,
-    private queueService: QueueService,
-  ) {
-    this.masterAccountAddress = this.configService.get<string>(
-      'MASTER_ACCOUNT_PUBLIC_KEY',
-    )!;
-  }
+    private stellarWallet: StellarWalletService,
+    @InjectQueue('withdrawal') private withdrawalQueue: Queue,
+  ) {}
 
   async getWalletByUserId(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -110,27 +103,22 @@ export class WalletService {
     lockId?: string,
   ) {
     // Queue withdrawal for processing
-    await this.queueService.addWithdrawalJob(
+    await this.withdrawalQueue.add('process-withdrawal', {
       transactionId,
       destination,
       amount,
       currency,
       walletId,
       lockId,
-    );
+    });
 
     this.logger.log(`Queued withdrawal ${transactionId} for processing`);
 
     return { transactionId, queued: true };
   }
 
-  async createWallet(memoId: string) {
-    return this.prisma.wallet.create({
-      data: {
-        memoId,
-        balance: 0,
-      },
-    });
+  async createWallet() {
+    return this.stellarWallet.createWallet();
   }
 
   async getAvailableBalance(walletId: string): Promise<number> {
@@ -140,6 +128,15 @@ export class WalletService {
 
     if (!wallet) {
       throw new NotFoundException('Wallet not found');
+    }
+
+    // Fetch balance from Stellar network
+    const onChainBalance = await this.stellarAccount.getAccountBalance(
+      wallet.publicKey,
+    );
+
+    if (onChainBalance === null) {
+      return 0;
     }
 
     // Calculate pending withdrawals and payouts
@@ -156,9 +153,9 @@ export class WalletService {
       },
     });
 
-    const pendingAmount = pendingTransactions._sum.amount || 0;
-    const balance = Number(wallet.balance);
-    const available = balance - Number(pendingAmount);
+    const pendingAmount = Number(pendingTransactions._sum.amount || 0);
+    const balance = parseFloat(onChainBalance);
+    const available = balance - pendingAmount;
 
     return Math.max(0, available);
   }
@@ -220,17 +217,7 @@ export class WalletService {
         },
       });
 
-      // Update wallet balance atomically
-      await tx.wallet.update({
-        where: { id: walletId },
-        data: {
-          balance: {
-            increment: amount,
-          },
-        },
-      });
-
-      // Mark transaction as completed
+      // Mark transaction as completed (balance tracked on Stellar network)
       await tx.transaction.update({
         where: { id: transaction.id },
         data: {
@@ -274,38 +261,20 @@ export class WalletService {
     position: number,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      // Create payout transaction
+      // Create payout transaction (balance tracked on Stellar network)
       const transaction = await tx.transaction.create({
         data: {
           walletId,
           type: TxType.PAYOUT,
           amount,
           currency,
-          state: TxState.PENDING,
+          state: TxState.COMPLETED,
           idempotencyKey: generateIdempotencyKey(),
           note: `Bounty reward - Position ${position}`,
           metadata: {
             bountyId,
             position,
           } as Prisma.InputJsonValue,
-        },
-      });
-
-      // Update wallet balance atomically
-      await tx.wallet.update({
-        where: { id: walletId },
-        data: {
-          balance: {
-            increment: amount,
-          },
-        },
-      });
-
-      // Mark transaction as completed
-      await tx.transaction.update({
-        where: { id: transaction.id },
-        data: {
-          state: TxState.COMPLETED,
         },
       });
 
@@ -329,21 +298,50 @@ export class WalletService {
       throw new NotFoundException('Wallet not found');
     }
 
-    const availableBalance = await this.getAvailableBalance(walletId);
+    // Fetch balance from Stellar network
+    const onChainBalance = await this.stellarAccount.getAccountBalance(
+      wallet.publicKey,
+    );
+
+    if (onChainBalance === null) {
+      throw new NotFoundException(
+        'Wallet not found on Stellar network. Please fund your wallet first.',
+      );
+    }
+
+    // Calculate available balance (on-chain balance minus pending transactions)
+    const pendingTransactions = await this.prisma.transaction.aggregate({
+      where: {
+        walletId,
+        state: TxState.PENDING,
+        type: {
+          in: [TxType.WITHDRAWAL, TxType.PAYOUT],
+        },
+      },
+      _sum: {
+        amount: true,
+      },
+    });
+
+    const pendingAmount = Number(pendingTransactions._sum.amount || 0);
+    const availableBalance = Math.max(
+      0,
+      parseFloat(onChainBalance) - pendingAmount,
+    );
 
     return {
-      balance: Number(wallet.balance),
+      balance: parseFloat(onChainBalance),
       availableBalance,
       currency: 'XLM', // Default to XLM for now
     };
   }
 
   /**
-   * Get wallet by memo ID
+   * Get wallet by public key
    */
-  async getWalletByMemoId(memoId: string) {
+  async getWalletByPublicKey(publicKey: string) {
     const wallet = await this.prisma.wallet.findUnique({
-      where: { memoId },
+      where: { publicKey },
     });
 
     if (!wallet) {
@@ -356,99 +354,20 @@ export class WalletService {
   /**
    * Get deposit address for funding wallet
    */
-  async getDepositAddress(memoId: string) {
+  async getDepositAddress(walletId: string) {
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: walletId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
     return {
-      address: this.masterAccountAddress,
-      memo: memoId,
-      memoType: 'text',
+      address: wallet.publicKey,
       instructions:
-        'Send XLM or supported tokens to this address with the memo to credit your wallet',
+        'Send XLM or supported tokens directly to this address to fund your wallet',
+      activated: wallet.isActivated,
     };
-  }
-
-  /**
-   * Map currency code to Stellar Asset
-   */
-  private getAssetFromCurrency(currency: string): Asset {
-    const assetConfig = SUPPORTED_STELLAR_ASSETS[currency];
-
-    if (!assetConfig) {
-      throw new BadRequestException(
-        `Unsupported currency: ${currency}. Supported currencies: ${getSupportedCurrencies()
-          .map((c) => c.code)
-          .join(', ')}`,
-      );
-    }
-
-    if (assetConfig.issuer === 'native') {
-      return Asset.native();
-    }
-
-    return new Asset(assetConfig.code, assetConfig.issuer);
-  }
-
-  /**
-   * Process withdrawal by sending funds via Stellar
-   */
-  private async processWithdrawal(
-    transactionId: string,
-    destination: string,
-    amount: number,
-    currency: string,
-  ) {
-    try {
-      const asset = this.getAssetFromCurrency(currency);
-      const txHash = await this.stellarAccount.sendPayment(
-        destination,
-        amount.toString(),
-        asset,
-      );
-
-      // Update transaction state
-      await this.prisma.transaction.update({
-        where: { id: transactionId },
-        data: {
-          state: TxState.COMPLETED,
-          externalTxId: txHash,
-        },
-      });
-
-      // Deduct from wallet balance
-      const transaction = await this.prisma.transaction.findUnique({
-        where: { id: transactionId },
-      });
-
-      if (transaction) {
-        await this.prisma.wallet.update({
-          where: { id: transaction.walletId },
-          data: {
-            balance: {
-              decrement: amount,
-            },
-          },
-        });
-
-        // Release lock
-        const metadata = transaction.metadata as { lockId?: string };
-        if (metadata?.lockId) {
-          await this.releaseLedgerLock(metadata.lockId);
-        }
-      }
-
-      this.logger.log(
-        `Withdrawal ${transactionId} completed with tx hash ${txHash}`,
-      );
-    } catch (error) {
-      // Mark transaction as failed
-      await this.prisma.transaction.update({
-        where: { id: transactionId },
-        data: {
-          state: TxState.FAILED,
-        },
-      });
-
-      this.logger.error(`Withdrawal ${transactionId} failed: ${error}`, error);
-      throw error;
-    }
   }
 }

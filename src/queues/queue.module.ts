@@ -1,22 +1,23 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { EmailModule } from 'src/email/email.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PointsModule } from 'src/points/points.module';
 import { SorobanModule } from 'src/soroban/soroban.module';
 import { WalletModule } from 'src/wallet/wallet.module';
-import { QueueService } from './queue.service';
 import { DepositReconcilerWorker } from './workers/deposit-reconciler.worker';
-import { PayoutWorker } from './workers/payout.worker';
+import { EmailWorker } from './workers/email.worker';
 import { WithdrawalWorker } from './workers/withdrawal.worker';
 
 @Module({
   imports: [
     ConfigModule,
-    PointsModule,
-    SorobanModule,
-    NotificationsModule,
     forwardRef(() => WalletModule),
+    forwardRef(() => NotificationsModule),
+    forwardRef(() => EmailModule),
+    SorobanModule,
+    PointsModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -28,18 +29,18 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
       inject: [ConfigService],
     }),
     BullModule.registerQueue(
-      { name: 'withdrawal' },
-      { name: 'payout' },
-      { name: 'deposit-reconciler' },
-      { name: 'notification' },
+      {
+        name: 'withdrawal',
+      },
+      {
+        name: 'deposit-reconciler',
+      },
+      {
+        name: 'email',
+      },
     ),
   ],
-  providers: [
-    QueueService,
-    WithdrawalWorker,
-    PayoutWorker,
-    DepositReconcilerWorker,
-  ],
-  exports: [QueueService],
+  providers: [WithdrawalWorker, DepositReconcilerWorker, EmailWorker],
+  exports: [BullModule],
 })
 export class QueueModule {}

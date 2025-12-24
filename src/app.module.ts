@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { BountiesModule } from './bounties/bounties.module';
 import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { CronModule } from './cron/cron.module';
 import { ForumModule } from './forum/forum.module';
 import { HackathonsModule } from './hackathons/hackathons.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -16,6 +17,7 @@ import { ReputationModule } from './reputation/reputation.module';
 import { SettingsModule } from './settings/settings.module';
 import { SorobanModule } from './soroban/soroban.module';
 import { TransactionsModule } from './transactions/transactions.module';
+import { UploadModule } from './upload/upload.module';
 import { UsersModule } from './users/users.module';
 import { WalletModule } from './wallet/wallet.module';
 
@@ -41,6 +43,8 @@ import { WalletModule } from './wallet/wallet.module';
     ChatModule,
     NotificationsModule,
     HackathonsModule,
+    UploadModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [AppService],

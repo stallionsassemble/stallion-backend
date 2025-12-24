@@ -5,7 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
@@ -15,6 +15,7 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { EncryptionUtil } from '../common/utils/encryption.util';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
+import { WalletService } from '../wallet/wallet.service';
 import { CompleteContributorProfileDto } from './dto/complete-contributor-profile.dto';
 import { CompleteOwnerProfileDto } from './dto/complete-owner-profile.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -31,6 +32,7 @@ export class AuthService {
     private jwtService: JwtService,
     private emailService: EmailService,
     private verificationCodeStorage: VerificationCodeStorageService,
+    private walletService: WalletService,
   ) {}
 
   async getProfile(userId: string) {
@@ -85,10 +87,12 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        name: fullName,
+        ...(user.profileCompleted && {
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          name: fullName,
+        }),
         role: user.role,
         profileCompleted: user.profileCompleted,
       },
@@ -183,9 +187,9 @@ export class AuthService {
   }
 
   /**
-   * Verify email signup code
+   * Verify email code for signup
    */
-  async verifyCode(
+  async verifySignupCode(
     dto: VerifyCodeDto,
   ): Promise<
     Awaited<ReturnType<typeof this.generateTokens>> & { message: string }
@@ -193,6 +197,7 @@ export class AuthService {
     // Check if user exists
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
+      include: { wallet: true },
     });
 
     if (!user) {
@@ -210,16 +215,80 @@ export class AuthService {
     }
 
     // Mark email as verified
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        emailVerified: true,
-      },
-    });
+    if (!user.emailVerified) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          emailVerified: true,
+        },
+      });
+    }
 
     return {
       ...(await this.generateTokens(user)),
       message: 'Email verified successfully.',
+    };
+  }
+
+  /**
+   * Verify email code for login (with optional TOTP for MFA users)
+   */
+  async verifyLoginCode(
+    email: string,
+    code: string,
+    totpCode?: string,
+  ): Promise<
+    Awaited<ReturnType<typeof this.generateTokens>> & { message: string }
+  > {
+    // Check if user exists
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { wallet: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid email or code');
+    }
+
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('Email not verified');
+    }
+
+    // Verify email code from Redis (will delete if valid)
+    const isValid = await this.verificationCodeStorage.verifyAndDeleteCode(
+      email,
+      code,
+    );
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid or expired verification code');
+    }
+
+    // If user has MFA enabled, verify TOTP
+    if (user.totpEnabled && user.totpSecret) {
+      if (!totpCode) {
+        throw new UnauthorizedException('MFA code required');
+      }
+
+      // Verify TOTP
+      const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
+      const isTotpValid = authenticator.verify({
+        token: totpCode,
+        secret: decryptedSecret,
+      });
+
+      if (!isTotpValid) {
+        // Try backup codes
+        const isValidBackup = await this.verifyBackupCode(user.id, totpCode);
+        if (!isValidBackup) {
+          throw new UnauthorizedException('Invalid TOTP code');
+        }
+      }
+    }
+
+    return {
+      ...(await this.generateTokens(user)),
+      message: 'Login successful.',
     };
   }
 
@@ -338,6 +407,10 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role !== Role.CONTRIBUTOR) {
+      throw new BadRequestException('User is not a contributor');
+    }
+
     if (user.profileCompleted) {
       throw new BadRequestException('Profile already completed');
     }
@@ -352,10 +425,10 @@ export class AuthService {
       }
     }
 
-    // Generate wallet memo ID
-    const memoId = this.generateMemoId();
+    // Create individual Stellar wallet for user
+    const { walletId } = await this.walletService.createWallet();
 
-    // Update user profile and create wallet
+    // Update user profile and link wallet
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -368,12 +441,7 @@ export class AuthService {
         socials: dto.socials,
         emailNotifications: dto.emailNotifications,
         profileCompleted: true,
-        wallet: {
-          create: {
-            memoId,
-            balance: 0,
-          },
-        },
+        walletId,
       },
     });
 
@@ -401,6 +469,10 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
+    if (user.role !== Role.PROJECT_OWNER) {
+      throw new BadRequestException('User is not a project owner');
+    }
+
     if (user.profileCompleted) {
       throw new BadRequestException('Profile already completed');
     }
@@ -415,10 +487,10 @@ export class AuthService {
       }
     }
 
-    // Generate wallet memo ID
-    const memoId = this.generateMemoId();
+    // Create individual Stellar wallet for user
+    const { walletId } = await this.walletService.createWallet();
 
-    // Update user profile and create wallet
+    // Update user profile and link wallet
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -437,12 +509,7 @@ export class AuthService {
         companyLogo: dto.companyLogo,
         emailNotifications: dto.emailNotifications,
         profileCompleted: true,
-        wallet: {
-          create: {
-            memoId,
-            balance: 0,
-          },
-        },
+        walletId,
       },
     });
 
@@ -471,10 +538,9 @@ export class AuthService {
   /**
    * Login with email + optional TOTP
    */
-  async login(email: string, totpCode?: string) {
+  async login(email: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
-      include: { wallet: true },
     });
 
     if (!user) {
@@ -485,33 +551,15 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
-    if (!user.profileCompleted) {
-      throw new UnauthorizedException('Please complete your profile first');
-    }
+    // Send verification code via email
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    await this.verificationCodeStorage.setVerificationCode(email, code);
+    await this.emailService.sendVerificationCode(email, code);
 
-    // If user has MFA enabled, verify TOTP
-    if (user.totpEnabled && user.totpSecret) {
-      if (!totpCode) {
-        throw new UnauthorizedException('MFA code required');
-      }
-
-      // Verify TOTP
-      const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
-      const isValid = authenticator.verify({
-        token: totpCode,
-        secret: decryptedSecret,
-      });
-
-      if (!isValid) {
-        // Try backup codes
-        const isValidBackup = await this.verifyBackupCode(user.id, totpCode);
-        if (!isValidBackup) {
-          throw new UnauthorizedException('Invalid TOTP code');
-        }
-      }
-    }
-
-    return this.generateTokens(user);
+    return {
+      message: 'Verification code sent to your email',
+      requiresVerification: true,
+    };
   }
 
   private generateBackupCodes(count: number = 10): string[] {
@@ -520,11 +568,6 @@ export class AuthService {
       codes.push(randomBytes(4).toString('hex').toUpperCase());
     }
     return codes;
-  }
-
-  private generateMemoId(): string {
-    // Generate a unique 8-character alphanumeric memo ID
-    return randomBytes(4).toString('hex').toUpperCase();
   }
 
   private async verifyBackupCode(

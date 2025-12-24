@@ -3,7 +3,6 @@ import { ConfigModule } from '@nestjs/config';
 import { KmsModule } from '../common/kms/kms.module';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { ReputationModule } from '../reputation/reputation.module';
-import { StellarAccountService } from '../soroban/stellar-account.service';
 import { WalletModule } from '../wallet/wallet.module';
 import { AdminService } from './admin.service';
 import { BountyController } from './bounties.controller';
@@ -18,7 +17,7 @@ import { BountiesService } from './bounties.service';
     ReputationModule,
   ],
   controllers: [BountyController],
-  providers: [StellarAccountService, BountiesService, AdminService],
+  providers: [BountiesService, AdminService],
   exports: [BountiesService, AdminService],
 })
 export class BountiesModule {}

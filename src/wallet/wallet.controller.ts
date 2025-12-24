@@ -46,13 +46,13 @@ export class WalletController {
   @Get('deposit-address')
   @ApiOperation({
     summary: 'Get deposit address',
-    description: 'Get the Stellar address and memo for depositing funds',
+    description: 'Get the Stellar address for depositing funds',
   })
   @ApiResponse({ status: 200, description: 'Deposit address details' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getDepositAddress(@CurrentUser('id') userId: string) {
     const wallet = await this.walletService.getWalletByUserId(userId);
-    return this.walletService.getDepositAddress(wallet.memoId);
+    return this.walletService.getDepositAddress(wallet.id);
   }
 
   @Get('transactions')

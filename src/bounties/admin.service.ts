@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -6,7 +11,7 @@ import {
   Client as SorobanClient,
   networks,
 } from '../soroban/contract-bindings';
-import { StellarAccountService } from '../soroban/stellar-account.service';
+import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 /**
  * Admin Service
@@ -22,7 +27,7 @@ export class AdminService {
 
   constructor(
     private prisma: PrismaService,
-    private stellarAccount: StellarAccountService,
+    private walletSigning: WalletSigningService,
     private configService: ConfigService,
   ) {
     this.contractId = this.configService.get<string>('SOROBAN_CONTRACT_ID')!;
@@ -84,8 +89,21 @@ export class AdminService {
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      // Note: Admin operations need a designated admin wallet
+      // For now, using the first admin user's wallet
+      const adminUser = await this.prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+        include: { wallet: true },
+      });
+
+      if (!adminUser?.wallet) {
+        throw new Error('Admin wallet not found');
+      }
+
+      const signedTx = await this.walletSigning.signTransaction(
+        adminUser.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(
@@ -119,8 +137,21 @@ export class AdminService {
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      // Note: Admin operations need a designated admin wallet
+      // For now, using the first admin user's wallet
+      const adminUser = await this.prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+        include: { wallet: true },
+      });
+
+      if (!adminUser?.wallet) {
+        throw new Error('Admin wallet not found');
+      }
+
+      const signedTx = await this.walletSigning.signTransaction(
+        adminUser.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(
@@ -193,12 +224,23 @@ export class AdminService {
     try {
       await this.verifyAdmin(userId);
 
-      const publicKey = this.stellarAccount.getMasterPublicKey();
-      const balance = await this.stellarAccount.getAccountBalance(publicKey);
+      // Get admin wallet balance
+      const adminUser = await this.prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+        include: { wallet: true },
+      });
+
+      if (!adminUser?.wallet) {
+        throw new NotFoundException('Admin wallet not found');
+      }
+
+      const balance = await this.walletSigning.getAccountBalance(
+        adminUser.wallet.publicKey,
+      );
 
       return {
-        balance,
-        publicKey,
+        balance: balance?.toString() || '0',
+        publicKey: adminUser.wallet.publicKey,
       };
     } catch (error) {
       this.logger.error('Failed to get master account balance', error);
@@ -214,7 +256,6 @@ export class AdminService {
     userId: string,
     destination: string,
     amount: string,
-    memo?: string,
   ): Promise<{ txHash: string }> {
     try {
       await this.verifyAdmin(userId);
@@ -223,11 +264,20 @@ export class AdminService {
         `Emergency withdraw initiated by ${userId} to ${destination} for ${amount} stroops`,
       );
 
-      const txHash = await this.stellarAccount.sendPayment(
+      // Emergency withdrawal from admin wallet
+      const adminUser = await this.prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+        include: { wallet: true },
+      });
+
+      if (!adminUser?.wallet) {
+        throw new Error('Admin wallet not found');
+      }
+
+      const txHash = await this.walletSigning.signAndSubmitPayment(
+        adminUser.wallet.id,
         destination,
         amount,
-        undefined,
-        memo,
       );
 
       return { txHash };
@@ -258,8 +308,21 @@ export class AdminService {
         preparedTx.toXDR(),
         this.networkPassphrase,
       ) as StellarSDK.Transaction;
-      const signedTx =
-        await this.stellarAccount.signTransactionWithVault(builtTx);
+      // Note: Admin operations need a designated admin wallet
+      // For now, using the first admin user's wallet
+      const adminUser = await this.prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+        include: { wallet: true },
+      });
+
+      if (!adminUser?.wallet) {
+        throw new Error('Admin wallet not found');
+      }
+
+      const signedTx = await this.walletSigning.signTransaction(
+        adminUser.wallet.id,
+        builtTx,
+      );
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(

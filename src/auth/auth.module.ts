@@ -6,6 +6,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
 import { EmailModule } from '../email/email.module';
 import { PasskeyModule } from '../passkey/passkey.module';
 import { UsersModule } from '../users/users.module';
+import { WalletModule } from '../wallet/wallet.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -19,6 +20,7 @@ import { VerificationCodeStorageService } from './verification-code-storage.serv
     ConfigModule,
     EmailModule,
     forwardRef(() => PasskeyModule),
+    forwardRef(() => WalletModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

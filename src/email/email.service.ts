@@ -1,5 +1,7 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Queue } from 'bullmq';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
 
@@ -8,7 +10,10 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
   private transporter: Transporter;
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectQueue('email') private emailQueue: Queue,
+  ) {
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('SMTP_HOST'),
       port: this.configService.get<number>('SMTP_PORT'),
@@ -21,79 +26,126 @@ export class EmailService {
   }
 
   /**
-   * Send verification code email
+   * Send verification code email (queued)
    */
   async sendVerificationCode(email: string, code: string): Promise<void> {
-    try {
-      const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
-      const appUrl =
-        this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
+    const appUrl =
+      this.configService.get<string>('APP_URL') || 'http://localhost:3000';
 
-      await this.transporter.sendMail({
-        from: `"${appName}" <${this.configService.get<string>('SMTP_FROM')}>`,
+    await this.emailQueue.add(
+      'send-email',
+      {
         to: email,
         subject: `Your ${appName} Verification Code`,
-        html: this.getVerificationEmailTemplate(code, appName, appUrl),
-      });
+        template: 'verification',
+        context: { code, appName, appUrl },
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+      },
+    );
 
-      this.logger.log(`Verification code sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send verification email to ${email}`, error);
-      throw new Error('Failed to send verification email');
-    }
+    this.logger.log(`Verification email queued for ${email}`);
   }
 
   /**
-   * Send welcome email after registration
+   * Send welcome email after registration (queued)
    */
   async sendWelcomeEmail(email: string, name: string): Promise<void> {
-    try {
-      const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
-      const appUrl =
-        this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
+    const appUrl =
+      this.configService.get<string>('APP_URL') || 'http://localhost:3000';
 
-      await this.transporter.sendMail({
-        from: `"${appName}" <${this.configService.get<string>('SMTP_FROM')}>`,
+    await this.emailQueue.add(
+      'send-email',
+      {
         to: email,
         subject: `Welcome to ${appName}!`,
-        html: this.getWelcomeEmailTemplate(name, appName, appUrl),
-      });
+        template: 'welcome',
+        context: { name, appName, appUrl },
+      },
+      {
+        attempts: 2,
+        backoff: {
+          type: 'exponential',
+          delay: 3000,
+        },
+      },
+    );
 
-      this.logger.log(`Welcome email sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send welcome email to ${email}`, error);
-    }
+    this.logger.log(`Welcome email queued for ${email}`);
   }
 
   /**
-   * Send bounty notification email
+   * Send bounty notification email (queued)
    */
   async sendBountyNotification(
     email: string,
     subject: string,
     message: string,
   ): Promise<void> {
-    try {
-      const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
+    const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
 
-      await this.transporter.sendMail({
-        from: `"${appName}" <${this.configService.get<string>('SMTP_FROM')}>`,
+    await this.emailQueue.add(
+      'send-email',
+      {
         to: email,
         subject,
-        html: this.getNotificationEmailTemplate(message, appName),
-      });
+        template: 'notification',
+        context: { message, appName },
+      },
+      {
+        attempts: 2,
+        backoff: {
+          type: 'fixed',
+          delay: 5000,
+        },
+      },
+    );
 
-      this.logger.log(`Notification sent to ${email}`);
-    } catch (error) {
-      this.logger.error(`Failed to send notification to ${email}`, error);
-    }
+    this.logger.log(`Notification email queued for ${email}`);
   }
 
   /**
-   * Send generic email with template
+   * Send generic email with template (queued)
    * Used by notification system
    */
   async sendEmail(
+    to: string,
+    subject: string,
+    template: string,
+    context: any,
+  ): Promise<void> {
+    await this.emailQueue.add(
+      'send-email',
+      {
+        to,
+        subject,
+        template,
+        context,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+      },
+    );
+
+    this.logger.log(`Email queued for ${to} with template: ${template}`);
+  }
+
+  /**
+   * Send email directly without queue (used by worker)
+   * @internal
+   */
+  async sendEmailDirect(
     to: string,
     subject: string,
     template: string,
@@ -104,8 +156,25 @@ export class EmailService {
       const appUrl =
         this.configService.get<string>('APP_URL') || 'http://localhost:3000';
 
-      // Generate HTML based on template and context
-      const html = this.generateEmailHtml(template, context, appName, appUrl);
+      let html: string;
+
+      switch (template) {
+        case 'verification':
+          html = this.getVerificationEmailTemplate(
+            context.code,
+            appName,
+            appUrl,
+          );
+          break;
+        case 'welcome':
+          html = this.getWelcomeEmailTemplate(context.name, appName, appUrl);
+          break;
+        case 'notification':
+          html = this.getNotificationEmailTemplate(context.message, appName);
+          break;
+        default:
+          html = this.generateEmailHtml(template, context, appName, appUrl);
+      }
 
       await this.transporter.sendMail({
         from: `"${appName}" <${this.configService.get<string>('SMTP_FROM')}>`,

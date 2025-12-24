@@ -4,8 +4,8 @@ import { TxState } from '@prisma/client';
 import { Asset } from '@stellar/stellar-sdk';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { StellarAccountService } from '../../soroban/stellar-account.service';
 import { SUPPORTED_STELLAR_ASSETS } from '../../wallet/assets.config';
+import { WalletSigningService } from '../../wallet/wallet-signing.service';
 
 interface WithdrawalJobData {
   transactionId: string;
@@ -23,7 +23,7 @@ export class WithdrawalWorker extends WorkerHost {
 
   constructor(
     private prisma: PrismaService,
-    private stellarAccount: StellarAccountService,
+    private walletSigning: WalletSigningService,
   ) {
     super();
   }
@@ -62,17 +62,12 @@ export class WithdrawalWorker extends WorkerHost {
         throw new Error(`Wallet ${walletId} not found`);
       }
 
-      if (Number(wallet.balance) < amount) {
-        throw new Error(
-          `Insufficient balance: ${wallet.balance.toString()} < ${amount}`,
-        );
-      }
-
       // 3. Get Stellar asset
       const asset = this.getAssetFromCurrency(currency);
 
-      // 4. Send payment via Stellar
-      const txHash = await this.stellarAccount.sendPayment(
+      // 4. Send payment via Stellar using user's wallet
+      const txHash = await this.walletSigning.signAndSubmitPayment(
+        walletId,
         destination,
         (amount * 10000000).toString(), // Convert to stroops
         asset,
@@ -93,15 +88,7 @@ export class WithdrawalWorker extends WorkerHost {
           },
         });
 
-        // Deduct from wallet balance
-        await tx.wallet.update({
-          where: { id: walletId },
-          data: {
-            balance: {
-              decrement: amount,
-            },
-          },
-        });
+        // Balance tracked on Stellar network, no DB update needed
       });
 
       // 6. Release ledger lock

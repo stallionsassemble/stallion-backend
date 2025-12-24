@@ -401,14 +401,12 @@ export class BountyController {
     dto: {
       destination: string;
       amount: string;
-      memo?: string;
     },
   ) {
     return this.adminService.emergencyWithdraw(
       userId,
       dto.destination,
       dto.amount,
-      dto.memo,
     );
   }
 

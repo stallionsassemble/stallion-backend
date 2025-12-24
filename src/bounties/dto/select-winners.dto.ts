@@ -3,8 +3,8 @@ import { IsArray, IsString } from 'class-validator';
 
 export class SelectWinnersDto {
   @ApiProperty({
-    description: 'Array of winner wallet memo IDs',
-    example: ['memo1', 'memo2', 'memo3'],
+    description: 'Array of winner user IDs',
+    example: ['clx123user1...', 'clx456user2...', 'clx789user3...'],
   })
   @IsArray()
   @IsString({ each: true })

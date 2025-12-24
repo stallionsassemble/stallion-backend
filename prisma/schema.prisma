@@ -264,16 +264,20 @@ model BountyWinner {
 }
 
 model Wallet {
-  id        String   @id @default(cuid())
-  memoId    String   @unique @map("memo_id")
-  balance   Decimal  @default(0)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                    String   @id @default(cuid())
+  publicKey             String   @unique @map("public_key")
+  encryptedPrivateKey   String   @map("encrypted_private_key")
+  encryptedDataKey      String   @map("encrypted_data_key")
+  isActivated           Boolean  @default(false) @map("is_activated")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
 
   // Relations
   users        User[]
   transactions Transaction[]
 
+  @@index([publicKey])
+  @@index([isActivated])
   @@map("wallets")
 }
 
