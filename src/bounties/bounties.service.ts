@@ -211,6 +211,11 @@ export class BountiesService {
     bountyId: number,
   ): Promise<Bounty & { ownerDetails: SanitizedUser }> {
     try {
+      // Make sure bountyId is valid u32
+      if (bountyId < 0 || bountyId > 4294967295) {
+        throw new NotFoundException('Bounty not found');
+      }
+
       const tx = await this.sorobanClient.get_bounty({ bounty_id: bountyId });
       const result = await tx.simulate();
 

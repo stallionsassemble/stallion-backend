@@ -57,7 +57,7 @@ export class BountyController {
     return this.bountyService.getSupportedCurrencies();
   }
 
-  @Get()
+  @Get('all')
   @ApiOperation({ summary: 'Get all bounties' })
   @ApiResponse({
     status: 200,
@@ -65,6 +65,18 @@ export class BountyController {
   })
   async getAllBounties() {
     return this.bountyService.getAllBounties();
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get bounties owned by current user' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bounties owned by user',
+  })
+  async getMyBounties(@CurrentUser('id') userId: string) {
+    return this.bountyService.getOwnerBounties(userId);
   }
 
   @Get('active')
@@ -77,19 +89,7 @@ export class BountyController {
     return this.bountyService.getActiveBounties();
   }
 
-  @Get('my-bounties')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get bounties owned by current user' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of bounty IDs owned by user',
-  })
-  async getMyBounties(@CurrentUser('id') userId: string) {
-    return this.bountyService.getOwnerBounties(userId);
-  }
-
-  @Get(':id')
+  @Get('id/:id')
   @ApiOperation({ summary: 'Get bounty details' })
   @ApiResponse({
     status: 200,
