@@ -4,6 +4,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Role, User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -26,6 +27,10 @@ import { VerificationCodeStorageService } from './verification-code-storage.serv
 
 @Injectable()
 export class AuthService {
+  private readonly refreshTokenSecret: string;
+  private readonly accessTokenExpiresIn: string;
+  private readonly refreshTokenExpiresIn: string;
+
   constructor(
     private usersService: UsersService,
     private prisma: PrismaService,
@@ -33,7 +38,16 @@ export class AuthService {
     private emailService: EmailService,
     private verificationCodeStorage: VerificationCodeStorageService,
     private walletService: WalletService,
-  ) {}
+    private configService: ConfigService,
+  ) {
+    this.refreshTokenSecret = this.configService.getOrThrow<string>(
+      'REFRESH_TOKEN_SECRET',
+    );
+    this.accessTokenExpiresIn =
+      this.configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '15m';
+    this.refreshTokenExpiresIn =
+      this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN') || '7d';
+  }
 
   async getProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -62,11 +76,16 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      expiresIn: '15m', // Short-lived access token
+      expiresIn: this.accessTokenExpiresIn as any,
     });
 
-    const refreshToken = this.jwtService.sign(payload, {
-      expiresIn: '7d', // Long-lived refresh token
+    const refreshTokenPayload = {
+      sub: user.id,
+    };
+
+    const refreshToken = this.jwtService.sign(refreshTokenPayload, {
+      secret: this.refreshTokenSecret,
+      expiresIn: this.refreshTokenExpiresIn as any,
     });
 
     // Hash and store refresh token
@@ -102,7 +121,9 @@ export class AuthService {
   async refreshTokens(refreshTokenDto: RefreshTokenDto) {
     try {
       // Verify the refresh token
-      const payload = this.jwtService.verify(refreshTokenDto.refreshToken);
+      const payload = this.jwtService.verify(refreshTokenDto.refreshToken, {
+        secret: this.refreshTokenSecret,
+      });
 
       // Find user
       const user = await this.prisma.user.findUnique({
