@@ -285,7 +285,7 @@ export class PasskeyService {
       include: { passkeys: true },
     });
 
-    if (user && user.passkeys.length === 1 && !user.totpEnabled) {
+    if (user && user.passkeys.length === 1 && !user.mfaEnabled) {
       throw new BadRequestException(
         'Cannot delete last passkey without TOTP enabled. Enable TOTP first.',
       );

@@ -283,7 +283,7 @@ export class AuthService {
     }
 
     // If user has MFA enabled, verify TOTP
-    if (user.totpEnabled && user.totpSecret) {
+    if (user.mfaEnabled && user.totpSecret) {
       if (!totpCode) {
         throw new UnauthorizedException('MFA code required');
       }
@@ -333,7 +333,7 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
-    if (user.totpEnabled) {
+    if (user.mfaEnabled) {
       throw new BadRequestException('MFA already set up');
     }
 
@@ -399,7 +399,7 @@ export class AuthService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        totpEnabled: true,
+        mfaEnabled: true,
         backupCodes: hashedBackupCodes,
       },
       include: {
@@ -587,7 +587,7 @@ export class AuthService {
 
     return {
       message: 'Verification code sent to your email',
-      requiresVerification: true,
+      mfaEnabled: user.mfaEnabled,
     };
   }
 

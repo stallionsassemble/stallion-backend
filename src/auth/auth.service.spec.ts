@@ -24,7 +24,7 @@ describe('AuthService', () => {
     name: 'Test User',
     role: 'CONTRIBUTOR' as any,
     totpSecret: 'JBSWY3DPEHPK3PXP',
-    totpEnabled: true,
+    mfaEnabled: true,
     backupCodes: ['hashed-code-1', 'hashed-code-2'],
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -105,7 +105,7 @@ describe('AuthService', () => {
         id: 'new-user-123',
         email: registerDto.email,
         totpSecret,
-        totpEnabled: false,
+        mfaEnabled: false,
       });
 
       const result = await service.register(registerDto);
@@ -159,7 +159,7 @@ describe('AuthService', () => {
         ...dtoWithoutRole,
         role: 'CONTRIBUTOR',
         totpSecret,
-        totpEnabled: false,
+        mfaEnabled: false,
       });
 
       const result = await service.register(dtoWithoutRole as any);
@@ -184,7 +184,7 @@ describe('AuthService', () => {
 
       mockPrismaService.user.findUnique.mockResolvedValue({
         ...mockUser,
-        totpEnabled: false,
+        mfaEnabled: false,
       });
 
       (authenticator.verify as jest.Mock).mockReturnValue(true);
@@ -192,7 +192,7 @@ describe('AuthService', () => {
 
       mockPrismaService.user.update.mockResolvedValue({
         ...mockUser,
-        totpEnabled: true,
+        mfaEnabled: true,
       });
 
       const result = await service.verifyTotpSetup(userId, code);
@@ -206,7 +206,7 @@ describe('AuthService', () => {
       expect(mockPrismaService.user.update).toHaveBeenCalledWith({
         where: { id: userId },
         data: {
-          totpEnabled: true,
+          mfaEnabled: true,
           backupCodes: expect.any(Array),
         },
       });
@@ -223,7 +223,7 @@ describe('AuthService', () => {
     it('should throw BadRequestException if TOTP code is invalid even if already enabled', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
         ...mockUser,
-        totpEnabled: true,
+        mfaEnabled: true,
       });
 
       (authenticator.verify as jest.Mock).mockReturnValue(false);
@@ -239,7 +239,7 @@ describe('AuthService', () => {
     it('should throw BadRequestException if TOTP code is invalid', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue({
         ...mockUser,
-        totpEnabled: false,
+        mfaEnabled: false,
       });
 
       (authenticator.verify as jest.Mock).mockReturnValue(false);

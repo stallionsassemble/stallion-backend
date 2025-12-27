@@ -474,7 +474,7 @@ describe('PasskeyService', () => {
       mockPrismaService.passkey.findFirst.mockResolvedValue(mockPasskey);
       mockPrismaService.user.findUnique.mockResolvedValue({
         ...mockUser,
-        totpEnabled: true,
+        mfaEnabled: true,
         passkeys: [mockPasskey, anotherPasskey], // Has another passkey
       });
       mockPrismaService.passkey.delete.mockResolvedValue(mockPasskey);
@@ -499,7 +499,7 @@ describe('PasskeyService', () => {
       mockPrismaService.passkey.findFirst.mockResolvedValue(mockPasskey);
       mockPrismaService.user.findUnique.mockResolvedValue({
         ...mockUser,
-        totpEnabled: false,
+        mfaEnabled: false,
         passkeys: [mockPasskey], // Only one passkey
       });
 

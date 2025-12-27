@@ -22,14 +22,14 @@ export class MFAGuard implements CanActivate {
     // Check if user has MFA enabled
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.id },
-      select: { totpEnabled: true },
+      select: { mfaEnabled: true },
     });
 
     if (!dbUser) {
       throw new UnauthorizedException('User not found');
     }
 
-    if (!dbUser.totpEnabled) {
+    if (!dbUser.mfaEnabled) {
       throw new ForbiddenException(
         'MFA is required for this operation. Please set up MFA in your settings.',
       );
