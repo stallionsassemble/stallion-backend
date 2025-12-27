@@ -10,7 +10,7 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
-import { sanitizeUser } from 'src/common/utils/user.util';
+import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EncryptionUtil } from '../common/utils/encryption.util';
 import { EmailService } from '../email/email.service';
@@ -398,8 +398,8 @@ export class AuthService {
   async completeContributorProfile(
     userId: string,
     dto: CompleteContributorProfileDto,
-  ): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
+  ): Promise<{ message: string; user: SanitizedUser }> {
+    let user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
@@ -429,7 +429,7 @@ export class AuthService {
     const { walletId } = await this.walletService.createWallet();
 
     // Update user profile and link wallet
-    await this.prisma.user.update({
+    user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         firstName: dto.firstName,
@@ -449,9 +449,13 @@ export class AuthService {
     await this.emailService.sendWelcomeEmail(
       user.email,
       `${dto.firstName} ${dto.lastName}`,
+      'CONTRIBUTOR',
     );
 
-    return { message: 'Profile completed successfully' };
+    return {
+      message: 'Profile completed successfully',
+      user: sanitizeUser(user),
+    };
   }
 
   /**
@@ -460,8 +464,8 @@ export class AuthService {
   async completeOwnerProfile(
     userId: string,
     dto: CompleteOwnerProfileDto,
-  ): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
+  ): Promise<{ message: string; user: SanitizedUser }> {
+    let user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
@@ -491,7 +495,7 @@ export class AuthService {
     const { walletId } = await this.walletService.createWallet();
 
     // Update user profile and link wallet
-    await this.prisma.user.update({
+    user = await this.prisma.user.update({
       where: { id: userId },
       data: {
         firstName: dto.firstName,
@@ -517,9 +521,13 @@ export class AuthService {
     await this.emailService.sendWelcomeEmail(
       user.email,
       `${dto.firstName} ${dto.lastName}`,
+      'PROJECT_OWNER',
     );
 
-    return { message: 'Profile completed successfully' };
+    return {
+      message: 'Profile completed successfully',
+      user: sanitizeUser(user),
+    };
   }
 
   /**

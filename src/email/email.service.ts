@@ -56,18 +56,25 @@ export class EmailService {
   /**
    * Send welcome email after registration (queued)
    */
-  async sendWelcomeEmail(email: string, name: string): Promise<void> {
+  async sendWelcomeEmail(
+    email: string,
+    name: string,
+    role: 'CONTRIBUTOR' | 'PROJECT_OWNER',
+  ): Promise<void> {
     const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
     const appUrl =
       this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+
+    const template =
+      role === 'CONTRIBUTOR' ? 'welcome-contributor' : 'welcome-owner';
 
     await this.emailQueue.add(
       'send-email',
       {
         to: email,
         subject: `Welcome to ${appName}!`,
-        template: 'welcome',
-        context: { name, appName, appUrl },
+        template,
+        context: { name, appName, appUrl, role },
       },
       {
         attempts: 2,
@@ -78,7 +85,7 @@ export class EmailService {
       },
     );
 
-    this.logger.log(`Welcome email queued for ${email}`);
+    this.logger.log(`Welcome email (${role}) queued for ${email}`);
   }
 
   /**
@@ -168,6 +175,20 @@ export class EmailService {
           break;
         case 'welcome':
           html = this.getWelcomeEmailTemplate(context.name, appName, appUrl);
+          break;
+        case 'welcome-contributor':
+          html = this.getWelcomeContributorEmailTemplate(
+            context.name,
+            appName,
+            appUrl,
+          );
+          break;
+        case 'welcome-owner':
+          html = this.getWelcomeOwnerEmailTemplate(
+            context.name,
+            appName,
+            appUrl,
+          );
           break;
         case 'notification':
           html = this.getNotificationEmailTemplate(context.message, appName);
@@ -330,6 +351,110 @@ export class EmailService {
             
             <div style="text-align: center; margin: 30px 0;">
               <a href="${appUrl}/dashboard" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              © ${new Date().getFullYear()} ${appName}. All rights reserved.<br>
+              <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit our website</a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Welcome email template for contributors
+   */
+  private getWelcomeContributorEmailTemplate(
+    name: string,
+    appName: string,
+    appUrl: string,
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to ${appName}</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">Welcome to ${appName}!</h1>
+          </div>
+          
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Hi ${name}! 👋</h2>
+            <p>We're thrilled to have you join our community of talented contributors! Your account has been successfully created.</p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0;">
+              <h3 style="color: #667eea; margin-top: 0;">Get Started as a Contributor</h3>
+              <ul style="padding-left: 20px; color: #555;">
+                <li style="margin-bottom: 10px;"><strong>Browse Bounties:</strong> Explore exciting projects and find bounties that match your skills</li>
+                <li style="margin-bottom: 10px;"><strong>Build Your Portfolio:</strong> Showcase your work and earn rewards for your contributions</li>
+                <li style="margin-bottom: 10px;"><strong>Earn Rewards:</strong> Get paid in crypto for your valuable contributions</li>
+                <li style="margin-bottom: 10px;"><strong>Connect:</strong> Collaborate with project owners and fellow contributors</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${appUrl}/bounties" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Browse Bounties</a>
+              <a href="${appUrl}/dashboard" style="background: #764ba2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              © ${new Date().getFullYear()} ${appName}. All rights reserved.<br>
+              <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit our website</a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Welcome email template for project owners
+   */
+  private getWelcomeOwnerEmailTemplate(
+    name: string,
+    appName: string,
+    appUrl: string,
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to ${appName}</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">Welcome to ${appName}!</h1>
+          </div>
+          
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Hi ${name}! 👋</h2>
+            <p>Welcome aboard! We're excited to help you find the perfect contributors for your projects. Your account has been successfully created.</p>
+            
+            <div style="background: white; padding: 20px; border-radius: 8px; margin: 30px 0;">
+              <h3 style="color: #667eea; margin-top: 0;">Get Started as a Project Owner</h3>
+              <ul style="padding-left: 20px; color: #555;">
+                <li style="margin-bottom: 10px;"><strong>Create Bounties:</strong> Post bounties and attract talented contributors to your projects</li>
+                <li style="margin-bottom: 10px;"><strong>Manage Projects:</strong> Track progress and collaborate with contributors seamlessly</li>
+                <li style="margin-bottom: 10px;"><strong>Pay with Crypto:</strong> Reward contributors securely using blockchain technology</li>
+                <li style="margin-bottom: 10px;"><strong>Build Your Team:</strong> Find skilled developers to bring your vision to life</li>
+              </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${appUrl}/bounties/create" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Create Bounty</a>
+              <a href="${appUrl}/dashboard" style="background: #764ba2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a>
             </div>
             
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">

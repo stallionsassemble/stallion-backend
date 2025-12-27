@@ -181,6 +181,12 @@ export class AuthController {
     schema: {
       example: {
         message: 'Profile completed successfully',
+        user: {
+          id: 'clx123...',
+          email: 'user@example.com',
+          role: 'CONTRIBUTOR',
+          profileCompleted: true,
+        },
       },
     },
   })
@@ -210,6 +216,12 @@ export class AuthController {
     schema: {
       example: {
         message: 'Profile completed successfully',
+        user: {
+          id: 'clx123...',
+          email: 'user@example.com',
+          role: 'PROJECT_OWNER',
+          profileCompleted: true,
+        },
       },
     },
   })

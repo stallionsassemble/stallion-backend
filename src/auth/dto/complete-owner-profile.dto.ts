@@ -39,7 +39,7 @@ export class CompleteOwnerProfileDto {
   @ApiProperty({ example: ['Product Management', 'Business Development'] })
   skills: string[];
 
-  @IsUrl()
+  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
   @ApiProperty({ example: 'http://localhost:3000/uploads/images/profile.jpg' })
   profilePicture: string;
 
@@ -82,7 +82,7 @@ export class CompleteOwnerProfileDto {
   })
   companyBio: string;
 
-  @IsUrl()
+  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
   @ApiProperty({
     example: 'http://localhost:3000/uploads/images/company-logo.jpg',
   })
