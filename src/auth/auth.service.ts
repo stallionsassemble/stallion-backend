@@ -254,11 +254,8 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
-    // Verify email code from Redis (will delete if valid)
-    const isValid = await this.verificationCodeStorage.verifyAndDeleteCode(
-      email,
-      code,
-    );
+    // Verify email code from Redis
+    const isValid = await this.verificationCodeStorage.verifyCode(email, code);
 
     if (!isValid) {
       throw new UnauthorizedException('Invalid or expired verification code');
@@ -285,6 +282,9 @@ export class AuthService {
         }
       }
     }
+
+    // Delete verification code
+    await this.verificationCodeStorage.deleteVerificationCode(email);
 
     return {
       ...(await this.generateTokens(user)),

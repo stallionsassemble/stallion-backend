@@ -105,6 +105,16 @@ export class WalletService {
         `Created withdrawal transaction ${transaction.id} with lock ${lock.id}`,
       );
 
+      // Queue withdrawal for processing outside the transaction
+      await this.queueWithdrawal(
+        transaction.id,
+        destination,
+        amount,
+        currency,
+        walletId,
+        lock.id,
+      );
+
       return transaction;
     });
   }

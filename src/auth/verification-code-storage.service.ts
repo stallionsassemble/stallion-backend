@@ -36,6 +36,28 @@ export class VerificationCodeStorageService {
   }
 
   /**
+   * Verify a code
+   * @param email User email
+   * @param code Code to verify
+   * @returns True if code is valid
+   */
+  async verifyCode(email: string, code: string): Promise<boolean> {
+    const storedCode = await this.getVerificationCode(email);
+
+    if (!storedCode) {
+      this.logger.warn(`No verification code found for ${email}`);
+      return false;
+    }
+
+    if (storedCode !== code) {
+      this.logger.warn(`Invalid verification code for ${email}`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Verify and delete a code (single-use)
    * @param email User email
    * @param code Code to verify

@@ -5,9 +5,14 @@ import { QueueModule } from '../queues/queue.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { DepositReconciliationCron } from './deposit-reconciliation.cron';
 import { KeyRotationCron } from './key-rotation.cron';
+import { WithdrawalProcessingCron } from './withdrawal-processing.cron';
 
 @Module({
   imports: [ScheduleModule.forRoot(), PrismaModule, WalletModule, QueueModule],
-  providers: [DepositReconciliationCron, KeyRotationCron],
+  providers: [
+    DepositReconciliationCron,
+    KeyRotationCron,
+    WithdrawalProcessingCron,
+  ],
 })
 export class CronModule {}
