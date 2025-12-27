@@ -61,6 +61,36 @@ export class AuthController {
     return this.authService.getProfile(userId);
   }
 
+  @ApiResponse({
+    status: 400,
+    description: 'Profile already completed or username taken',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async completeOwnerProfile(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CompleteOwnerProfileDto,
+  ) {
+    return this.authService.completeOwnerProfile(userId, dto);
+  }
+
+  @Get('check-username/:username')
+  @ApiOperation({
+    summary: 'Check username availability',
+    description: 'Check if a username is available for registration',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Username availability checked',
+    schema: {
+      example: {
+        available: true,
+      },
+    },
+  })
+  async checkUsername(@Param('username') username: string) {
+    return this.authService.checkUsernameAvailability(username);
+  }
+
   @Post('signup/request-verification')
   @HttpCode(200)
   @ApiOperation({
@@ -117,63 +147,12 @@ export class AuthController {
     return this.authService.verifySignupCode(dto);
   }
 
-  @Post('signup/setup-mfa/:userId')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Setup MFA during signup',
-    description:
-      'Generate TOTP secret and QR code for MFA setup after email verification',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'MFA setup initiated',
-    schema: {
-      example: {
-        totpSecret: 'JBSWY3DPEHPK3PXP',
-        qrCode: 'data:image/png;base64,...',
-        message: 'Scan the QR code with your authenticator app',
-      },
-    },
-  })
-  @ApiResponse({
-    status: 401,
-    description: 'Email not verified or MFA already set up',
-  })
-  async setupMfa(@Param('userId') userId: string) {
-    return this.authService.setupMfa(userId);
-  }
-
-  @Post('signup/verify-totp/:userId')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Verify TOTP during signup',
-    description: 'Complete MFA setup by verifying TOTP code during signup',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'TOTP verified and backup codes generated',
-    schema: {
-      example: {
-        message: 'MFA setup completed successfully',
-        backupCodes: ['A1B2C3D4', 'E5F6G7H8', '...'],
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
-  async verifyTotp(
-    @Param('userId') userId: string,
-    @Body() verifyTotpDto: VerifyTotpDto,
-  ) {
-    return this.authService.verifyTotpSetup(userId, verifyTotpDto.code);
-  }
-
   @Post('signup/complete-profile/contributor')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Complete contributor profile',
-    description:
-      'Complete profile with contributor-specific fields after MFA setup',
+    description: 'Complete profile with contributor-specific fields',
   })
   @ApiResponse({
     status: 201,
@@ -207,8 +186,7 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Complete project owner profile',
-    description:
-      'Complete profile with project owner-specific fields after MFA setup',
+    description: 'Complete profile with project owner-specific fields',
   })
   @ApiResponse({
     status: 201,
@@ -225,36 +203,6 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({
-    status: 400,
-    description: 'Profile already completed or username taken',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async completeOwnerProfile(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CompleteOwnerProfileDto,
-  ) {
-    return this.authService.completeOwnerProfile(userId, dto);
-  }
-
-  @Get('check-username/:username')
-  @ApiOperation({
-    summary: 'Check username availability',
-    description: 'Check if a username is available for registration',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Username availability checked',
-    schema: {
-      example: {
-        available: true,
-      },
-    },
-  })
-  async checkUsername(@Param('username') username: string) {
-    return this.authService.checkUsernameAvailability(username);
-  }
-
   @Post('login')
   @HttpCode(200)
   @ApiOperation({
@@ -314,6 +262,104 @@ export class AuthController {
   })
   async verifyLoginCode(@Body() dto: VerifyLoginCodeDto) {
     return this.authService.verifyLoginCode(dto.email, dto.code, dto.totpCode);
+  }
+
+  @Post('refresh')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Refresh access token',
+    description:
+      'Get new access and refresh tokens using a valid refresh token',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Tokens refreshed successfully',
+    schema: {
+      example: {
+        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        user: {
+          id: 'clx123...',
+          email: 'user@example.com',
+          name: 'John Doe',
+          role: 'CONTRIBUTOR',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
+    return this.authService.refreshTokens(refreshTokenDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @HttpCode(200)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Logout user',
+    description: 'Invalidate refresh token and logout user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Logged out successfully',
+    schema: {
+      example: {
+        message: 'Logged out successfully',
+      },
+    },
+  })
+  async logout(@CurrentUser('id') userId: string) {
+    return this.authService.logout(userId);
+  }
+
+  @Post('setup-mfa/:userId')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Setup MFA (Authenticator App)',
+    description: 'Generate TOTP secret and QR code for MFA setup',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'MFA setup initiated',
+    schema: {
+      example: {
+        totpSecret: 'JBSWY3DPEHPK3PXP',
+        qrCode: 'data:image/png;base64,...',
+        message: 'Scan the QR code with your authenticator app',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Email not verified or MFA already set up',
+  })
+  async setupMfa(@Param('userId') userId: string) {
+    return this.authService.setupMfa(userId);
+  }
+
+  @Post('verify-totp/:userId')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Verify TOTP',
+    description: 'Complete MFA setup by verifying TOTP code',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'TOTP verified and backup codes generated',
+    schema: {
+      example: {
+        message: 'MFA setup completed successfully',
+        backupCodes: ['A1B2C3D4', 'E5F6G7H8', '...'],
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
+  async verifyTotp(
+    @Param('userId') userId: string,
+    @Body() verifyTotpDto: VerifyTotpDto,
+  ) {
+    return this.authService.verifyTotpSetup(userId, verifyTotpDto.code);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -405,54 +451,5 @@ export class AuthController {
     @Body() dto: VerifyPasskeyAuthenticationDto,
   ) {
     return this.passkeyService.verifyAuthentication(dto.email, dto.response);
-  }
-
-  @Post('refresh')
-  @HttpCode(200)
-  @ApiOperation({
-    summary: 'Refresh access token',
-    description:
-      'Get new access and refresh tokens using a valid refresh token',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Tokens refreshed successfully',
-    schema: {
-      example: {
-        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        refreshToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        user: {
-          id: 'clx123...',
-          email: 'user@example.com',
-          name: 'John Doe',
-          role: 'CONTRIBUTOR',
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refreshTokens(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refreshTokens(refreshTokenDto);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('logout')
-  @HttpCode(200)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Logout user',
-    description: 'Invalidate refresh token and logout user',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Logged out successfully',
-    schema: {
-      example: {
-        message: 'Logged out successfully',
-      },
-    },
-  })
-  async logout(@CurrentUser('id') userId: string) {
-    return this.authService.logout(userId);
   }
 }
