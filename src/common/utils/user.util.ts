@@ -7,12 +7,12 @@ export const sanitizeUser = (
   const { totpSecret, backupCodes, refreshToken, ...sanitizedUser } = user;
 
   // Sanitize wallet
-  if (user.wallet) {
-    user.wallet = {
-      id: user.wallet.id,
-      publicKey: user.wallet.publicKey,
-      isActivated: user.wallet.isActivated,
-      createdAt: user.wallet.createdAt,
+  if (sanitizedUser.wallet) {
+    sanitizedUser.wallet = {
+      id: sanitizedUser.wallet.id,
+      publicKey: sanitizedUser.wallet.publicKey,
+      isActivated: sanitizedUser.wallet.isActivated,
+      createdAt: sanitizedUser.wallet.createdAt,
     };
   }
 
