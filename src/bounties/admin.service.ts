@@ -1,9 +1,4 @@
-import {
-  ForbiddenException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -83,7 +78,7 @@ export class AdminService {
         new_admin: newAdminAddress,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
@@ -131,7 +126,7 @@ export class AdminService {
         new_fee_account: newFeeAccount,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),
@@ -215,41 +210,7 @@ export class AdminService {
   }
 
   /**
-   * Get master account balance
-   */
-  async getMasterAccountBalance(userId: string): Promise<{
-    balance: string;
-    publicKey: string;
-  }> {
-    try {
-      await this.verifyAdmin(userId);
-
-      // Get admin wallet balance
-      const adminUser = await this.prisma.user.findFirst({
-        where: { role: 'ADMIN' },
-        include: { wallet: true },
-      });
-
-      if (!adminUser?.wallet) {
-        throw new NotFoundException('Admin wallet not found');
-      }
-
-      const balance = await this.walletSigning.getAccountBalance(
-        adminUser.wallet.publicKey,
-      );
-
-      return {
-        balance: balance?.toString() || '0',
-        publicKey: adminUser.wallet.publicKey,
-      };
-    } catch (error) {
-      this.logger.error('Failed to get master account balance', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Emergency: Send funds from master account
+   * Emergency: Send funds from admin wallet
    * Should only be used in emergencies
    */
   async emergencyWithdraw(
@@ -302,7 +263,7 @@ export class AdminService {
         bounty_id: bountyId,
       });
 
-      // Prepare, sign with Vault and send transaction
+      // Prepare, sign and send transaction
       const preparedTx = await tx.simulate();
       const builtTx = StellarSDK.TransactionBuilder.fromXDR(
         preparedTx.toXDR(),

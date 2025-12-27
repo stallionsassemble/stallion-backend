@@ -278,7 +278,6 @@ export class BountiesService {
 
   /**
    * Create a new bounty
-   * User must send funds to master account before calling this
    */
   async createBounty(
     userId: string,

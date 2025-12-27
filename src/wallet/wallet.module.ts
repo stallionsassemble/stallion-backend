@@ -1,6 +1,5 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-import { KmsModule } from '../common/kms/kms.module';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { SorobanModule } from '../soroban/soroban.module';
 import { StellarWalletService } from './stellar-wallet.service';
@@ -13,7 +12,6 @@ import { WalletService } from './wallet.service';
   imports: [
     PrismaModule,
     SorobanModule,
-    KmsModule,
     BullModule.registerQueue({
       name: 'withdrawal',
     }),

@@ -104,8 +104,7 @@ export class BountyController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Create a new bounty',
-    description:
-      'Create a bounty on the Soroban contract. User must send funds to master account first.',
+    description: 'Create a bounty on the Soroban contract.',
   })
   @ApiResponse({
     status: 201,
@@ -370,19 +369,6 @@ export class BountyController {
   })
   async getContractStats(@CurrentUser('id') userId: string) {
     return this.adminService.getContractStats(userId);
-  }
-
-  @Get('admin/balance')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get master account balance (Admin only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Master account balance',
-  })
-  async getMasterAccountBalance(@CurrentUser('id') userId: string) {
-    return this.adminService.getMasterAccountBalance(userId);
   }
 
   @Post('admin/emergency-withdraw')

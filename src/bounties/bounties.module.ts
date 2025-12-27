@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { KmsModule } from '../common/kms/kms.module';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { ReputationModule } from '../reputation/reputation.module';
 import { WalletModule } from '../wallet/wallet.module';
@@ -9,13 +8,7 @@ import { BountyController } from './bounties.controller';
 import { BountiesService } from './bounties.service';
 
 @Module({
-  imports: [
-    ConfigModule,
-    PrismaModule,
-    KmsModule,
-    WalletModule,
-    ReputationModule,
-  ],
+  imports: [ConfigModule, PrismaModule, WalletModule, ReputationModule],
   controllers: [BountyController],
   providers: [BountiesService, AdminService],
   exports: [BountiesService, AdminService],

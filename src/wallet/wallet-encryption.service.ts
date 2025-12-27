@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { KmsService } from '../common/kms/kms.service';
+import { EncryptionUtil } from '../common/utils/encryption.util';
 
 @Injectable()
 export class WalletEncryptionService {
@@ -9,14 +9,16 @@ export class WalletEncryptionService {
   private readonly IV_LENGTH = 16;
   private readonly KEY_LENGTH = 32;
 
-  constructor(private readonly kmsService: KmsService) {}
+  constructor() {}
 
   async encryptPrivateKey(
     privateKey: string,
   ): Promise<{ encryptedPrivateKey: string; encryptedDataKey: string }> {
-    const dataKey = await this.kmsService.generateDataKey();
+    // Generate a random data encryption key
+    const dataKeyPlaintext = EncryptionUtil.generateKey();
+    const dataKeyEncrypted = EncryptionUtil.encrypt(dataKeyPlaintext);
 
-    const dekBuffer = Buffer.from(dataKey.plaintext, 'hex');
+    const dekBuffer = Buffer.from(dataKeyPlaintext, 'hex');
     const iv = randomBytes(this.IV_LENGTH);
 
     const cipher = createCipheriv(this.ALGORITHM, dekBuffer, iv);
@@ -32,7 +34,7 @@ export class WalletEncryptionService {
 
     return {
       encryptedPrivateKey,
-      encryptedDataKey: dataKey.encrypted,
+      encryptedDataKey: dataKeyEncrypted,
     };
   }
 
@@ -40,7 +42,7 @@ export class WalletEncryptionService {
     encryptedPrivateKey: string,
     encryptedDataKey: string,
   ): Promise<string> {
-    const dekPlaintext = await this.kmsService.decrypt(encryptedDataKey);
+    const dekPlaintext = EncryptionUtil.decrypt(encryptedDataKey);
 
     const dekBuffer = Buffer.from(dekPlaintext, 'hex');
 
