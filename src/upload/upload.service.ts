@@ -27,6 +27,19 @@ export class UploadService {
   ];
   private readonly allowedVideoTypes = ['video/mp4', 'video/webm', 'video/ogg'];
   private readonly allowedAudioTypes = ['audio/mpeg', 'audio/wav', 'audio/ogg'];
+  private readonly allowedDocumentTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+    'text/csv',
+    'application/zip',
+    'application/x-zip-compressed',
+  ];
 
   constructor(private configService: ConfigService) {
     this.uploadDir =
@@ -90,6 +103,21 @@ export class UploadService {
    */
   async uploadAudios(files: Express.Multer.File[]): Promise<UploadedFile[]> {
     return Promise.all(files.map((file) => this.uploadAudio(file)));
+  }
+
+  /**
+   * Upload a single document
+   */
+  async uploadDocument(file: Express.Multer.File): Promise<UploadedFile> {
+    this.validateFile(file, this.allowedDocumentTypes, 'document');
+    return this.saveFile(file, 'documents');
+  }
+
+  /**
+   * Upload multiple documents
+   */
+  async uploadDocuments(files: Express.Multer.File[]): Promise<UploadedFile[]> {
+    return Promise.all(files.map((file) => this.uploadDocument(file)));
   }
 
   /**
@@ -165,10 +193,13 @@ export class UploadService {
   /**
    * Get file type from mimetype
    */
-  getFileType(mimetype: string): 'image' | 'video' | 'audio' | 'unknown' {
+  getFileType(
+    mimetype: string,
+  ): 'image' | 'video' | 'audio' | 'document' | 'unknown' {
     if (this.allowedImageTypes.includes(mimetype)) return 'image';
     if (this.allowedVideoTypes.includes(mimetype)) return 'video';
     if (this.allowedAudioTypes.includes(mimetype)) return 'audio';
+    if (this.allowedDocumentTypes.includes(mimetype)) return 'document';
     return 'unknown';
   }
 }

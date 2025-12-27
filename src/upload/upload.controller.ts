@@ -162,4 +162,53 @@ export class UploadController {
   async uploadAudios(@UploadedFiles() files: Express.Multer.File[]) {
     return this.uploadService.uploadAudios(files);
   }
+
+  @Post('document')
+  @UseInterceptors(FileInterceptor('file'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a single document' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description:
+            'Document file (pdf, doc, docx, xls, xlsx, ppt, pptx, txt, csv, zip)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 201, description: 'Document uploaded successfully' })
+  async uploadDocument(@UploadedFile() file: Express.Multer.File) {
+    return this.uploadService.uploadDocument(file);
+  }
+
+  @Post('documents')
+  @UseInterceptors(FilesInterceptor('files', 10))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload multiple documents (max 10)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        files: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+          description: 'Document files (max 10)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Documents uploaded successfully',
+  })
+  async uploadDocuments(@UploadedFiles() files: Express.Multer.File[]) {
+    return this.uploadService.uploadDocuments(files);
+  }
 }
