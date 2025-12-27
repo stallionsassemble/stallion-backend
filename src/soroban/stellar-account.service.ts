@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Asset,
@@ -19,7 +19,8 @@ import { KmsService } from '../common/kms/kms.service';
  * - Transactions are built → hashed → signed → submitted
  */
 @Injectable()
-export class StellarAccountService implements OnModuleInit {
+// export class StellarAccountService implements OnModuleInit {
+export class StellarAccountService {
   private readonly logger = new Logger(StellarAccountService.name);
   private server: Horizon.Server;
   private masterPublicKey: string;
@@ -44,9 +45,9 @@ export class StellarAccountService implements OnModuleInit {
     this.masterPublicKey = this.configService.get<string>('MASTER_PUBLIC_KEY')!;
   }
 
-  async onModuleInit() {
-    await this.verifyMasterAccount();
-  }
+  // async onModuleInit() {
+  //   await this.verifyMasterAccount();
+  // }
 
   /**
    * Verify that master account exists on Stellar network
