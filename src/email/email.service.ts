@@ -28,18 +28,29 @@ export class EmailService {
   /**
    * Send verification code email (queued)
    */
-  async sendVerificationCode(email: string, code: string): Promise<void> {
+  async sendVerificationCode(
+    email: string,
+    code: string,
+    context: 'signup' | 'login',
+  ): Promise<void> {
     const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
     const appUrl =
       this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+
+    const template =
+      context === 'signup' ? 'verification-signup' : 'verification-login';
+    const subject =
+      context === 'signup'
+        ? `Your ${appName} Verification Code`
+        : `Your ${appName} Login Code`;
 
     await this.emailQueue.add(
       'send-email',
       {
         to: email,
-        subject: `Your ${appName} Verification Code`,
-        template: 'verification',
-        context: { code, appName, appUrl },
+        subject,
+        template,
+        context: { code, appName, appUrl, emailContext: context },
       },
       {
         attempts: 3,
@@ -50,7 +61,7 @@ export class EmailService {
       },
     );
 
-    this.logger.log(`Verification email queued for ${email}`);
+    this.logger.log(`Verification email (${context}) queued for ${email}`);
   }
 
   /**
@@ -173,6 +184,20 @@ export class EmailService {
             appUrl,
           );
           break;
+        case 'verification-signup':
+          html = this.getVerificationSignupEmailTemplate(
+            context.code,
+            appName,
+            appUrl,
+          );
+          break;
+        case 'verification-login':
+          html = this.getVerificationLoginEmailTemplate(
+            context.code,
+            appName,
+            appUrl,
+          );
+          break;
         case 'welcome':
           html = this.getWelcomeEmailTemplate(context.name, appName, appUrl);
           break;
@@ -272,7 +297,7 @@ export class EmailService {
   }
 
   /**
-   * Verification code email template
+   * Verification code email template (legacy - kept for backward compatibility)
    */
   private getVerificationEmailTemplate(
     code: string,
@@ -302,6 +327,106 @@ export class EmailService {
             
             <p style="color: #666; font-size: 14px;">This code will expire in 10 minutes.</p>
             <p style="color: #666; font-size: 14px;">If you didn't request this code, please ignore this email.</p>
+            
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              © ${new Date().getFullYear()} ${appName}. All rights reserved.<br>
+              <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit our website</a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Signup verification code email template
+   */
+  private getVerificationSignupEmailTemplate(
+    code: string,
+    appName: string,
+    appUrl: string,
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Verify Your Email</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">${appName}</h1>
+          </div>
+          
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Welcome! Verify Your Email 🎉</h2>
+            <p>Thank you for signing up with ${appName}! We're excited to have you join our community.</p>
+            <p>Please use the verification code below to complete your registration:</p>
+            
+            <div style="background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 30px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <p style="color: #666; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Your Verification Code</p>
+              <h1 style="color: #667eea; font-size: 36px; letter-spacing: 8px; margin: 0;">${code}</h1>
+            </div>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+              <p style="color: #856404; font-size: 14px; margin: 0;">⏰ This code will expire in <strong>10 minutes</strong>.</p>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">If you didn't create an account with ${appName}, please ignore this email.</p>
+            
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+            
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              © ${new Date().getFullYear()} ${appName}. All rights reserved.<br>
+              <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit our website</a>
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Login verification code email template
+   */
+  private getVerificationLoginEmailTemplate(
+    code: string,
+    appName: string,
+    appUrl: string,
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Login Verification Code</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">${appName}</h1>
+          </div>
+          
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px;">
+            <h2 style="color: #333; margin-top: 0;">Login Verification 🔐</h2>
+            <p>We received a login request for your ${appName} account.</p>
+            <p>Please use the verification code below to complete your login:</p>
+            
+            <div style="background: white; padding: 20px; text-align: center; border-radius: 8px; margin: 30px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+              <p style="color: #666; font-size: 14px; margin: 0 0 10px 0; text-transform: uppercase; letter-spacing: 1px;">Your Login Code</p>
+              <h1 style="color: #667eea; font-size: 36px; letter-spacing: 8px; margin: 0;">${code}</h1>
+            </div>
+            
+            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin: 20px 0;">
+              <p style="color: #856404; font-size: 14px; margin: 0;">⏰ This code will expire in <strong>10 minutes</strong>.</p>
+            </div>
+            
+            <div style="background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; border-radius: 4px; margin: 20px 0;">
+              <p style="color: #721c24; font-size: 14px; margin: 0;">🔒 <strong>Security Alert:</strong> If you didn't attempt to log in, please secure your account immediately and contact support.</p>
+            </div>
             
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             

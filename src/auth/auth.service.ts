@@ -181,7 +181,7 @@ export class AuthService {
     }
 
     // Send verification email
-    await this.emailService.sendVerificationCode(dto.email, code);
+    await this.emailService.sendVerificationCode(dto.email, code, 'signup');
 
     return { message: 'Verification code sent to your email' };
   }
@@ -562,7 +562,7 @@ export class AuthService {
     // Send verification code via email
     const code = Math.floor(100000 + Math.random() * 900000).toString();
     await this.verificationCodeStorage.setVerificationCode(email, code);
-    await this.emailService.sendVerificationCode(email, code);
+    await this.emailService.sendVerificationCode(email, code, 'login');
 
     return {
       message: 'Verification code sent to your email',
