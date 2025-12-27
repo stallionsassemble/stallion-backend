@@ -203,6 +203,7 @@ model Bounty {
   rewardCurrency     String?      @map("reward_currency")
   rewardDistribution Json?        @map("reward_distribution")
   submissionFields   Json?        @map("submission_fields")
+  attachments        Json?        // Array of attachment objects: [{filename, url, size, mimetype}]
   status             BountyStatus @default(ACTIVE)
   contractBountyId   Int?         @unique @map("contract_bounty_id") // ID from Soroban contract
   txHash             String?      @map("tx_hash") // Transaction hash from Soroban

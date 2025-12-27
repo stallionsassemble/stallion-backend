@@ -381,6 +381,7 @@ export class BountiesService {
           rewardDistribution: dto.rewardDistribution,
           submissionFields:
             dto.submissionFields as unknown as Prisma.InputJsonValue,
+          attachments: dto.attachments as unknown as Prisma.InputJsonValue,
           submissionDeadline,
           judgingDeadline,
           ownerId: userId,

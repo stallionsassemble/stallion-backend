@@ -9,6 +9,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUrl,
   ValidateNested,
 } from 'class-validator';
 
@@ -65,6 +66,33 @@ export class RewardDistributionItem {
   @ApiProperty({ description: 'Percentage of reward', example: 70 })
   @IsNumber()
   percentage: number;
+}
+
+export class AttachmentItem {
+  @ApiProperty({
+    description: 'Original filename',
+    example: 'requirements.pdf',
+  })
+  @IsString()
+  filename: string;
+
+  @ApiProperty({
+    description: 'File URL',
+    example: 'http://localhost:3000/uploads/documents/1234567890-abc123.pdf',
+  })
+  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
+  url: string;
+
+  @ApiProperty({ description: 'File size in bytes', example: 102400 })
+  @IsNumber()
+  size: number;
+
+  @ApiProperty({
+    description: 'File MIME type',
+    example: 'application/pdf',
+  })
+  @IsString()
+  mimetype: string;
 }
 
 export class CreateBountyDto {
@@ -145,6 +173,24 @@ export class CreateBountyDto {
   @Type(() => SubmissionFieldItem)
   @IsOptional()
   submissionFields?: SubmissionFieldItem[];
+
+  @ApiPropertyOptional({
+    description: 'Attachments for the bounty (documents, images, etc.)',
+    type: [AttachmentItem],
+    example: [
+      {
+        filename: 'requirements.pdf',
+        url: 'http://localhost:3000/uploads/documents/1234567890-abc123.pdf',
+        size: 102400,
+        mimetype: 'application/pdf',
+      },
+    ],
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttachmentItem)
+  @IsOptional()
+  attachments?: AttachmentItem[];
 
   @ApiProperty({
     description: 'Reward distribution by rank',
