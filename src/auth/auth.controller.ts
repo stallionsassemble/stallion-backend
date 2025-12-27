@@ -61,18 +61,6 @@ export class AuthController {
     return this.authService.getProfile(userId);
   }
 
-  @ApiResponse({
-    status: 400,
-    description: 'Profile already completed or username taken',
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async completeOwnerProfile(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CompleteOwnerProfileDto,
-  ) {
-    return this.authService.completeOwnerProfile(userId, dto);
-  }
-
   @Get('check-username/:username')
   @ApiOperation({
     summary: 'Check username availability',
@@ -203,6 +191,18 @@ export class AuthController {
       },
     },
   })
+  @ApiResponse({
+    status: 400,
+    description: 'Profile already completed or username taken',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async completeOwnerProfile(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CompleteOwnerProfileDto,
+  ) {
+    return this.authService.completeOwnerProfile(userId, dto);
+  }
+
   @Post('login')
   @HttpCode(200)
   @ApiOperation({
