@@ -146,15 +146,26 @@ export class StellarAccountService implements OnModuleInit {
    */
   async getAccountBalance(publicKey: string): Promise<string> {
     try {
+      this.logger.log(`Fetching balance for public key: ${publicKey}`);
       const account = await this.server.loadAccount(publicKey);
 
       const bal = account.balances.find((b) => b.asset_type === 'native');
 
-      if (!bal) return '0';
+      if (!bal) {
+        this.logger.warn(`No native balance found for ${publicKey}`);
+        return '0';
+      }
 
-      return BigInt(Math.floor(parseFloat(bal.balance) * 10000000)).toString();
+      const balance = BigInt(
+        Math.floor(parseFloat(bal.balance) * 10000000),
+      ).toString();
+      this.logger.log(`Balance for ${publicKey}: ${balance} stroops`);
+      return balance;
     } catch (error) {
-      this.logger.error('Failed to get account balance', error);
+      this.logger.error(
+        `Failed to get account balance for ${publicKey}`,
+        error,
+      );
       return '0';
     }
   }

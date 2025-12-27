@@ -67,6 +67,30 @@ export class WalletController {
     return this.walletService.getTransactions(wallet.id);
   }
 
+  @Post('sync')
+  @ApiOperation({
+    summary: 'Sync wallet with blockchain',
+    description:
+      'Manually sync wallet activation status and transactions from blockchain',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Wallet synced successfully',
+    schema: {
+      example: {
+        synced: true,
+        activated: true,
+        transactionsSynced: 5,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Wallet not found' })
+  async syncWallet(@CurrentUser('id') userId: string) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
+    return this.walletService.syncWallet(wallet.id);
+  }
+
   @Post('withdraw')
   @UseGuards(MFAGuard)
   @ApiOperation({

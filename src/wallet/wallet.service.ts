@@ -33,10 +33,25 @@ export class WalletService {
       throw new NotFoundException('Wallet not found');
     }
 
-    return user.wallet;
+    this.logger.log(
+      `Retrieved wallet for user ${userId}: walletId=${user.wallet.id}, publicKey=${user.wallet.publicKey}`,
+    );
+
+    // Sync wallet with blockchain before returning
+    await this.syncWallet(user.wallet.id);
+
+    // Fetch updated wallet data after sync
+    const updatedWallet = await this.prisma.wallet.findUnique({
+      where: { id: user.wallet.id },
+    });
+
+    return updatedWallet!;
   }
 
   async getTransactions(walletId: string) {
+    // Sync wallet with blockchain before fetching transactions
+    await this.syncWallet(walletId);
+
     return this.prisma.transaction.findMany({
       where: { walletId },
       orderBy: { createdAt: 'desc' },
@@ -290,6 +305,9 @@ export class WalletService {
    * Get wallet balance with available balance
    */
   async getWalletBalance(walletId: string) {
+    // Sync wallet with blockchain first
+    await this.syncWallet(walletId);
+
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
     });
@@ -297,6 +315,10 @@ export class WalletService {
     if (!wallet) {
       throw new NotFoundException('Wallet not found');
     }
+
+    this.logger.log(
+      `Getting balance for wallet ${walletId} with public key: ${wallet.publicKey}`,
+    );
 
     // Fetch balance from Stellar network
     const onChainBalance = await this.stellarAccount.getAccountBalance(
@@ -369,5 +391,170 @@ export class WalletService {
         'Send XLM or supported tokens directly to this address to fund your wallet',
       activated: wallet.isActivated,
     };
+  }
+
+  /**
+   * Sync wallet with blockchain state
+   * - Check activation status
+   * - Fetch and sync recent transactions
+   */
+  async syncWallet(walletId: string): Promise<{
+    synced: boolean;
+    activated: boolean;
+    transactionsSynced: number;
+  }> {
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: walletId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    this.logger.log(
+      `Syncing wallet ${walletId} (${wallet.publicKey}) with blockchain`,
+    );
+
+    try {
+      // Check if account exists on blockchain
+      await this.stellarAccount.getServer().loadAccount(wallet.publicKey);
+
+      // Account exists, so it's activated
+      if (!wallet.isActivated) {
+        await this.prisma.wallet.update({
+          where: { id: walletId },
+          data: { isActivated: true },
+        });
+        this.logger.log(`Wallet ${walletId} marked as activated`);
+      }
+
+      // Fetch recent transactions from blockchain
+      const transactionsSynced = await this.syncTransactionsFromBlockchain(
+        walletId,
+        wallet.publicKey,
+      );
+
+      return {
+        synced: true,
+        activated: true,
+        transactionsSynced,
+      };
+    } catch (error: any) {
+      // Account not found on blockchain (404 error)
+      if (
+        error.response?.status === 404 ||
+        error.message?.includes('Not Found')
+      ) {
+        this.logger.warn(`Wallet ${walletId} not yet activated on blockchain`);
+
+        // Ensure database reflects non-activated state
+        if (wallet.isActivated) {
+          await this.prisma.wallet.update({
+            where: { id: walletId },
+            data: { isActivated: false },
+          });
+        }
+
+        return {
+          synced: true,
+          activated: false,
+          transactionsSynced: 0,
+        };
+      }
+
+      // Other errors
+      this.logger.error(`Failed to sync wallet ${walletId}`, error);
+      throw new BadRequestException('Failed to sync wallet with blockchain');
+    }
+  }
+
+  /**
+   * Sync transactions from blockchain to database
+   */
+  private async syncTransactionsFromBlockchain(
+    walletId: string,
+    publicKey: string,
+  ): Promise<number> {
+    try {
+      // Fetch recent transactions (limit to last 50)
+      const txRecords = await this.stellarAccount
+        .getServer()
+        .transactions()
+        .forAccount(publicKey)
+        .order('desc')
+        .limit(50)
+        .call();
+
+      let syncedCount = 0;
+
+      for (const txRecord of txRecords.records) {
+        // Check if transaction already exists in database
+        const existing = await this.prisma.transaction.findFirst({
+          where: {
+            externalTxId: txRecord.id,
+          },
+        });
+
+        if (existing) {
+          continue; // Skip already synced transactions
+        }
+
+        // Load transaction details to get operations
+        const tx = await this.stellarAccount
+          .getServer()
+          .transactions()
+          .transaction(txRecord.id)
+          .call();
+        const operations = await tx.operations();
+
+        // Process each operation
+        for (const op of operations.records) {
+          const opType = op.type as string;
+          if (opType === 'payment' || opType === 'create_account') {
+            const isIncoming = (op as any).to === publicKey;
+            const amount = parseFloat(
+              (op as any).amount || (op as any).starting_balance || '0',
+            );
+
+            if (amount > 0) {
+              // Create transaction record
+              await this.prisma.transaction.create({
+                data: {
+                  walletId,
+                  type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
+                  amount: amount,
+                  currency: 'XLM',
+                  state: TxState.COMPLETED,
+                  externalTxId: txRecord.id,
+                  idempotencyKey: generateIdempotencyKey(),
+                  note: `Synced from blockchain - ${op.type}`,
+                  metadata: {
+                    syncedAt: new Date().toISOString(),
+                    operationType: op.type,
+                    txHash: txRecord.hash,
+                  } as Prisma.InputJsonValue,
+                },
+              });
+
+              syncedCount++;
+              this.logger.log(
+                `Synced ${op.type} transaction: ${amount} XLM (${isIncoming ? 'incoming' : 'outgoing'})`,
+              );
+            }
+          }
+        }
+      }
+
+      this.logger.log(
+        `Synced ${syncedCount} transactions for wallet ${walletId}`,
+      );
+      return syncedCount;
+    } catch (error) {
+      this.logger.error(
+        `Failed to sync transactions for wallet ${walletId}`,
+        error,
+      );
+      return 0;
+    }
   }
 }
