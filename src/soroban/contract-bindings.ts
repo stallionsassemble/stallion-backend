@@ -20,7 +20,7 @@ if (typeof window !== 'undefined') {
 export const networks = {
   testnet: {
     networkPassphrase: 'Test SDF Network ; September 2015',
-    contractId: 'CD5VMWXZQDG77ONFIAB543NXA73FAN5BP5JVAR3WMPWZ67BGPCZVKORK',
+    contractId: 'CAX2BG7RMYZDXGBJAFS7VGM2IQPYFF5V4OPXQW3UBAIWMQRXLQRNGUHX',
   },
 } as const;
 
@@ -70,22 +70,7 @@ export interface Client {
    */
   get_bounty: (
     { bounty_id }: { bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<Bounty>>>;
 
   /**
@@ -93,65 +78,22 @@ export interface Client {
    */
   close_bounty: (
     { owner, bounty_id }: { owner: string; bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a get_bounties transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  get_bounties: (options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<Array<u32>>>;
+  get_bounties: (
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
    * Construct and simulate a update_admin transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   update_admin: (
     { new_admin }: { new_admin: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<string>>>;
 
   /**
@@ -159,22 +101,7 @@ export interface Client {
    */
   check_judging: (
     { bounty_id }: { bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
@@ -198,22 +125,7 @@ export interface Client {
       judging_deadline: u64;
       title: string;
     },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<u32>>>;
 
   /**
@@ -221,22 +133,7 @@ export interface Client {
    */
   delete_bounty: (
     { owner, bounty_id }: { owner: string; bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
@@ -256,22 +153,7 @@ export interface Client {
       new_distribution: Array<readonly [u32, u32]>;
       new_submission_deadline: Option<u64>;
     },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
@@ -279,22 +161,7 @@ export interface Client {
    */
   get_submission: (
     { bounty_id, user }: { bounty_id: u32; user: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<string>>>;
 
   /**
@@ -306,22 +173,7 @@ export interface Client {
       bounty_id,
       winners,
     }: { owner: string; bounty_id: u32; winners: Array<string> },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
@@ -333,22 +185,7 @@ export interface Client {
       bounty_id,
       submission_link,
     }: { applicant: string; bounty_id: u32; submission_link: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
@@ -356,22 +193,7 @@ export interface Client {
    */
   get_bounty_status: (
     { bounty_id }: { bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<Status>>>;
 
   /**
@@ -379,22 +201,7 @@ export interface Client {
    */
   get_user_bounties: (
     { user }: { user: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
@@ -406,65 +213,22 @@ export interface Client {
       bounty_id,
       new_submission_link,
     }: { applicant: string; bounty_id: u32; new_submission_link: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a get_bounties_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  get_bounties_count: (options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<u32>>;
+  get_bounties_count: (
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<u32>>;
 
   /**
    * Construct and simulate a get_bounty_winners transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_bounty_winners: (
     { bounty_id }: { bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<Array<string>>>>;
 
   /**
@@ -472,22 +236,7 @@ export interface Client {
    */
   get_owner_bounties: (
     { owner }: { owner: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
@@ -495,65 +244,22 @@ export interface Client {
    */
   update_fee_account: (
     { new_fee_account }: { new_fee_account: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<string>>>;
 
   /**
    * Construct and simulate a get_active_bounties transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
-  get_active_bounties: (options?: {
-    /**
-     * The fee to pay for the transaction. Default: BASE_FEE
-     */
-    fee?: number;
-
-    /**
-     * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-     */
-    timeoutInSeconds?: number;
-
-    /**
-     * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-     */
-    simulate?: boolean;
-  }) => Promise<AssembledTransaction<Array<u32>>>;
+  get_active_bounties: (
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
    * Construct and simulate a get_bounties_by_token transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_bounties_by_token: (
     { token }: { token: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
@@ -561,22 +267,7 @@ export interface Client {
    */
   get_bounty_applicants: (
     { bounty_id }: { bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<Array<string>>>>;
 
   /**
@@ -584,22 +275,7 @@ export interface Client {
    */
   get_bounties_by_status: (
     { status }: { status: Status },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
@@ -607,22 +283,7 @@ export interface Client {
    */
   get_bounty_submissions: (
     { bounty_id }: { bounty_id: u32 },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<Map<string, string>>>>;
 
   /**
@@ -630,22 +291,7 @@ export interface Client {
    */
   get_user_bounties_count: (
     { user }: { user: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<u32>>;
 
   /**
@@ -653,22 +299,7 @@ export interface Client {
    */
   get_owner_bounties_count: (
     { owner }: { owner: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<u32>>;
 
   /**
@@ -676,22 +307,7 @@ export interface Client {
    */
   get_bounties_by_token_count: (
     { token }: { token: string },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<u32>>;
 
   /**
@@ -699,22 +315,7 @@ export interface Client {
    */
   get_bounties_by_status_count: (
     { status }: { status: Status },
-    options?: {
-      /**
-       * The fee to pay for the transaction. Default: BASE_FEE
-       */
-      fee?: number;
-
-      /**
-       * The maximum amount of time to wait for the transaction to complete. Default: DEFAULT_TIMEOUT
-       */
-      timeoutInSeconds?: number;
-
-      /**
-       * Whether to automatically simulate the transaction when constructing the AssembledTransaction. Default: true
-       */
-      simulate?: boolean;
-    },
+    options?: MethodOptions,
   ) => Promise<AssembledTransaction<u32>>;
 }
 export class Client extends ContractClient {

@@ -77,9 +77,9 @@ export class BountiesService {
    */
   async getAllBounties(): Promise<Bounty[]> {
     try {
-      const tx = await this.sorobanClient.get_bounties();
-      const result = await tx.simulate();
-      const contractBountyIds = result.result.map(Number);
+      const assembled = await this.sorobanClient.get_bounties();
+      const simulated = await assembled.simulate();
+      const contractBountyIds = simulated.result.map(Number);
 
       // Fetch bounties from database based on contract IDs
       const bounties = await this.prisma.bounty.findMany({
@@ -126,12 +126,12 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
-      const tx = await this.sorobanClient.get_owner_bounties({
+      const assembled = await this.sorobanClient.get_owner_bounties({
         owner: user.wallet.publicKey,
       });
+      const simulated = await assembled.simulate();
 
-      const result = await tx.simulate();
-      const contractBountyIds = result.result.map(Number);
+      const contractBountyIds = simulated.result.map(Number);
 
       // Fetch bounties from database based on contract IDs
       const bounties = await this.prisma.bounty.findMany({
@@ -169,9 +169,9 @@ export class BountiesService {
    */
   async getActiveBounties(): Promise<Bounty[]> {
     try {
-      const tx = await this.sorobanClient.get_active_bounties();
-      const result = await tx.simulate();
-      const contractBountyIds = result.result.map(Number);
+      const assembled = await this.sorobanClient.get_active_bounties();
+      const simulated = await assembled.simulate();
+      const contractBountyIds = simulated.result.map(Number);
 
       // Fetch bounties from database based on contract IDs
       const bounties = await this.prisma.bounty.findMany({
@@ -216,14 +216,16 @@ export class BountiesService {
         throw new NotFoundException('Bounty not found');
       }
 
-      const tx = await this.sorobanClient.get_bounty({ bounty_id: bountyId });
-      const result = await tx.simulate();
+      const assembled = await this.sorobanClient.get_bounty({
+        bounty_id: bountyId,
+      });
+      const simulated = await assembled.simulate();
 
-      if (!result.result.isOk()) {
+      if (!simulated.result.isOk()) {
         throw new NotFoundException('Bounty not found');
       }
 
-      const contractBounty = result.result.unwrap();
+      const contractBounty = simulated.result.unwrap();
 
       // Fetch database bounty details
       const dbBounty = await this.prisma.bounty.findUnique({
@@ -909,13 +911,13 @@ export class BountiesService {
       }
 
       // Check if bounty has any submissions
-      const submissions = await this.sorobanClient.get_bounty_submissions({
+      const assembled = await this.sorobanClient.get_bounty_submissions({
         bounty_id: bountyId,
       });
-      const submissionsResult = await submissions.simulate();
+      const simulated = await assembled.simulate();
 
-      if (submissionsResult.result.isOk()) {
-        const submissionsMap = submissionsResult.result.unwrap();
+      if (simulated.result.isOk()) {
+        const submissionsMap = simulated.result.unwrap();
         if (submissionsMap.size > 0) {
           throw new ForbiddenException(
             'Cannot close bounty with existing submissions',
@@ -963,17 +965,16 @@ export class BountiesService {
    */
   async getBountySubmissions(bountyId: number): Promise<Map<string, string>> {
     try {
-      const tx = await this.sorobanClient.get_bounty_submissions({
+      const assembled = await this.sorobanClient.get_bounty_submissions({
         bounty_id: bountyId,
       });
+      const simulated = await assembled.simulate();
 
-      const result = await tx.simulate();
-
-      if (!result.result.isOk()) {
+      if (!simulated.result.isOk()) {
         throw new NotFoundException('Bounty not found');
       }
 
-      return result.result.unwrap();
+      return simulated.result.unwrap();
     } catch (error) {
       this.logger.error('Failed to get bounty submissions', error);
       throw error;
@@ -1026,17 +1027,16 @@ export class BountiesService {
    */
   async getBountyApplicants(bountyId: number): Promise<string[]> {
     try {
-      const tx = await this.sorobanClient.get_bounty_applicants({
+      const assembled = await this.sorobanClient.get_bounty_applicants({
         bounty_id: bountyId,
       });
+      const simulated = await assembled.simulate();
 
-      const result = await tx.simulate();
-
-      if (!result.result.isOk()) {
+      if (!simulated.result.isOk()) {
         throw new NotFoundException('Bounty not found');
       }
 
-      return result.result.unwrap();
+      return simulated.result.unwrap();
     } catch (error) {
       this.logger.error('Failed to get bounty applicants', error);
       throw error;
@@ -1048,17 +1048,16 @@ export class BountiesService {
    */
   async getBountyWinners(bountyId: number): Promise<string[]> {
     try {
-      const tx = await this.sorobanClient.get_bounty_winners({
+      const assembled = await this.sorobanClient.get_bounty_winners({
         bounty_id: bountyId,
       });
+      const simulated = await assembled.simulate();
 
-      const result = await tx.simulate();
-
-      if (!result.result.isOk()) {
+      if (!simulated.result.isOk()) {
         throw new NotFoundException('Bounty not found');
       }
 
-      return result.result.unwrap();
+      return simulated.result.unwrap();
     } catch (error) {
       this.logger.error('Failed to get bounty winners', error);
       throw error;
@@ -1070,17 +1069,16 @@ export class BountiesService {
    */
   async getBountyStatus(bountyId: number): Promise<Status> {
     try {
-      const tx = await this.sorobanClient.get_bounty_status({
+      const assembled = await this.sorobanClient.get_bounty_status({
         bounty_id: bountyId,
       });
+      const simulated = await assembled.simulate();
 
-      const result = await tx.simulate();
-
-      if (!result.result.isOk()) {
+      if (!simulated.result.isOk()) {
         throw new NotFoundException('Bounty not found');
       }
 
-      return result.result.unwrap();
+      return simulated.result.unwrap();
     } catch (error) {
       this.logger.error('Failed to get bounty status', error);
       throw error;

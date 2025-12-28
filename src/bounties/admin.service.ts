@@ -173,20 +173,25 @@ export class AdminService {
       await this.verifyAdmin(userId);
 
       // Get total bounties
-      const totalBountiesTx = await this.sorobanClient.get_bounties_count();
-      const totalBounties = Number((await totalBountiesTx.simulate()).result);
+      const totalBountiesAssembled =
+        await this.sorobanClient.get_bounties_count();
+      const totalBountiesSimulated = await totalBountiesAssembled.simulate();
+      const totalBounties = Number(totalBountiesSimulated.result);
 
       // Get active bounties
-      const activeBountiesTx = await this.sorobanClient.get_active_bounties();
-      const activeBounties = (await activeBountiesTx.simulate()).result.length;
+      const activeBountiesAssembled =
+        await this.sorobanClient.get_active_bounties();
+      const activeBountiesSimulated = await activeBountiesAssembled.simulate();
+      const activeBounties = activeBountiesSimulated.result.length;
 
       // Get completed bounties
-      const completedBountiesTx =
+      const completedBountiesAssembled =
         await this.sorobanClient.get_bounties_by_status({
           status: { tag: 'Completed', values: undefined },
         });
-      const completedBounties = (await completedBountiesTx.simulate()).result
-        .length;
+      const completedBountiesSimulated =
+        await completedBountiesAssembled.simulate();
+      const completedBounties = completedBountiesSimulated.result.length;
 
       // Calculate total rewards from database
       const bounties = await this.prisma.bounty.findMany({
