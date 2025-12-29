@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -259,13 +264,22 @@ export class AdminService {
    */
   async checkJudging(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
   ): Promise<{ txHash: string }> {
     try {
       await this.verifyAdmin(userId);
 
+      // Get bounty to fetch contract ID
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
       const tx = await this.sorobanClient.check_judging({
-        bounty_id: bountyId,
+        bounty_id: bounty.contractBountyId,
       });
 
       // Prepare, sign and send transaction
@@ -292,7 +306,7 @@ export class AdminService {
 
       const sendResponse = await this.rpcServer.sendTransaction(signedTx);
       this.logger.log(
-        `Judging checked for bounty ${bountyId}, tx: ${sendResponse.hash}`,
+        `Judging checked for bounty ${dbBountyId}, tx: ${sendResponse.hash}`,
       );
 
       return { txHash: sendResponse.hash };

@@ -96,7 +96,7 @@ export class BountyController {
     description: 'Bounty details from contract',
   })
   async getBounty(@Param('id') id: string) {
-    return this.bountyService.getBounty(parseInt(id));
+    return this.bountyService.getBounty(id);
   }
 
   @Post()
@@ -142,7 +142,7 @@ export class BountyController {
     @Param('id') id: string,
     @Body() dto: UpdateBountyDto,
   ) {
-    return this.bountyService.updateBounty(userId, parseInt(id), dto);
+    return this.bountyService.updateBounty(userId, id, dto);
   }
 
   @Patch(':id/close')
@@ -167,7 +167,7 @@ export class BountyController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
   ) {
-    return this.bountyService.closeBounty(userId, parseInt(id));
+    return this.bountyService.closeBounty(userId, id);
   }
 
   @Delete(':id')
@@ -183,7 +183,7 @@ export class BountyController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
   ) {
-    return this.bountyService.deleteBounty(userId, parseInt(id));
+    return this.bountyService.deleteBounty(userId, id);
   }
 
   @Post(':id/apply')
@@ -206,7 +206,7 @@ export class BountyController {
     @Param('id') id: string,
     @Body() dto: ApplyToBountyDto,
   ) {
-    return this.bountyService.applyToBounty(userId, parseInt(id), dto);
+    return this.bountyService.applyToBounty(userId, id, dto);
   }
 
   @Patch(':id/submission')
@@ -223,7 +223,7 @@ export class BountyController {
     @Param('id') id: string,
     @Body() dto: ApplyToBountyDto,
   ) {
-    return this.bountyService.updateSubmission(userId, parseInt(id), dto);
+    return this.bountyService.updateSubmission(userId, id, dto);
   }
 
   @Post(':id/winners')
@@ -245,7 +245,7 @@ export class BountyController {
     @Param('id') id: string,
     @Body() dto: SelectWinnersDto,
   ) {
-    return this.bountyService.selectWinners(userId, parseInt(id), dto);
+    return this.bountyService.selectWinners(userId, id, dto);
   }
 
   @Get(':id/submissions')
@@ -280,7 +280,7 @@ export class BountyController {
     },
   })
   async getBountySubmissionsDetailed(@Param('id') id: string) {
-    return this.bountyService.getBountySubmissionsDetailed(parseInt(id));
+    return this.bountyService.getBountySubmissionsDetailed(id);
   }
 
   @Get(':id/applicants')
@@ -290,7 +290,7 @@ export class BountyController {
     description: 'List of applicant addresses',
   })
   async getBountyApplicants(@Param('id') id: string) {
-    return this.bountyService.getBountyApplicants(parseInt(id));
+    return this.bountyService.getBountyApplicants(id);
   }
 
   @Get(':id/winners')
@@ -300,7 +300,7 @@ export class BountyController {
     description: 'List of winner addresses',
   })
   async getBountyWinners(@Param('id') id: string) {
-    return this.bountyService.getBountyWinners(parseInt(id));
+    return this.bountyService.getBountyWinners(id);
   }
 
   // Admin endpoints
@@ -387,6 +387,6 @@ export class BountyController {
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
   ) {
-    return this.adminService.checkJudging(userId, parseInt(id));
+    return this.adminService.checkJudging(userId, id);
   }
 }

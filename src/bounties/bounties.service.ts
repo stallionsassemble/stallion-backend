@@ -208,16 +208,30 @@ export class BountiesService {
    * Fetches from both contract and database, with contract details taking precedence
    */
   async getBounty(
-    bountyId: number,
+    dbBountyId: string,
   ): Promise<Bounty & { ownerDetails: SanitizedUser }> {
     try {
-      // Make sure bountyId is valid u32
-      if (bountyId < 0 || bountyId > 4294967295) {
+      // Fetch database bounty details first
+      const dbBounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+        include: {
+          owner: true,
+        },
+      });
+
+      if (!dbBounty || dbBounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      const contractBountyId = dbBounty.contractBountyId;
+
+      // Make sure contractBountyId is valid u32
+      if (contractBountyId < 0 || contractBountyId > 4294967295) {
         throw new NotFoundException('Bounty not found');
       }
 
       const assembled = await this.sorobanClient.get_bounty({
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -226,18 +240,6 @@ export class BountiesService {
       }
 
       const contractBounty = simulated.result.unwrap();
-
-      // Fetch database bounty details
-      const dbBounty = await this.prisma.bounty.findUnique({
-        where: { contractBountyId: bountyId },
-        include: {
-          owner: true,
-        },
-      });
-
-      if (!dbBounty) {
-        throw new NotFoundException('Bounty not found');
-      }
 
       // Convert contract status to database status
       let status: BountyStatus = BountyStatus.ACTIVE;
@@ -414,7 +416,7 @@ export class BountiesService {
    */
   async updateBounty(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
     dto: UpdateBountyDto,
   ): Promise<{ txHash: string }> {
     try {
@@ -428,10 +430,12 @@ export class BountiesService {
       }
 
       // Verify user owns the bounty
-      const bounty = await this.getBounty(bountyId);
+      const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
         throw new ForbiddenException('You do not own this bounty');
       }
+
+      const contractBountyId = bounty.contractBountyId!;
 
       // Prepare update parameters
       const distribution: Array<readonly [number, number]> = dto.distribution
@@ -444,7 +448,7 @@ export class BountiesService {
 
       const tx = await this.sorobanClient.update_bounty({
         owner: user.wallet.publicKey,
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
         new_title: dto.title || undefined,
         new_distribution: distribution,
         new_submission_deadline: submissionDeadline
@@ -467,7 +471,7 @@ export class BountiesService {
 
       // Update in database
       await this.prisma.bounty.update({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
         data: {
           ...(dto.title && { title: dto.title }),
           ...(submissionDeadline && {
@@ -476,7 +480,9 @@ export class BountiesService {
         },
       });
 
-      this.logger.log(`Bounty updated: ${bountyId}, tx: ${sendResponse.hash}`);
+      this.logger.log(
+        `Bounty updated: ${dbBountyId}, tx: ${sendResponse.hash}`,
+      );
 
       return { txHash: sendResponse.hash };
     } catch (error) {
@@ -490,7 +496,7 @@ export class BountiesService {
    */
   async deleteBounty(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
   ): Promise<{ txHash: string }> {
     try {
       const user = await this.prisma.user.findUnique({
@@ -503,14 +509,16 @@ export class BountiesService {
       }
 
       // Verify user owns the bounty
-      const bounty = await this.getBounty(bountyId);
+      const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
         throw new ForbiddenException('You do not own this bounty');
       }
 
+      const contractBountyId = bounty.contractBountyId!;
+
       const tx = await this.sorobanClient.delete_bounty({
         owner: user.wallet.publicKey,
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
       });
 
       // Prepare, sign with user's wallet and send transaction
@@ -528,10 +536,12 @@ export class BountiesService {
 
       // Delete from database
       await this.prisma.bounty.delete({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
       });
 
-      this.logger.log(`Bounty deleted: ${bountyId}, tx: ${sendResponse.hash}`);
+      this.logger.log(
+        `Bounty deleted: ${dbBountyId}, tx: ${sendResponse.hash}`,
+      );
 
       return { txHash: sendResponse.hash };
     } catch (error) {
@@ -545,7 +555,7 @@ export class BountiesService {
    */
   async applyToBounty(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
     dto: ApplyToBountyDto,
   ): Promise<{ txHash: string }> {
     try {
@@ -560,12 +570,14 @@ export class BountiesService {
 
       // Get bounty to validate submission fields
       const bounty = await this.prisma.bounty.findUnique({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
       });
 
-      if (!bounty) {
+      if (!bounty || bounty.contractBountyId === null) {
         throw new NotFoundException('Bounty not found');
       }
+
+      const contractBountyId = bounty.contractBountyId;
 
       // Validate submission data against bounty's submission fields
       const submissionFields = bounty.submissionFields as unknown as
@@ -575,7 +587,7 @@ export class BountiesService {
 
       const tx = await this.sorobanClient.apply_to_bounty({
         applicant: user.wallet.publicKey,
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
         submission_link: dto.submissionLink,
       });
 
@@ -620,7 +632,7 @@ export class BountiesService {
       }
 
       this.logger.log(
-        `User ${userId} applied to bounty ${bountyId}, tx: ${sendResponse.hash}`,
+        `User ${userId} applied to bounty ${dbBountyId}, tx: ${sendResponse.hash}`,
       );
 
       return { txHash: sendResponse.hash };
@@ -635,7 +647,7 @@ export class BountiesService {
    */
   async updateSubmission(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
     dto: ApplyToBountyDto,
   ): Promise<{ txHash: string }> {
     try {
@@ -650,12 +662,14 @@ export class BountiesService {
 
       // Get bounty to validate submission fields
       const bounty = await this.prisma.bounty.findUnique({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
       });
 
-      if (!bounty) {
+      if (!bounty || bounty.contractBountyId === null) {
         throw new NotFoundException('Bounty not found');
       }
+
+      const contractBountyId = bounty.contractBountyId;
 
       // Validate submission data against bounty's submission fields
       const submissionFields = bounty.submissionFields as unknown as
@@ -680,7 +694,7 @@ export class BountiesService {
       ) {
         const tx = await this.sorobanClient.update_submission({
           applicant: user.wallet.publicKey,
-          bounty_id: bountyId,
+          bounty_id: contractBountyId,
           new_submission_link: dto.submissionLink,
         });
 
@@ -699,7 +713,7 @@ export class BountiesService {
         txHash = sendResponse.hash;
 
         this.logger.log(
-          `User ${userId} updated submission link for bounty ${bountyId}, tx: ${txHash}`,
+          `User ${userId} updated submission link for bounty ${dbBountyId}, tx: ${txHash}`,
         );
       }
 
@@ -716,7 +730,7 @@ export class BountiesService {
       });
 
       this.logger.log(
-        `User ${userId} updated submission for bounty ${bountyId}`,
+        `User ${userId} updated submission for bounty ${dbBountyId}`,
       );
 
       return { txHash: txHash || 'no-chain-update' };
@@ -731,7 +745,7 @@ export class BountiesService {
    */
   async selectWinners(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
     dto: SelectWinnersDto,
   ): Promise<{ txHash: string }> {
     try {
@@ -745,10 +759,12 @@ export class BountiesService {
       }
 
       // Verify user owns the bounty
-      const bounty = await this.getBounty(bountyId);
+      const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
         throw new ForbiddenException('You do not own this bounty');
       }
+
+      const contractBountyId = bounty.contractBountyId!;
 
       // Fetch winner users and their public keys
       const winnerUsers = await this.prisma.user.findMany({
@@ -777,7 +793,7 @@ export class BountiesService {
 
       const tx = await this.sorobanClient.select_winners({
         owner: user.wallet.publicKey,
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
         winners: winnerPublicKeys,
       });
 
@@ -796,13 +812,13 @@ export class BountiesService {
 
       // Update bounty status in database
       await this.prisma.bounty.update({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
         data: { status: BountyStatus.COMPLETED },
       });
 
       // Create winner records and process payouts
       const dbBounty = await this.prisma.bounty.findUnique({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
       });
 
       // Parse reward distribution
@@ -876,7 +892,7 @@ export class BountiesService {
       }
 
       this.logger.log(
-        `Winners selected for bounty ${bountyId}, tx: ${sendResponse.hash}`,
+        `Winners selected for bounty ${dbBountyId}, tx: ${sendResponse.hash}`,
       );
 
       return { txHash: sendResponse.hash };
@@ -892,7 +908,7 @@ export class BountiesService {
    */
   async closeBounty(
     userId: string,
-    bountyId: number,
+    dbBountyId: string,
   ): Promise<{ txHash: string }> {
     try {
       const user = await this.prisma.user.findUnique({
@@ -905,14 +921,16 @@ export class BountiesService {
       }
 
       // Verify user owns the bounty
-      const bounty = await this.getBounty(bountyId);
+      const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
         throw new ForbiddenException('You do not own this bounty');
       }
 
+      const contractBountyId = bounty.contractBountyId!;
+
       // Check if bounty has any submissions
       const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -927,7 +945,7 @@ export class BountiesService {
 
       const tx = await this.sorobanClient.close_bounty({
         owner: user.wallet.publicKey,
-        bounty_id: bountyId,
+        bounty_id: contractBountyId,
       });
 
       // Prepare, sign with user's wallet and send transaction
@@ -945,12 +963,12 @@ export class BountiesService {
 
       // Update bounty status in database
       await this.prisma.bounty.update({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
         data: { status: BountyStatus.CLOSED },
       });
 
       this.logger.log(
-        `Bounty ${bountyId} closed by owner, tx: ${sendResponse.hash}`,
+        `Bounty ${dbBountyId} closed by owner, tx: ${sendResponse.hash}`,
       );
 
       return { txHash: sendResponse.hash };
@@ -963,10 +981,18 @@ export class BountiesService {
   /**
    * Get bounty submissions (from contract)
    */
-  async getBountySubmissions(bountyId: number): Promise<Map<string, string>> {
+  async getBountySubmissions(dbBountyId: string): Promise<Map<string, string>> {
     try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
       const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: bountyId,
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -985,10 +1011,10 @@ export class BountiesService {
    * Get detailed bounty submissions from database
    * Includes submission data and user information
    */
-  async getBountySubmissionsDetailed(bountyId: number) {
+  async getBountySubmissionsDetailed(dbBountyId: string) {
     try {
       const bounty = await this.prisma.bounty.findUnique({
-        where: { contractBountyId: bountyId },
+        where: { id: dbBountyId },
       });
 
       if (!bounty) {
@@ -1025,10 +1051,18 @@ export class BountiesService {
   /**
    * Get bounty applicants
    */
-  async getBountyApplicants(bountyId: number): Promise<string[]> {
+  async getBountyApplicants(dbBountyId: string): Promise<string[]> {
     try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
       const assembled = await this.sorobanClient.get_bounty_applicants({
-        bounty_id: bountyId,
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -1046,10 +1080,18 @@ export class BountiesService {
   /**
    * Get bounty winners
    */
-  async getBountyWinners(bountyId: number): Promise<string[]> {
+  async getBountyWinners(dbBountyId: string): Promise<string[]> {
     try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
       const assembled = await this.sorobanClient.get_bounty_winners({
-        bounty_id: bountyId,
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -1067,10 +1109,18 @@ export class BountiesService {
   /**
    * Get bounty status
    */
-  async getBountyStatus(bountyId: number): Promise<Status> {
+  async getBountyStatus(dbBountyId: string): Promise<Status> {
     try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
       const assembled = await this.sorobanClient.get_bounty_status({
-        bounty_id: bountyId,
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
