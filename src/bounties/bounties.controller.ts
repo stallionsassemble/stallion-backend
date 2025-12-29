@@ -303,16 +303,6 @@ export class BountyController {
     return this.bountyService.getBountyWinners(parseInt(id));
   }
 
-  @Get(':id/status')
-  @ApiOperation({ summary: 'Get bounty status' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bounty status',
-  })
-  async getBountyStatus(@Param('id') id: string) {
-    return this.bountyService.getBountyStatus(parseInt(id));
-  }
-
   // Admin endpoints
   @Post('admin/update-admin')
   @UseGuards(JwtAuthGuard)
