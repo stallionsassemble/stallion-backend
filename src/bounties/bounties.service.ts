@@ -8,9 +8,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { BountyStatus, Prisma, type Bounty } from '@prisma/client';
 import * as StellarSDK from '@stellar/stellar-sdk';
+import { createHash } from 'crypto';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { ReputationService } from 'src/reputation/reputation.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { EnvConfig } from '../config/env.config';
 import type { Status } from '../soroban/contract-bindings';
 import {
   networks,
@@ -31,6 +33,10 @@ import {
   getTokenAddress,
   SupportedCurrency,
 } from './utils/supported-currencies';
+import {
+  validateWalletForBountyCreation,
+  validateWalletForTransaction,
+} from './utils/wallet-validator';
 
 /**
  * Bounty Service
@@ -51,9 +57,9 @@ export class BountiesService {
     private reputationService: ReputationService,
     private walletSigning: WalletSigningService,
   ) {
-    this.contractId = this.configService.get<string>('SOROBAN_CONTRACT_ID')!;
-    const network = this.configService.get<string>('SOROBAN_NETWORK')!;
-    const rpcUrl = this.configService.get<string>('SOROBAN_RPC_URL')!;
+    this.contractId = EnvConfig.SOROBAN_CONTRACT_ID;
+    const network = EnvConfig.SOROBAN_NETWORK;
+    const rpcUrl = EnvConfig.SOROBAN_RPC_URL;
 
     // Initialize Soroban RPC server
     this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
@@ -298,23 +304,23 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
+      // Validate wallet readiness before proceeding
+      await validateWalletForBountyCreation(
+        user.wallet.publicKey,
+        dto.reward,
+        dto.rewardCurrency,
+        EnvConfig.SOROBAN_RPC_URL,
+        this.networkPassphrase,
+      );
+
       // Get token address from currency
-      const tokenAddress = getTokenAddress(dto.rewardCurrency);
+      const tokenAddress = getTokenAddress(
+        dto.rewardCurrency,
+        this.networkPassphrase,
+      );
 
-      // Calculate total amount needed (reward + 5% fee)
+      // Convert reward to BigInt for contract
       const rewardAmount = BigInt(dto.reward);
-      const feeAmount = (rewardAmount * BigInt(5)) / BigInt(100);
-      const totalRequired = rewardAmount + feeAmount;
-
-      // Check if user has sufficient balance on Stellar network
-      const balance = await this.walletService.getWalletBalance(user.wallet.id);
-      const balanceInStroops = BigInt(Math.floor(balance.balance * 10000000));
-
-      if (balanceInStroops < totalRequired) {
-        throw new BadRequestException(
-          `Insufficient balance. Required: ${Number(totalRequired) / 10000000} ${dto.rewardCurrency}, Available: ${balance.balance} ${dto.rewardCurrency}`,
-        );
-      }
 
       // Convert distribution to contract format
       const distribution: Array<readonly [number, number]> =
@@ -429,6 +435,12 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
+      // Validate wallet has sufficient XLM for transaction
+      await validateWalletForTransaction(
+        user.wallet.publicKey,
+        EnvConfig.SOROBAN_RPC_URL,
+      );
+
       // Verify user owns the bounty
       const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
@@ -534,6 +546,12 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
+      // Validate wallet has sufficient XLM for transaction
+      await validateWalletForTransaction(
+        user.wallet.publicKey,
+        EnvConfig.SOROBAN_RPC_URL,
+      );
+
       // Verify user owns the bounty
       const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
@@ -594,6 +612,12 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
+      // Validate wallet has sufficient XLM for transaction
+      await validateWalletForTransaction(
+        user.wallet.publicKey,
+        EnvConfig.SOROBAN_RPC_URL,
+      );
+
       // Get bounty to validate submission fields
       const bounty = await this.prisma.bounty.findUnique({
         where: { id: dbBountyId },
@@ -611,10 +635,15 @@ export class BountiesService {
         | undefined;
       validateSubmissionData(dto.submissionData, submissionFields);
 
+      // Hash the submission link before sending to smart contract
+      const hashedLink = createHash('sha256')
+        .update(dto.submissionLink)
+        .digest('hex');
+
       const tx = await this.sorobanClient.apply_to_bounty({
         applicant: user.wallet.publicKey,
         bounty_id: contractBountyId,
-        submission_link: dto.submissionLink,
+        submission_link: hashedLink,
       });
 
       // Prepare, sign with user's wallet and send transaction
@@ -686,6 +715,12 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
+      // Validate wallet has sufficient XLM for transaction
+      await validateWalletForTransaction(
+        user.wallet.publicKey,
+        EnvConfig.SOROBAN_RPC_URL,
+      );
+
       // Get bounty to validate submission fields
       const bounty = await this.prisma.bounty.findUnique({
         where: { id: dbBountyId },
@@ -693,6 +728,10 @@ export class BountiesService {
 
       if (!bounty || bounty.contractBountyId === null) {
         throw new NotFoundException('Bounty not found');
+      }
+
+      if (new Date() > bounty.submissionDeadline) {
+        throw new BadRequestException('Submission deadline has passed');
       }
 
       const contractBountyId = bounty.contractBountyId;
@@ -713,15 +752,24 @@ export class BountiesService {
 
       let txHash: string | undefined;
 
+      // Hash the new submission link
+      const hashedLink = createHash('sha256')
+        .update(dto.submissionLink)
+        .digest('hex');
+
+      // Hash the existing submission link for comparison
+      const existingHashedLink = existingSubmission?.submissionLink
+        ? createHash('sha256')
+            .update(existingSubmission.submissionLink)
+            .digest('hex')
+        : undefined;
+
       // Only update on-chain if submission link changed
-      if (
-        dto.submissionLink &&
-        existingSubmission?.submissionLink !== dto.submissionLink
-      ) {
+      if (dto.submissionLink && existingHashedLink !== hashedLink) {
         const tx = await this.sorobanClient.update_submission({
           applicant: user.wallet.publicKey,
           bounty_id: contractBountyId,
-          new_submission_link: dto.submissionLink,
+          new_submission_link: hashedLink,
         });
 
         // Prepare, sign with user's wallet and send transaction
@@ -784,10 +832,22 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
+      // Validate wallet has sufficient XLM for transaction
+      await validateWalletForTransaction(
+        user.wallet.publicKey,
+        EnvConfig.SOROBAN_RPC_URL,
+      );
+
       // Verify user owns the bounty
       const bounty = await this.getBounty(dbBountyId);
       if (bounty.ownerId !== user.id) {
         throw new ForbiddenException('You do not own this bounty');
+      }
+
+      if (new Date() < bounty.submissionDeadline) {
+        throw new BadRequestException(
+          'Cannot select winners before submission deadline',
+        );
       }
 
       const contractBountyId = bounty.contractBountyId!;
@@ -945,6 +1005,12 @@ export class BountiesService {
       if (!user || !user.wallet) {
         throw new NotFoundException('User or wallet not found');
       }
+
+      // Validate wallet has sufficient XLM for transaction
+      await validateWalletForTransaction(
+        user.wallet.publicKey,
+        EnvConfig.SOROBAN_RPC_URL,
+      );
 
       // Verify user owns the bounty
       const bounty = await this.getBounty(dbBountyId);
@@ -1163,9 +1229,9 @@ export class BountiesService {
 
   /**
    * Get supported currencies
-   * Returns list of supported currencies with their token addresses
+   * Returns list of supported currencies with their token addresses for the current network
    */
   getSupportedCurrencies(): SupportedCurrency[] {
-    return getSupportedCurrencies();
+    return getSupportedCurrencies(this.networkPassphrase);
   }
 }

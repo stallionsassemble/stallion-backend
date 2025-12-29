@@ -1,10 +1,16 @@
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { EnvConfig } from './config/env.config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Initialize EnvConfig with ConfigService
+  const configService = app.get(ConfigService);
+  EnvConfig.initialize(configService);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -56,7 +62,7 @@ async function bootstrap() {
     customCss: '.swagger-ui .topbar { display: none }',
   });
 
-  await app.listen(process.env.PORT ?? 5000);
+  await app.listen(EnvConfig.PORT);
   console.log(`Application is running on: ${await app.getUrl()}`);
   console.log(`Swagger documentation: ${await app.getUrl()}/api/docs`);
 }

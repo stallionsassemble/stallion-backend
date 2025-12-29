@@ -1,11 +1,12 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module, forwardRef } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { EmailModule } from 'src/email/email.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PointsModule } from 'src/points/points.module';
 import { SorobanModule } from 'src/soroban/soroban.module';
 import { WalletModule } from 'src/wallet/wallet.module';
+import { EnvConfig } from '../config/env.config';
 import { DepositReconcilerWorker } from './workers/deposit-reconciler.worker';
 import { EmailWorker } from './workers/email.worker';
 import { WithdrawalWorker } from './workers/withdrawal.worker';
@@ -20,13 +21,12 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
     PointsModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: async () => ({
         connection: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
+          host: EnvConfig.REDIS_HOST,
+          port: EnvConfig.REDIS_PORT,
         },
       }),
-      inject: [ConfigService],
     }),
     BullModule.registerQueue(
       {

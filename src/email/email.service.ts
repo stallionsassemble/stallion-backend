@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
+import { EnvConfig } from '../config/env.config';
 
 @Injectable()
 export class EmailService {
@@ -15,12 +16,12 @@ export class EmailService {
     @InjectQueue('email') private emailQueue: Queue,
   ) {
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('SMTP_HOST'),
-      port: this.configService.get<number>('SMTP_PORT'),
-      secure: this.configService.get<boolean>('SMTP_SECURE') || false,
+      host: EnvConfig.SMTP_HOST,
+      port: EnvConfig.SMTP_PORT,
+      secure: EnvConfig.SMTP_SECURE,
       auth: {
-        user: this.configService.get<string>('SMTP_USER'),
-        pass: this.configService.get<string>('SMTP_PASS'),
+        user: EnvConfig.SMTP_USER,
+        pass: EnvConfig.SMTP_PASS,
       },
     });
   }
@@ -33,9 +34,8 @@ export class EmailService {
     code: string,
     context: 'signup' | 'login',
   ): Promise<void> {
-    const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
-    const appUrl =
-      this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    const appName = EnvConfig.APP_NAME;
+    const appUrl = EnvConfig.APP_URL;
 
     const template =
       context === 'signup' ? 'verification-signup' : 'verification-login';
@@ -72,9 +72,8 @@ export class EmailService {
     name: string,
     role: 'CONTRIBUTOR' | 'PROJECT_OWNER',
   ): Promise<void> {
-    const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
-    const appUrl =
-      this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+    const appName = EnvConfig.APP_NAME;
+    const appUrl = EnvConfig.APP_URL;
 
     const template =
       role === 'CONTRIBUTOR' ? 'welcome-contributor' : 'welcome-owner';
@@ -223,7 +222,7 @@ export class EmailService {
       }
 
       await this.transporter.sendMail({
-        from: `"${appName}" <${this.configService.get<string>('SMTP_FROM')}>`,
+        from: `"${appName}" <${EnvConfig.SMTP_FROM}>`,
         to,
         subject,
         html,

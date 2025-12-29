@@ -62,4 +62,34 @@ export class StellarAccountService {
       return '0';
     }
   }
+
+  /**
+   * Get all account balances for all assets
+   */
+  async getAllAccountBalances(publicKey: string): Promise<
+    Array<{
+      asset_type: string;
+      asset_code?: string;
+      asset_issuer?: string;
+      balance: string;
+    }>
+  > {
+    try {
+      this.logger.log(`Fetching all balances for public key: ${publicKey}`);
+      const account = await this.server.loadAccount(publicKey);
+
+      return account.balances.map((bal: any) => ({
+        asset_type: bal.asset_type,
+        asset_code: bal.asset_code,
+        asset_issuer: bal.asset_issuer,
+        balance: bal.balance,
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Failed to get account balances for ${publicKey}`,
+        error,
+      );
+      return [];
+    }
+  }
 }

@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Socket } from 'socket.io';
+import { EnvConfig } from '../../config/env.config';
 
 @Injectable()
 export class WsAuthGuard implements CanActivate {
@@ -28,7 +29,7 @@ export class WsAuthGuard implements CanActivate {
       }
 
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('JWT_SECRET'),
+        secret: EnvConfig.JWT_SECRET,
       });
 
       (client as any).userId = payload.userId;

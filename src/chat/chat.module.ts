@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { EnvConfig } from '../config/env.config';
 import { ChatController } from './chat.controller';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
@@ -12,11 +13,10 @@ import { WsAuthGuard } from './guards/ws-auth.guard';
     PrismaModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+      useFactory: async () => ({
+        secret: EnvConfig.JWT_SECRET,
         signOptions: { expiresIn: '7d' },
       }),
-      inject: [ConfigService],
     }),
   ],
   controllers: [ChatController],

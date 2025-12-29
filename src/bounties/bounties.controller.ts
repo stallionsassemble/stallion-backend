@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiBody,
   ApiOperation,
   ApiResponse,
   ApiTags,
@@ -309,9 +310,31 @@ export class BountyController {
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
   @ApiOperation({ summary: 'Update contract admin (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        newAdminAddress: {
+          type: 'string',
+          example: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+          description: 'Stellar public key of the new admin',
+        },
+      },
+      required: ['newAdminAddress'],
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Admin updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          example: 'abc123def456...',
+        },
+      },
+    },
   })
   async updateAdmin(
     @CurrentUser('id') userId: string,
@@ -325,9 +348,31 @@ export class BountyController {
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
   @ApiOperation({ summary: 'Update fee account (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        newFeeAccount: {
+          type: 'string',
+          example: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+          description: 'Stellar public key of the new fee account',
+        },
+      },
+      required: ['newFeeAccount'],
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Fee account updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          example: 'abc123def456...',
+        },
+      },
+    },
   })
   async updateFeeAccount(
     @CurrentUser('id') userId: string,
@@ -343,6 +388,23 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'Contract statistics',
+    schema: {
+      type: 'object',
+      properties: {
+        totalBounties: {
+          type: 'number',
+          example: 42,
+        },
+        totalRewards: {
+          type: 'string',
+          example: '1000000',
+        },
+        totalSubmissions: {
+          type: 'number',
+          example: 128,
+        },
+      },
+    },
   })
   async getContractStats(@CurrentUser('id') userId: string) {
     return this.adminService.getContractStats(userId);
@@ -354,9 +416,36 @@ export class BountyController {
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
   @ApiOperation({ summary: 'Emergency withdraw (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        destination: {
+          type: 'string',
+          example: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+          description: 'Stellar public key of the destination account',
+        },
+        amount: {
+          type: 'string',
+          example: '1000000',
+          description: 'Amount to withdraw (in stroops)',
+        },
+      },
+      required: ['destination', 'amount'],
+    },
+  })
   @ApiResponse({
     status: 200,
     description: 'Withdrawal successful',
+    schema: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          example: 'abc123def456...',
+        },
+      },
+    },
   })
   async emergencyWithdraw(
     @CurrentUser('id') userId: string,
@@ -378,10 +467,23 @@ export class BountyController {
   @Roles('ADMIN')
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Check judging deadline (Admin only)' })
+  @ApiOperation({
+    summary: 'Check judging deadline (Admin only)',
+    description:
+      'Checks if judging deadline has passed and automatically completes the bounty if needed',
+  })
   @ApiResponse({
     status: 200,
     description: 'Judging checked successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        txHash: {
+          type: 'string',
+          example: 'abc123def456...',
+        },
+      },
+    },
   })
   async checkJudging(
     @CurrentUser('id') userId: string,

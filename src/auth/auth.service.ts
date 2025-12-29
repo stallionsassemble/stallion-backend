@@ -14,6 +14,7 @@ import * as QRCode from 'qrcode';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EncryptionUtil } from '../common/utils/encryption.util';
+import { EnvConfig } from '../config/env.config';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
 import { WalletService } from '../wallet/wallet.service';
@@ -40,13 +41,9 @@ export class AuthService {
     private walletService: WalletService,
     private configService: ConfigService,
   ) {
-    this.refreshTokenSecret = this.configService.getOrThrow<string>(
-      'REFRESH_TOKEN_SECRET',
-    );
-    this.accessTokenExpiresIn =
-      this.configService.get<string>('ACCESS_TOKEN_EXPIRES_IN') || '15m';
-    this.refreshTokenExpiresIn =
-      this.configService.get<string>('REFRESH_TOKEN_EXPIRES_IN') || '7d';
+    this.refreshTokenSecret = EnvConfig.REFRESH_TOKEN_SECRET;
+    this.accessTokenExpiresIn = EnvConfig.ACCESS_TOKEN_EXPIRES_IN;
+    this.refreshTokenExpiresIn = EnvConfig.REFRESH_TOKEN_EXPIRES_IN;
   }
 
   async getProfile(userId: string) {

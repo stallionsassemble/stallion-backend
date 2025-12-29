@@ -73,10 +73,15 @@ export class WalletService {
         throw new NotFoundException('Wallet not found');
       }
 
-      // Check available balance
-      const availableBalance = await this.getAvailableBalance(walletId);
+      // Check available balance for the specific currency
+      const availableBalance = await this.getAvailableBalance(
+        walletId,
+        currency,
+      );
       if (availableBalance < amount) {
-        throw new BadRequestException('Insufficient available balance');
+        throw new BadRequestException(
+          `Insufficient available ${currency} balance. Available: ${availableBalance}, Required: ${amount}`,
+        );
       }
 
       // Create ledger lock to reserve funds
@@ -146,7 +151,10 @@ export class WalletService {
     return this.stellarWallet.createWallet();
   }
 
-  async getAvailableBalance(walletId: string): Promise<number> {
+  async getAvailableBalance(
+    walletId: string,
+    currency: string = 'XLM',
+  ): Promise<number> {
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
     });
@@ -155,19 +163,33 @@ export class WalletService {
       throw new NotFoundException('Wallet not found');
     }
 
-    // Fetch balance from Stellar network
-    const onChainBalance = await this.stellarAccount.getAccountBalance(
+    // Fetch all balances from Stellar network
+    const allBalances = await this.stellarAccount.getAllAccountBalances(
       wallet.publicKey,
     );
 
-    if (onChainBalance === null) {
+    if (!allBalances || allBalances.length === 0) {
       return 0;
     }
 
-    // Calculate pending withdrawals and payouts
+    // Find balance for the specified currency
+    let onChainBalance = 0;
+    if (currency.toUpperCase() === 'XLM') {
+      const nativeBalance = allBalances.find((b) => b.asset_type === 'native');
+      onChainBalance = nativeBalance ? parseFloat(nativeBalance.balance) : 0;
+    } else {
+      // For other assets, match by asset_code
+      const assetBalance = allBalances.find(
+        (b) => b.asset_code?.toUpperCase() === currency.toUpperCase(),
+      );
+      onChainBalance = assetBalance ? parseFloat(assetBalance.balance) : 0;
+    }
+
+    // Calculate pending withdrawals and payouts for this currency
     const pendingTransactions = await this.prisma.transaction.aggregate({
       where: {
         walletId,
+        currency,
         state: TxState.PENDING,
         type: {
           in: [TxType.WITHDRAWAL, TxType.PAYOUT],
@@ -179,8 +201,7 @@ export class WalletService {
     });
 
     const pendingAmount = Number(pendingTransactions._sum.amount || 0);
-    const balance = parseFloat(onChainBalance);
-    const available = balance - pendingAmount;
+    const available = onChainBalance - pendingAmount;
 
     return Math.max(0, available);
   }
@@ -312,7 +333,7 @@ export class WalletService {
   }
 
   /**
-   * Get wallet balance with available balance
+   * Get wallet balance with available balance for all assets
    */
   async getWalletBalance(walletId: string) {
     // Sync wallet with blockchain first
@@ -330,41 +351,56 @@ export class WalletService {
       `Getting balance for wallet ${walletId} with public key: ${wallet.publicKey}`,
     );
 
-    // Fetch balance from Stellar network
-    const onChainBalance = await this.stellarAccount.getAccountBalance(
+    // Fetch all balances from Stellar network
+    const allBalances = await this.stellarAccount.getAllAccountBalances(
       wallet.publicKey,
     );
 
-    if (onChainBalance === null) {
+    if (!allBalances || allBalances.length === 0) {
       throw new NotFoundException(
         'Wallet not found on Stellar network. Please fund your wallet first.',
       );
     }
 
-    // Calculate available balance (on-chain balance minus pending transactions)
-    const pendingTransactions = await this.prisma.transaction.aggregate({
-      where: {
-        walletId,
-        state: TxState.PENDING,
-        type: {
-          in: [TxType.WITHDRAWAL, TxType.PAYOUT],
-        },
-      },
-      _sum: {
-        amount: true,
-      },
-    });
+    // Process each balance and calculate available amounts
+    const balances = await Promise.all(
+      allBalances.map(async (bal) => {
+        const currency =
+          bal.asset_type === 'native' ? 'XLM' : bal.asset_code || 'UNKNOWN';
+        const balance = parseFloat(bal.balance);
 
-    const pendingAmount = Number(pendingTransactions._sum.amount || 0);
-    const availableBalance = Math.max(
-      0,
-      parseFloat(onChainBalance) - pendingAmount,
+        // Calculate pending transactions for this currency
+        const pendingTransactions = await this.prisma.transaction.aggregate({
+          where: {
+            walletId,
+            currency,
+            state: TxState.PENDING,
+            type: {
+              in: [TxType.WITHDRAWAL, TxType.PAYOUT],
+            },
+          },
+          _sum: {
+            amount: true,
+          },
+        });
+
+        const pendingAmount = Number(pendingTransactions._sum.amount || 0);
+        const availableBalance = Math.max(0, balance - pendingAmount);
+
+        return {
+          currency,
+          balance,
+          availableBalance,
+          asset_type: bal.asset_type,
+          asset_code: bal.asset_code,
+          asset_issuer: bal.asset_issuer,
+        };
+      }),
     );
 
     return {
-      balance: parseFloat(onChainBalance),
-      availableBalance,
-      currency: 'XLM', // Default to XLM for now
+      balances,
+      totalAssets: balances.length,
     };
   }
 
@@ -398,7 +434,7 @@ export class WalletService {
     return {
       address: wallet.publicKey,
       instructions:
-        'Send XLM or supported tokens directly to this address to fund your wallet',
+        'Send XLM or any supported token (USDC, EURC, etc.) directly to this address to fund your wallet. Make sure you have established trustlines for non-native assets.',
       activated: wallet.isActivated,
     };
   }
@@ -526,6 +562,12 @@ export class WalletService {
               (op as any).amount || (op as any).starting_balance || '0',
             );
 
+            // Determine currency from operation
+            let currency = 'XLM';
+            if (opType === 'payment' && (op as any).asset_type !== 'native') {
+              currency = (op as any).asset_code || 'UNKNOWN';
+            }
+
             if (amount > 0) {
               // Create transaction record
               await this.prisma.transaction.create({
@@ -533,7 +575,7 @@ export class WalletService {
                   walletId,
                   type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
                   amount: amount,
-                  currency: 'XLM',
+                  currency,
                   state: TxState.COMPLETED,
                   externalTxId: txRecord.id,
                   idempotencyKey: generateIdempotencyKey(),
@@ -542,13 +584,16 @@ export class WalletService {
                     syncedAt: new Date().toISOString(),
                     operationType: op.type,
                     txHash: txRecord.hash,
+                    asset_type: (op as any).asset_type,
+                    asset_code: (op as any).asset_code,
+                    asset_issuer: (op as any).asset_issuer,
                   } as Prisma.InputJsonValue,
                 },
               });
 
               syncedCount++;
               this.logger.log(
-                `Synced ${op.type} transaction: ${amount} XLM (${isIncoming ? 'incoming' : 'outgoing'})`,
+                `Synced ${op.type} transaction: ${amount} ${currency} (${isIncoming ? 'incoming' : 'outgoing'})`,
               );
             }
           }

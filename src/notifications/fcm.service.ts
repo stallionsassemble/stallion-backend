@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 import { readFileSync } from 'fs';
+import { EnvConfig } from '../config/env.config';
 
 @Injectable()
 export class FcmService implements OnModuleInit {
@@ -12,9 +13,7 @@ export class FcmService implements OnModuleInit {
 
   onModuleInit() {
     try {
-      const serviceAccountPath = this.configService.get<string>(
-        'FIREBASE_SERVICE_ACCOUNT_PATH',
-      );
+      const serviceAccountPath = EnvConfig.FIREBASE_SERVICE_ACCOUNT_PATH;
 
       if (!serviceAccountPath) {
         this.logger.warn(

@@ -110,14 +110,14 @@ export class CreateBountyDto {
   @IsString()
   shortDescription: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     description: 'Detailed description of the bounty requirements',
     example:
       'Full requirements: responsive design, mobile-first, dark mode support...',
   })
   @IsString()
   @IsOptional()
-  description?: string;
+  description: string;
 
   @ApiProperty({
     description: 'Reward amount',

@@ -16,6 +16,7 @@ import {
 } from '@simplewebauthn/server';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { EnvConfig } from '../config/env.config';
 import { ChallengeStorageService } from './challenge-storage.service';
 
 @Injectable()
@@ -30,11 +31,8 @@ export class PasskeyService {
     private configService: ConfigService,
     private challengeStorage: ChallengeStorageService,
   ) {
-    this.rpID = this.configService.get<string>('RP_ID', 'localhost');
-    this.origin = this.configService.get<string>(
-      'ORIGIN',
-      'http://localhost:3000',
-    );
+    this.rpID = EnvConfig.RP_ID;
+    this.origin = EnvConfig.ORIGIN;
   }
 
   async generateRegistrationOptions(userId: string) {

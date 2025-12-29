@@ -196,19 +196,19 @@ model ReputationHistory {
 model Bounty {
   id                 String       @id @default(cuid())
   title              String
-  shortDescription   String?      @map("short_description")
-  description        String?
+  shortDescription   String      @map("short_description")
+  description        String
   reward             String       @default("0") // Stored as string for large numbers
-  token              String?      // Token contract address
-  rewardCurrency     String?      @map("reward_currency")
-  rewardDistribution Json?        @map("reward_distribution")
+  token              String      // Token contract address
+  rewardCurrency     String      @map("reward_currency")
+  rewardDistribution Json        @map("reward_distribution")
   submissionFields   Json?        @map("submission_fields")
   attachments        Json?        // Array of attachment objects: [{filename, url, size, mimetype}]
   status             BountyStatus @default(ACTIVE)
-  contractBountyId   Int?         @unique @map("contract_bounty_id") // ID from Soroban contract
-  txHash             String?      @map("tx_hash") // Transaction hash from Soroban
-  submissionDeadline DateTime?    @map("submission_deadline")
-  judgingDeadline    DateTime?    @map("judging_deadline")
+  contractBountyId   Int         @unique @map("contract_bounty_id") // ID from Soroban contract
+  txHash             String      @map("tx_hash") // Transaction hash from Soroban
+  submissionDeadline DateTime    @map("submission_deadline")
+  judgingDeadline    DateTime    @map("judging_deadline")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -229,7 +229,7 @@ model Bounty {
 model BountySubmission {
   id             String           @id @default(cuid())
   submission     Json?
-  submissionLink String?          @map("submission_link") // Link to submission
+  submissionLink String          @map("submission_link")
   status         SubmissionStatus @default(PENDING)
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
