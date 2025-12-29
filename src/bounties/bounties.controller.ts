@@ -249,19 +249,6 @@ export class BountyController {
   }
 
   @Get(':id/submissions')
-  @ApiOperation({ summary: 'Get bounty submissions (contract only)' })
-  @ApiResponse({
-    status: 200,
-    description: 'Map of user addresses to submission links',
-  })
-  async getBountySubmissions(@Param('id') id: string) {
-    const submissions = await this.bountyService.getBountySubmissions(
-      parseInt(id),
-    );
-    return Object.fromEntries(submissions);
-  }
-
-  @Get(':id/submissions/detailed')
   @ApiOperation({
     summary: 'Get detailed bounty submissions',
     description:
