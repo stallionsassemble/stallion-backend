@@ -145,23 +145,7 @@ export class BountyController {
     return this.bountyService.updateBounty(userId, parseInt(id), dto);
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
-  @ApiBearerAuth('JWT-auth')
-  @HttpCode(200)
-  @ApiOperation({ summary: 'Delete bounty' })
-  @ApiResponse({
-    status: 200,
-    description: 'Bounty deleted successfully',
-  })
-  async deleteBounty(
-    @CurrentUser('id') userId: string,
-    @Param('id') id: string,
-  ) {
-    return this.bountyService.deleteBounty(userId, parseInt(id));
-  }
-
-  @Post(':id/close')
+  @Patch(':id/close')
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
@@ -184,6 +168,22 @@ export class BountyController {
     @Param('id') id: string,
   ) {
     return this.bountyService.closeBounty(userId, parseInt(id));
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @ApiBearerAuth('JWT-auth')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Delete bounty' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bounty deleted successfully',
+  })
+  async deleteBounty(
+    @CurrentUser('id') userId: string,
+    @Param('id') id: string,
+  ) {
+    return this.bountyService.deleteBounty(userId, parseInt(id));
   }
 
   @Post(':id/apply')
