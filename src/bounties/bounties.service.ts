@@ -437,6 +437,18 @@ export class BountiesService {
 
       const contractBountyId = bounty.contractBountyId!;
 
+      // Validate submission deadline against judging deadline
+      if (dto.submissionDeadline) {
+        const newSubmissionDeadline = new Date(dto.submissionDeadline);
+        const judgingDeadline = bounty.judgingDeadline;
+
+        if (judgingDeadline && newSubmissionDeadline >= judgingDeadline) {
+          throw new BadRequestException(
+            'Submission deadline must be before judging deadline',
+          );
+        }
+      }
+
       // Prepare update parameters
       const distribution: Array<readonly [number, number]> = dto.distribution
         ? dto.distribution.map((d) => [d.rank, d.percentage] as const)
@@ -474,6 +486,20 @@ export class BountiesService {
         where: { id: dbBountyId },
         data: {
           ...(dto.title && { title: dto.title }),
+          ...(dto.shortDescription && {
+            shortDescription: dto.shortDescription,
+          }),
+          ...(dto.description && { description: dto.description }),
+          ...(dto.rewardDistribution && {
+            rewardDistribution: dto.rewardDistribution,
+          }),
+          ...(dto.submissionFields && {
+            submissionFields:
+              dto.submissionFields as unknown as Prisma.InputJsonValue,
+          }),
+          ...(dto.attachments && {
+            attachments: dto.attachments as unknown as Prisma.InputJsonValue,
+          }),
           ...(submissionDeadline && {
             submissionDeadline,
           }),
