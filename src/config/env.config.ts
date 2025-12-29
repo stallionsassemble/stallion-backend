@@ -36,6 +36,7 @@ export class EnvConfig {
   static readonly SOROBAN_CONTRACT_ID = 'SOROBAN_CONTRACT_ID';
   static readonly SOROBAN_NETWORK = 'SOROBAN_NETWORK';
   static readonly SOROBAN_RPC_URL = 'SOROBAN_RPC_URL';
+  static readonly SOROBAN_HORIZON_URL = 'SOROBAN_HORIZON_URL';
   static readonly SOROBAN_NETWORK_PASSPHRASE = 'SOROBAN_NETWORK_PASSPHRASE';
 
   // Upload

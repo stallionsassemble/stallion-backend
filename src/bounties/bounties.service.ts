@@ -319,6 +319,7 @@ export class BountiesService {
         dto.reward,
         dto.rewardCurrency,
         this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
         this.networkPassphrase,
       );
 
@@ -447,7 +448,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
       );
 
       // Verify user owns the bounty
@@ -558,7 +559,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
       );
 
       // Verify user owns the bounty
@@ -624,7 +625,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
       );
 
       // Get bounty to validate submission fields
@@ -727,7 +728,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
       );
 
       // Get bounty to validate submission fields
@@ -844,7 +845,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
       );
 
       // Verify user owns the bounty
@@ -1066,7 +1067,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
       );
 
       // Verify user owns the bounty

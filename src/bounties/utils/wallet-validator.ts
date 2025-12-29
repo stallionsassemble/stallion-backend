@@ -28,7 +28,8 @@ const CONTRACT_FEE_PERCENTAGE = 0.05;
  * @param publicKey - Stellar public key of the wallet
  * @param rewardAmount - Reward amount in token units
  * @param currencyCode - Currency code (e.g., 'USDC', 'XLM')
- * @param rpcUrl - Stellar RPC URL
+ * @param rpcUrl - Stellar RPC URL for contract simulation
+ * @param horizonUrl - Stellar Horizon URL for account data
  * @param networkPassphrase - Stellar network passphrase (defaults to TESTNET)
  * @throws BadRequestException if any validation fails
  */
@@ -37,15 +38,20 @@ export async function validateWalletForBountyCreation(
   rewardAmount: number,
   currencyCode: string,
   rpcUrl: string,
+  horizonUrl: string,
   networkPassphrase: string = StellarSDK.Networks.TESTNET,
 ): Promise<void> {
-  const server = new StellarSDK.rpc.Server(rpcUrl);
+  const rpcServer = new StellarSDK.rpc.Server(rpcUrl);
+  // Use Horizon server for account data
+  const horizonServer = new StellarSDK.Horizon.Server(horizonUrl, {
+    allowHttp: true,
+  });
 
   try {
     // 1. Check if account exists and is activated
-    let accountResponse: any;
+    let accountResponse: StellarSDK.Horizon.AccountResponse;
     try {
-      accountResponse = await server.getAccount(publicKey);
+      accountResponse = await horizonServer.loadAccount(publicKey);
     } catch {
       throw new BadRequestException(
         'Wallet is not activated on the Stellar network. Please activate your wallet by funding it with XLM.',
@@ -72,23 +78,26 @@ export async function validateWalletForBountyCreation(
     } else {
       // For Soroban tokens, query the token contract for balance
       try {
-        const tokenContract = new StellarSDK.Contract(tokenAddress);
-
-        // Convert public key to Address ScVal
-        const addressScVal = new StellarSDK.Address(publicKey).toScVal();
-
-        // Build transaction to call balance function
-        const account = new StellarSDK.Account(publicKey, '0');
-        const builtTx = new StellarSDK.TransactionBuilder(account, {
-          fee: StellarSDK.BASE_FEE,
-          networkPassphrase,
-        })
-          .addOperation(tokenContract.call('balance', addressScVal))
-          .setTimeout(StellarSDK.TimeoutInfinite)
+        // Build contract call to get balance
+        const contract = new StellarSDK.Contract(tokenAddress);
+        const tx = new StellarSDK.TransactionBuilder(
+          new StellarSDK.Account(publicKey, '0'),
+          {
+            fee: StellarSDK.BASE_FEE,
+            networkPassphrase,
+          },
+        )
+          .addOperation(
+            contract.call(
+              'balance',
+              StellarSDK.nativeToScVal(publicKey, { type: 'address' }),
+            ),
+          )
+          .setTimeout(30)
           .build();
 
-        // Simulate the transaction to get balance
-        const simulation = await server.simulateTransaction(builtTx);
+        // Simulate the transaction to get balance using RPC server
+        const simulation = await rpcServer.simulateTransaction(tx);
 
         if (StellarSDK.rpc.Api.isSimulationSuccess(simulation)) {
           if (!simulation.result) {
@@ -180,20 +189,22 @@ export async function validateWalletForBountyCreation(
  * 2. Has sufficient XLM balance for transaction fees
  *
  * @param publicKey - Stellar public key of the wallet
- * @param rpcUrl - Stellar RPC URL
+ * @param horizonUrl - Stellar Horizon URL for account data
  * @throws BadRequestException if any validation fails
  */
 export async function validateWalletForTransaction(
   publicKey: string,
-  rpcUrl: string,
+  horizonUrl: string,
 ): Promise<void> {
-  const server = new StellarSDK.rpc.Server(rpcUrl);
+  const horizonServer = new StellarSDK.Horizon.Server(horizonUrl, {
+    allowHttp: true,
+  });
 
   try {
     // Check if account exists and is activated
-    let accountResponse: any;
+    let accountResponse: StellarSDK.Horizon.AccountResponse;
     try {
-      accountResponse = await server.getAccount(publicKey);
+      accountResponse = await horizonServer.loadAccount(publicKey);
     } catch {
       throw new BadRequestException(
         'Wallet is not activated on the Stellar network. Please activate your wallet by funding it with XLM.',
@@ -202,7 +213,7 @@ export async function validateWalletForTransaction(
 
     // Check XLM balance for transaction fees
     const xlmBalance = accountResponse.balances.find(
-      (b: any) => b.asset_type === 'native',
+      (b) => b.asset_type === 'native',
     );
 
     if (!xlmBalance) {

@@ -15,14 +15,14 @@ export class StellarAccountService {
   private readonly networkPassphrase: string;
 
   constructor(private configService: ConfigService) {
-    const rpcUrl = this.configService.getOrThrow<string>(
-      EnvConfig.SOROBAN_RPC_URL,
+    const horizonUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_HORIZON_URL,
     );
     const network = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_NETWORK,
     );
 
-    this.server = new Horizon.Server(rpcUrl, {
+    this.server = new Horizon.Server(horizonUrl, {
       allowHttp: network === 'testnet',
     });
 
