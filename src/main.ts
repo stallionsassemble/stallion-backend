@@ -8,9 +8,7 @@ import { EnvConfig } from './config/env.config';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Initialize EnvConfig with ConfigService
   const configService = app.get(ConfigService);
-  EnvConfig.initialize(configService);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -62,7 +60,7 @@ async function bootstrap() {
     customCss: '.swagger-ui .topbar { display: none }',
   });
 
-  await app.listen(EnvConfig.PORT);
+  await app.listen(configService.get<number>(EnvConfig.PORT) || 3000);
   console.log(`Application is running on: ${await app.getUrl()}`);
   console.log(`Swagger documentation: ${await app.getUrl()}/api/docs`);
 }

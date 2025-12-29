@@ -11,6 +11,8 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from './stellar-wallet.service';
+import { hasTrustline, setupTrustline } from './utils/trustline.util';
+import { WalletSigningService } from './wallet-signing.service';
 
 @Injectable()
 export class WalletService {
@@ -20,6 +22,7 @@ export class WalletService {
     private prisma: PrismaService,
     private stellarAccount: StellarAccountService,
     private stellarWallet: StellarWalletService,
+    private walletSigning: WalletSigningService,
     @InjectQueue('withdrawal') private withdrawalQueue: Queue,
   ) {}
 
@@ -611,5 +614,80 @@ export class WalletService {
       );
       return 0;
     }
+  }
+
+  /**
+   * Setup trustline for a specific currency
+   */
+  async setupTrustlineForCurrency(
+    walletId: string,
+    currencyCode: string,
+    networkPassphrase: string,
+  ): Promise<{
+    success: boolean;
+    txHash?: string;
+    message: string;
+  }> {
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: walletId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    try {
+      const result = await setupTrustline(
+        walletId,
+        wallet.publicKey,
+        currencyCode,
+        networkPassphrase,
+        this.stellarAccount.getServer(),
+        this.walletSigning,
+      );
+
+      if (result === 'exists') {
+        return {
+          success: true,
+          message: `Trustline for ${currencyCode} already exists`,
+        };
+      }
+
+      return {
+        success: true,
+        txHash: result,
+        message: `Trustline for ${currencyCode} established successfully`,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to setup trustline for wallet ${walletId} and currency ${currencyCode}`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Check if wallet has trustline for a specific currency
+   */
+  async checkTrustline(
+    walletId: string,
+    currencyCode: string,
+    networkPassphrase: string,
+  ): Promise<boolean> {
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: walletId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    return hasTrustline(
+      wallet.publicKey,
+      currencyCode,
+      networkPassphrase,
+      this.stellarAccount.getServer(),
+    );
   }
 }

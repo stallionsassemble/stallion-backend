@@ -16,12 +16,12 @@ export class EmailService {
     @InjectQueue('email') private emailQueue: Queue,
   ) {
     this.transporter = nodemailer.createTransport({
-      host: EnvConfig.SMTP_HOST,
-      port: EnvConfig.SMTP_PORT,
-      secure: EnvConfig.SMTP_SECURE,
+      host: this.configService.getOrThrow<string>(EnvConfig.SMTP_HOST),
+      port: this.configService.get<number>(EnvConfig.SMTP_PORT) || 587,
+      secure: this.configService.get<boolean>(EnvConfig.SMTP_SECURE) || false,
       auth: {
-        user: EnvConfig.SMTP_USER,
-        pass: EnvConfig.SMTP_PASS,
+        user: this.configService.getOrThrow<string>(EnvConfig.SMTP_USER),
+        pass: this.configService.getOrThrow<string>(EnvConfig.SMTP_PASS),
       },
     });
   }
@@ -34,8 +34,11 @@ export class EmailService {
     code: string,
     context: 'signup' | 'login',
   ): Promise<void> {
-    const appName = EnvConfig.APP_NAME;
-    const appUrl = EnvConfig.APP_URL;
+    const appName =
+      this.configService.get<string>(EnvConfig.APP_NAME) || 'Stallion';
+    const appUrl =
+      this.configService.get<string>(EnvConfig.APP_URL) ||
+      'http://localhost:3000';
 
     const template =
       context === 'signup' ? 'verification-signup' : 'verification-login';
@@ -72,8 +75,11 @@ export class EmailService {
     name: string,
     role: 'CONTRIBUTOR' | 'PROJECT_OWNER',
   ): Promise<void> {
-    const appName = EnvConfig.APP_NAME;
-    const appUrl = EnvConfig.APP_URL;
+    const appName =
+      this.configService.get<string>(EnvConfig.APP_NAME) || 'Stallion';
+    const appUrl =
+      this.configService.get<string>(EnvConfig.APP_URL) ||
+      'http://localhost:3000';
 
     const template =
       role === 'CONTRIBUTOR' ? 'welcome-contributor' : 'welcome-owner';
@@ -222,7 +228,7 @@ export class EmailService {
       }
 
       await this.transporter.sendMail({
-        from: `"${appName}" <${EnvConfig.SMTP_FROM}>`,
+        from: `"${appName}" <${this.configService.getOrThrow<string>(EnvConfig.SMTP_FROM)}>`,
         to,
         subject,
         html,

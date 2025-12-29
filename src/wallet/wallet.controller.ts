@@ -8,6 +8,9 @@ import {
 import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { EnvConfig } from '../config/env.config';
+import { networks } from '../soroban/contract-bindings';
+import { SetupTrustlineDto } from './dto/setup-trustline.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
 
@@ -114,6 +117,45 @@ export class WalletController {
       withdrawDto.amount,
       withdrawDto.currency,
       withdrawDto.destination,
+    );
+  }
+
+  @Post('trustline')
+  @ApiOperation({
+    summary: 'Setup trustline for a currency',
+    description:
+      'Establish a trustline for a supported currency (USDC, EURC, etc.) to enable receiving and holding that asset',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Trustline established successfully',
+    schema: {
+      example: {
+        success: true,
+        txHash: 'abc123...',
+        message: 'Trustline for USDC established successfully',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid currency or trustline setup failed',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async setupTrustline(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SetupTrustlineDto,
+  ) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
+    const configService = this.walletService['configService'];
+    const network = configService.getOrThrow<string>(EnvConfig.SOROBAN_NETWORK);
+    const networkPassphrase =
+      networks[network as keyof typeof networks].networkPassphrase;
+
+    return this.walletService.setupTrustlineForCurrency(
+      wallet.id,
+      dto.currencyCode,
+      networkPassphrase,
     );
   }
 }

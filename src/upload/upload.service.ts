@@ -43,8 +43,11 @@ export class UploadService {
   ];
 
   constructor(private configService: ConfigService) {
-    this.uploadDir = EnvConfig.UPLOAD_DIR;
-    this.maxFileSize = EnvConfig.MAX_FILE_SIZE;
+    this.uploadDir =
+      this.configService.get<string>(EnvConfig.UPLOAD_DIR) || './uploads';
+    this.maxFileSize =
+      this.configService.get<number>(EnvConfig.MAX_FILE_SIZE) ||
+      10 * 1024 * 1024;
 
     // Ensure upload directory exists
     this.ensureUploadDir().catch((error) => {
@@ -169,7 +172,9 @@ export class UploadService {
       await writeFile(filepath, file.buffer);
 
       // Generate URL
-      const baseUrl = EnvConfig.APP_URL;
+      const baseUrl =
+        this.configService.get<string>(EnvConfig.APP_URL) ||
+        'http://localhost:3000';
       const url = `${baseUrl}/uploads/${subfolder}/${filename}`;
 
       this.logger.log(`File uploaded: ${filename}`);

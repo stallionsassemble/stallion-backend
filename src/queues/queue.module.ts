@@ -1,6 +1,6 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module, forwardRef } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { EmailModule } from 'src/email/email.module';
 import { NotificationsModule } from 'src/notifications/notifications.module';
 import { PointsModule } from 'src/points/points.module';
@@ -21,12 +21,13 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
     PointsModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async () => ({
+      useFactory: async (configService: ConfigService) => ({
         connection: {
-          host: EnvConfig.REDIS_HOST,
-          port: EnvConfig.REDIS_PORT,
+          host: configService.get<string>(EnvConfig.REDIS_HOST) || 'localhost',
+          port: configService.get<number>(EnvConfig.REDIS_PORT) || 6379,
         },
       }),
+      inject: [ConfigService],
     }),
     BullModule.registerQueue(
       {

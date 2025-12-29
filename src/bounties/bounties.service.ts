@@ -11,6 +11,7 @@ import * as StellarSDK from '@stellar/stellar-sdk';
 import { createHash } from 'crypto';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { ReputationService } from 'src/reputation/reputation.service';
+import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
 import type { Status } from '../soroban/contract-bindings';
@@ -18,6 +19,7 @@ import {
   networks,
   Client as SorobanClient,
 } from '../soroban/contract-bindings';
+import { StellarAccountService } from '../soroban/stellar-account.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 import { WalletService } from '../wallet/wallet.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
@@ -56,10 +58,17 @@ export class BountiesService {
     private walletService: WalletService,
     private reputationService: ReputationService,
     private walletSigning: WalletSigningService,
+    private stellarAccount: StellarAccountService,
   ) {
-    this.contractId = EnvConfig.SOROBAN_CONTRACT_ID;
-    const network = EnvConfig.SOROBAN_NETWORK;
-    const rpcUrl = EnvConfig.SOROBAN_RPC_URL;
+    this.contractId = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_CONTRACT_ID,
+    );
+    const network = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK,
+    );
+    const rpcUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_RPC_URL,
+    );
 
     // Initialize Soroban RPC server
     this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
@@ -309,7 +318,7 @@ export class BountiesService {
         user.wallet.publicKey,
         dto.reward,
         dto.rewardCurrency,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
         this.networkPassphrase,
       );
 
@@ -438,7 +447,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
       );
 
       // Verify user owns the bounty
@@ -549,7 +558,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
       );
 
       // Verify user owns the bounty
@@ -615,7 +624,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
       );
 
       // Get bounty to validate submission fields
@@ -718,7 +727,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
       );
 
       // Get bounty to validate submission fields
@@ -835,7 +844,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
       );
 
       // Verify user owns the bounty
@@ -869,6 +878,54 @@ export class BountiesService {
         throw new BadRequestException(
           `Winners with IDs ${missingWallets.join(', ')} do not have wallets`,
         );
+      }
+
+      // Get bounty currency for trustline validation
+      const bountyForTrustline = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+      const rewardCurrency = bountyForTrustline!.rewardCurrency || 'XLM';
+
+      // Ensure all winners have trustlines for the reward currency
+      this.logger.log(
+        `Checking and setting up trustlines for winners for currency: ${rewardCurrency}`,
+      );
+
+      for (const winner of winnerUsers) {
+        if (!winner.wallet) continue;
+
+        try {
+          const result = await ensureTrustline(
+            winner.wallet.id,
+            winner.wallet.publicKey,
+            rewardCurrency,
+            this.networkPassphrase,
+            this.stellarAccount.getServer(),
+            this.walletSigning,
+            this.configService.get<string>(EnvConfig.FUNDING_WALLET_ID), // Optional funding wallet for account activation
+          );
+
+          if (result.exists) {
+            this.logger.log(
+              `Winner ${winner.id} already has trustline for ${rewardCurrency}`,
+            );
+          } else {
+            const fundingMsg = result.funded
+              ? ` (account funded with ${result.fundingTxHash})`
+              : '';
+            this.logger.log(
+              `Trustline established for winner ${winner.id} for ${rewardCurrency}: ${result.txHash}${fundingMsg}`,
+            );
+          }
+        } catch (error) {
+          this.logger.error(
+            `Failed to ensure trustline for winner ${winner.id}`,
+            error,
+          );
+          throw new BadRequestException(
+            `Failed to setup trustline for winner ${winner.username || winner.id}. ${error instanceof Error ? error.message : 'Please ask them to manually setup a trustline for ' + rewardCurrency + '.'}`,
+          );
+        }
       }
 
       // Extract public keys in the same order as winner IDs
@@ -1009,7 +1066,7 @@ export class BountiesService {
       // Validate wallet has sufficient XLM for transaction
       await validateWalletForTransaction(
         user.wallet.publicKey,
-        EnvConfig.SOROBAN_RPC_URL,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
       );
 
       // Verify user owns the bounty

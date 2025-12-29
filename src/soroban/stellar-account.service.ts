@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Horizon, Networks } from '@stellar/stellar-sdk';
+import { EnvConfig } from 'src/config/env.config';
 
 /**
  * Stellar Account Service
@@ -14,15 +15,19 @@ export class StellarAccountService {
   private readonly networkPassphrase: string;
 
   constructor(private configService: ConfigService) {
-    const rpcUrl = this.configService.get<string>('SOROBAN_RPC_URL')!;
-    const network = this.configService.get<string>('SOROBAN_NETWORK')!;
+    const rpcUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_RPC_URL,
+    );
+    const network = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK,
+    );
 
     this.server = new Horizon.Server(rpcUrl, {
       allowHttp: network === 'testnet',
     });
 
     this.networkPassphrase =
-      this.configService.get<string>('SOROBAN_NETWORK_PASSPHRASE') ||
+      this.configService.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
       (network === 'testnet' ? Networks.TESTNET : Networks.PUBLIC);
   }
 

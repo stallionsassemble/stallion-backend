@@ -1,9 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { PrismaModule } from '../common/prisma/prisma.module';
-import { EnvConfig } from '../config/env.config';
 import { EmailModule } from '../email/email.module';
 import { PasskeyModule } from '../passkey/passkey.module';
 import { UsersModule } from '../users/users.module';
@@ -24,12 +23,13 @@ import { VerificationCodeStorageService } from './verification-code-storage.serv
     forwardRef(() => WalletModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: () => ({
-        secret: EnvConfig.JWT_SECRET,
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.getOrThrow<string>('JWT_SECRET'),
         signOptions: {
           expiresIn: '7d',
         },
       }),
+      inject: [ConfigService],
     }),
   ],
   controllers: [AuthController],

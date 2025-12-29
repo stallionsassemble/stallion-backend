@@ -16,10 +16,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   constructor(private configService: ConfigService) {}
 
   async onModuleInit() {
-    const redisHost = EnvConfig.REDIS_HOST;
-    const redisPort = EnvConfig.REDIS_PORT;
-    const redisPassword = EnvConfig.REDIS_PASSWORD;
-    const redisDb = EnvConfig.REDIS_DB;
+    const redisHost =
+      this.configService.get<string>(EnvConfig.REDIS_HOST) || 'localhost';
+    const redisPort =
+      this.configService.get<number>(EnvConfig.REDIS_PORT) || 6379;
+    const redisPassword = this.configService.get<string>(
+      EnvConfig.REDIS_PASSWORD,
+    );
+    const redisDb = this.configService.get<number>(EnvConfig.REDIS_DB) || 0;
 
     this.client = new Redis({
       host: redisHost,

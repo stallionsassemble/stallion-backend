@@ -31,9 +31,15 @@ export class AdminService {
     private walletSigning: WalletSigningService,
     private configService: ConfigService,
   ) {
-    this.contractId = EnvConfig.SOROBAN_CONTRACT_ID;
-    const network = EnvConfig.SOROBAN_NETWORK;
-    const rpcUrl = EnvConfig.SOROBAN_RPC_URL;
+    this.contractId = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_CONTRACT_ID,
+    );
+    const network = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK,
+    );
+    const rpcUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_RPC_URL,
+    );
 
     // Initialize Soroban RPC server
     this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);

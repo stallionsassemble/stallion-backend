@@ -13,7 +13,9 @@ export class FcmService implements OnModuleInit {
 
   onModuleInit() {
     try {
-      const serviceAccountPath = EnvConfig.FIREBASE_SERVICE_ACCOUNT_PATH;
+      const serviceAccountPath = this.configService.get<string>(
+        EnvConfig.FIREBASE_SERVICE_ACCOUNT_PATH,
+      );
 
       if (!serviceAccountPath) {
         this.logger.warn(

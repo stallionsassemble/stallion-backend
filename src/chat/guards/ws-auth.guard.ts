@@ -29,7 +29,7 @@ export class WsAuthGuard implements CanActivate {
       }
 
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: EnvConfig.JWT_SECRET,
+        secret: this.configService.getOrThrow<string>(EnvConfig.JWT_SECRET),
       });
 
       (client as any).userId = payload.userId;

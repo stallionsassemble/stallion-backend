@@ -41,9 +41,15 @@ export class AuthService {
     private walletService: WalletService,
     private configService: ConfigService,
   ) {
-    this.refreshTokenSecret = EnvConfig.REFRESH_TOKEN_SECRET;
-    this.accessTokenExpiresIn = EnvConfig.ACCESS_TOKEN_EXPIRES_IN;
-    this.refreshTokenExpiresIn = EnvConfig.REFRESH_TOKEN_EXPIRES_IN;
+    this.refreshTokenSecret = this.configService.getOrThrow<string>(
+      EnvConfig.REFRESH_TOKEN_SECRET,
+    );
+    this.accessTokenExpiresIn =
+      this.configService.get<string>(EnvConfig.ACCESS_TOKEN_EXPIRES_IN) ||
+      '15m';
+    this.refreshTokenExpiresIn =
+      this.configService.get<string>(EnvConfig.REFRESH_TOKEN_EXPIRES_IN) ||
+      '7d';
   }
 
   async getProfile(userId: string) {
