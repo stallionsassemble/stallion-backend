@@ -368,13 +368,42 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get passkey registration options',
-    description: 'Generate WebAuthn registration challenge for passkey setup',
+    description:
+      'Generate WebAuthn registration challenge for passkey setup. This endpoint returns the challenge data needed to create a new passkey using the WebAuthn API.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Registration options generated',
+    description: 'Registration options generated successfully',
+    schema: {
+      example: {
+        rp: {
+          name: 'Stallion',
+          id: 'localhost',
+        },
+        user: {
+          id: 'clx123...',
+          name: 'user@example.com',
+          displayName: 'user@example.com',
+        },
+        challenge: 'Y2hhbGxlbmdlXzEyMzQ1Njc4OTA=',
+        pubKeyCredParams: [
+          { alg: -7, type: 'public-key' },
+          { alg: -257, type: 'public-key' },
+        ],
+        timeout: 60000,
+        attestation: 'none',
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'preferred',
+          residentKey: 'preferred',
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
   async getPasskeyRegistrationOptions(@CurrentUser('id') userId: string) {
     return this.passkeyService.generateRegistrationOptions(userId);
   }
@@ -384,7 +413,8 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Verify passkey registration',
-    description: 'Complete passkey registration with WebAuthn response',
+    description:
+      'Complete passkey registration by sending the WebAuthn response from the client. This endpoint verifies the registration challenge and stores the new passkey.',
   })
   @ApiResponse({
     status: 201,
@@ -393,12 +423,25 @@ export class AuthController {
       example: {
         verified: true,
         passkeyId: 'clx123...',
+        name: 'My iPhone',
         message: 'Passkey registered successfully',
       },
     },
   })
-  @ApiResponse({ status: 400, description: 'Invalid passkey response' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid passkey response or registration failed',
+    schema: {
+      example: {
+        message: 'Invalid passkey response',
+        error: 'Registration verification failed',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - JWT token required',
+  })
   async verifyPasskeyRegistration(
     @CurrentUser('id') userId: string,
     @Body() dto: VerifyPasskeyRegistrationDto,
@@ -414,13 +457,46 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Get passkey authentication options',
-    description: 'Generate WebAuthn authentication challenge for passkey login',
+    description:
+      'Generate WebAuthn authentication challenge for passkey login. This endpoint returns the challenge data needed to authenticate with an existing passkey using the WebAuthn API.',
   })
   @ApiResponse({
     status: 200,
-    description: 'Authentication options generated',
+    description: 'Authentication options generated successfully',
+    schema: {
+      example: {
+        challenge: 'Y2hhbGxlbmdlXzEyMzQ1Njc4OTA=',
+        allowCredentials: [
+          {
+            id: 'Y3JlZGVudGlhbF9pZF8xMjM0NTY3ODkw',
+            type: 'public-key',
+            transports: ['internal', 'usb', 'nfc', 'ble'],
+          },
+        ],
+        userVerification: 'preferred',
+        timeout: 60000,
+        rpId: 'localhost',
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'No passkeys found' })
+  @ApiResponse({
+    status: 400,
+    description: 'No passkeys found for this email',
+    schema: {
+      example: {
+        message: 'No passkeys found for this email address',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    schema: {
+      example: {
+        message: 'User not found',
+      },
+    },
+  })
   async getPasskeyAuthenticationOptions(@Body('email') email: string) {
     return this.passkeyService.generateAuthenticationOptions(email);
   }
@@ -429,24 +505,47 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({
     summary: 'Verify passkey authentication',
-    description: 'Complete passkey authentication and receive JWT token',
+    description:
+      'Complete passkey authentication by sending the WebAuthn response from the client. This endpoint verifies the authentication challenge and confirms successful authentication.',
   })
   @ApiResponse({
     status: 200,
     description: 'Authentication successful',
     schema: {
       example: {
-        accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
-        user: {
-          id: 'clx123...',
-          email: 'user@example.com',
-          name: 'John Doe',
-          role: 'CONTRIBUTOR',
-        },
+        message: 'Passkey authenticated successfully',
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Invalid passkey or challenge' })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid passkey response or authentication failed',
+    schema: {
+      example: {
+        message: 'Invalid passkey response',
+        error: 'Authentication verification failed',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid passkey or expired challenge',
+    schema: {
+      example: {
+        message: 'Authentication failed',
+        error: 'Invalid passkey or challenge expired',
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'User not found',
+    schema: {
+      example: {
+        message: 'User not found',
+      },
+    },
+  })
   async verifyPasskeyAuthentication(
     @Body() dto: VerifyPasskeyAuthenticationDto,
   ) {
