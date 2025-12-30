@@ -50,6 +50,7 @@ export const NotificationTypeToCategory: Record<
 
   // Bounty
   BOUNTY_CREATED: NotificationCategory.BOUNTY,
+  BOUNTY_COMPLETED: NotificationCategory.BOUNTY,
   SUBMISSION_RECEIVED: NotificationCategory.BOUNTY,
   SUBMISSION_APPROVED: NotificationCategory.BOUNTY,
   SUBMISSION_REJECTED: NotificationCategory.BOUNTY,
