@@ -20,6 +20,7 @@ import {
   Client as SorobanClient,
 } from '../soroban/contract-bindings';
 import { StellarAccountService } from '../soroban/stellar-account.service';
+import { StellarWalletService } from '../wallet/stellar-wallet.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 import { WalletService } from '../wallet/wallet.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
@@ -59,6 +60,7 @@ export class BountiesService {
     private reputationService: ReputationService,
     private walletSigning: WalletSigningService,
     private stellarAccount: StellarAccountService,
+    private stellarWallet: StellarWalletService,
   ) {
     this.contractId = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_CONTRACT_ID,
@@ -457,7 +459,7 @@ export class BountiesService {
         throw new ForbiddenException('You do not own this bounty');
       }
 
-      const contractBountyId = bounty.contractBountyId!;
+      const contractBountyId = bounty.contractBountyId;
 
       // Validate submission deadline against judging deadline
       if (dto.submissionDeadline) {
@@ -568,7 +570,7 @@ export class BountiesService {
         throw new ForbiddenException('You do not own this bounty');
       }
 
-      const contractBountyId = bounty.contractBountyId!;
+      const contractBountyId = bounty.contractBountyId;
 
       const tx = await this.sorobanClient.delete_bounty({
         owner: user.wallet.publicKey,
@@ -860,7 +862,7 @@ export class BountiesService {
         );
       }
 
-      const contractBountyId = bounty.contractBountyId!;
+      const contractBountyId = bounty.contractBountyId;
 
       // Fetch winner users and their public keys
       const winnerUsers = await this.prisma.user.findMany({
@@ -903,6 +905,7 @@ export class BountiesService {
             this.networkPassphrase,
             this.stellarAccount.getServer(),
             this.walletSigning,
+            this.stellarWallet,
             this.configService.get<string>(EnvConfig.FUNDING_WALLET_ID), // Optional funding wallet for account activation
           );
 
@@ -1076,7 +1079,7 @@ export class BountiesService {
         throw new ForbiddenException('You do not own this bounty');
       }
 
-      const contractBountyId = bounty.contractBountyId!;
+      const contractBountyId = bounty.contractBountyId;
 
       // Check if bounty has any submissions
       const assembled = await this.sorobanClient.get_bounty_submissions({

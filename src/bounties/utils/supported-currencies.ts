@@ -4,6 +4,7 @@ export interface SupportedCurrency {
   code: string;
   name: string;
   tokenAddress: string;
+  issuer: string;
   decimals: number;
 }
 
@@ -18,18 +19,21 @@ const NETWORK_CURRENCIES: Record<string, NetworkCurrencies> = {
       code: 'USDC',
       name: 'USD Coin',
       tokenAddress: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+      issuer: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
       decimals: 7,
     },
     XLM: {
       code: 'XLM',
       name: 'Stellar Lumens',
       tokenAddress: 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC',
+      issuer: 'native',
       decimals: 7,
     },
     EURC: {
       code: 'EURC',
       name: 'Euro Coin',
-      tokenAddress: 'CCVVQCBPH7VJQZLQKLVTXVXBMUYLKONUYT3YZFVBCTJXZQMQ7QQQQQQQ',
+      tokenAddress: 'CCUUDM434BMZMYWYDITHFXHDMIVTGGD6T2I5UKNX5BSLXLW7HVR4MCGZ',
+      issuer: 'GB3Q6QDZYTHWT7E5PVS3W7FUT5GVAFC5KSZFFLPU25GO7VTC3NM2ZTVO',
       decimals: 7,
     },
   },
@@ -38,18 +42,21 @@ const NETWORK_CURRENCIES: Record<string, NetworkCurrencies> = {
       code: 'USDC',
       name: 'USD Coin',
       tokenAddress: 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75',
+      issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
       decimals: 7,
     },
     XLM: {
       code: 'XLM',
       name: 'Stellar Lumens',
       tokenAddress: 'CAS3J7GYLGXMF6TDJBBYYSE3HQ6BBSMLNUQ34T6TZMYMW2EVH34XOWMA',
+      issuer: 'native',
       decimals: 7,
     },
     EURC: {
       code: 'EURC',
       name: 'Euro Coin',
-      tokenAddress: 'CDD4JW7FWJQPVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV',
+      tokenAddress: 'CDTKPWPLOURQA2SGTKTUQOWRCBZEORB4BWBOMJ3D3ZTQQSGE5F6JBQLV',
+      issuer: 'GDHU6WRG4IEQXM5NZ4BMPKOXHW76MZM4Y2IEMFDVXBSDP6SJY4ITNPP2',
       decimals: 7,
     },
   },
@@ -63,7 +70,7 @@ export const SUPPORTED_CURRENCIES: Record<string, SupportedCurrency> =
  * Get token address for a given currency code on a specific network
  * @param currencyCode - The currency code (e.g., 'USDC', 'XLM')
  * @param networkPassphrase - The Stellar network passphrase
- * @returns The token contract address
+ * @returns The token contract address (for Soroban interactions)
  * @throws Error if currency is not supported on the network
  */
 export function getTokenAddress(
@@ -82,6 +89,31 @@ export function getTokenAddress(
     );
   }
   return currency.tokenAddress;
+}
+
+/**
+ * Get issuer address for a given currency code on a specific network
+ * @param currencyCode - The currency code (e.g., 'USDC', 'XLM')
+ * @param networkPassphrase - The Stellar network passphrase
+ * @returns The issuer address (for trustline creation)
+ * @throws Error if currency is not supported on the network
+ */
+export function getIssuerAddress(
+  currencyCode: string,
+  networkPassphrase: string = StellarSDK.Networks.TESTNET,
+): string {
+  const networkCurrencies = NETWORK_CURRENCIES[networkPassphrase];
+  if (!networkCurrencies) {
+    throw new Error(`Unsupported network: ${networkPassphrase}`);
+  }
+
+  const currency = networkCurrencies[currencyCode.toUpperCase()];
+  if (!currency) {
+    throw new Error(
+      `Unsupported currency: ${currencyCode} on network ${networkPassphrase}. Supported currencies: ${Object.keys(networkCurrencies).join(', ')}`,
+    );
+  }
+  return currency.issuer;
 }
 
 /**

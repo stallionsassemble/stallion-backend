@@ -1,6 +1,17 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as StellarSDK from '@stellar/stellar-sdk';
+import { Transaction } from '@stellar/stellar-sdk';
 import { getCurrency } from '../../bounties/utils/supported-currencies';
+import { StellarWalletService } from '../stellar-wallet.service';
+import { WalletSigningService } from '../wallet-signing.service';
+
+// Interface for the wallet signing service methods we need
+interface IWalletSigningService {
+  signTransaction(
+    walletId: string,
+    transaction: Transaction,
+  ): Promise<Transaction>;
+}
 
 const logger = new Logger('TrustlineUtil');
 
@@ -28,7 +39,8 @@ export async function hasTrustline(
     // For Soroban tokens, we check if there's a balance entry
     // The presence of a balance entry indicates a trustline exists
     const hasTrust = account.balances.some(
-      (balance: any) =>
+      (balance) =>
+        'asset_code' in balance &&
         balance.asset_code?.toUpperCase() === currencyCode.toUpperCase(),
     );
 
@@ -52,7 +64,7 @@ export async function setupTrustline(
   currencyCode: string,
   networkPassphrase: string,
   server: StellarSDK.Horizon.Server,
-  walletSigningService: any,
+  walletSigningService: IWalletSigningService,
 ): Promise<string> {
   try {
     // XLM doesn't require a trustline
@@ -81,12 +93,8 @@ export async function setupTrustline(
     // Load the account
     const account = await server.loadAccount(publicKey);
 
-    // For Soroban tokens, we need to create a trustline using the token contract
-    // Create an asset representing the Soroban token
-    const asset = new StellarSDK.Asset(
-      currencyCode,
-      currency.tokenAddress.substring(0, 56), // Stellar classic issuer format
-    );
+    // Create an asset for the trustline using the issuer address
+    const asset = new StellarSDK.Asset(currencyCode, currency.issuer);
 
     // Build change trust transaction
     const transaction = new StellarSDK.TransactionBuilder(account, {
@@ -145,7 +153,7 @@ async function checkAccountReserves(
 
     // Get native XLM balance
     const nativeBalance = account.balances.find(
-      (b: any) => b.asset_type === 'native',
+      (b) => b.asset_type === 'native',
     );
 
     if (!nativeBalance) {
@@ -192,17 +200,21 @@ async function fundAccount(
   targetPublicKey: string,
   amount: string,
   server: StellarSDK.Horizon.Server,
-  walletSigningService: any,
+  walletSigningService: IWalletSigningService,
+  stellarWalletService: StellarWalletService,
   fundingWalletId: string,
   networkPassphrase: string,
 ): Promise<string> {
   try {
     logger.log(`Funding account ${targetPublicKey} with ${amount} XLM`);
 
+    // Get the funding wallet details
+    const fundingWallet =
+      await stellarWalletService.getWalletById(fundingWalletId);
+    const fundingPublicKey = fundingWallet.publicKey;
+
     // Load funding account
-    const fundingAccount = await server.loadAccount(
-      await walletSigningService.getPublicKey(fundingWalletId),
-    );
+    const fundingAccount = await server.loadAccount(fundingPublicKey);
 
     // Build payment transaction
     const transaction = new StellarSDK.TransactionBuilder(fundingAccount, {
@@ -247,7 +259,8 @@ export async function ensureTrustline(
   currencyCode: string,
   networkPassphrase: string,
   server: StellarSDK.Horizon.Server,
-  walletSigningService: any,
+  walletSigningService: WalletSigningService,
+  stellarWalletService: StellarWalletService,
   fundingWalletId?: string,
 ): Promise<{
   exists: boolean;
@@ -289,6 +302,7 @@ export async function ensureTrustline(
       reserveCheck.requiredAmount!,
       server,
       walletSigningService,
+      stellarWalletService,
       fundingWalletId,
       networkPassphrase,
     );
