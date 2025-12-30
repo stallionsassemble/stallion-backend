@@ -28,6 +28,7 @@ import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
 import { SelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateBountyDto } from './dto/update-bounty.dto';
+import { UpdateBountyApplicationDto } from './dto/update-bounty-application.dto';
 
 @ApiTags('Bounties')
 @Controller('bounties')
@@ -369,7 +370,6 @@ export class BountyController {
   @Post(':id/apply')
   @UseGuards(JwtAuthGuard, MFAGuard)
   @ApiBearerAuth('JWT-auth')
-  @HttpCode(200)
   @ApiOperation({ summary: 'Apply to bounty (requires MFA)' })
   @ApiResponse({
     status: 200,
@@ -409,13 +409,22 @@ export class BountyController {
     schema: {
       example: {
         message: 'Submission updated successfully',
+        submission: {
+          id: 'uuid',
+          bountyId: 'bounty-uuid',
+          userId: 'user-uuid',
+          submissionLink: 'https://github.com/user/repo',
+          submission: {},
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
       },
     },
   })
   async updateSubmission(
     @CurrentUser('id') userId: string,
     @Param('id') id: string,
-    @Body() dto: ApplyToBountyDto,
+    @Body() dto: UpdateBountyApplicationDto,
   ) {
     return this.bountyService.updateSubmission(userId, id, dto);
   }

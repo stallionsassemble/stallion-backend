@@ -1,15 +1,16 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsObject, IsOptional, IsString } from 'class-validator';
 
-export class ApplyToBountyDto {
-  @ApiProperty({
+export class UpdateBountyApplicationDto {
+  @ApiPropertyOptional({
     description: 'Link to the submission',
     example: 'https://github.com/user/repo',
   })
   @IsString()
-  submissionLink: string;
+  @IsOptional()
+  submissionLink?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description: 'Dynamic submission fields based on bounty requirements',
     example: {
       githubRepo: 'https://github.com/user/repo',

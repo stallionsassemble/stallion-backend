@@ -241,6 +241,7 @@ model BountySubmission {
   bountyId String @map("bounty_id")
   bounty   Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
 
+@@unique([bountyId, userId])
   @@index([bountyId, status])
   @@index([userId])
   @@index([status])

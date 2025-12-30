@@ -32,6 +32,7 @@ import { WalletService } from '../wallet/wallet.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
 import { SelectWinnersDto } from './dto/select-winners.dto';
+import { UpdateBountyApplicationDto } from './dto/update-bounty-application.dto';
 import { UpdateBountyDto } from './dto/update-bounty.dto';
 import {
   validateSubmissionData,
@@ -824,8 +825,8 @@ export class BountiesService {
   async updateSubmission(
     userId: string,
     dbBountyId: string,
-    dto: ApplyToBountyDto,
-  ): Promise<{ message: string }> {
+    dto: UpdateBountyApplicationDto,
+  ): Promise<{ message: string; submission: BountySubmission }> {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -863,88 +864,97 @@ export class BountiesService {
         | undefined;
       validateSubmissionData(dto.submissionData, submissionFields);
 
-      // Get existing submission to check if link changed
       const existingSubmission = await this.prisma.bountySubmission.findFirst({
         where: {
           bountyId: bounty.id,
           userId,
         },
       });
+      if (!existingSubmission) {
+        throw new NotFoundException('Submission not found');
+      }
 
-      let txHash: string | undefined;
+      if (dto.submissionLink) {
+        let txHash: string | undefined;
 
-      // Hash the new submission link
-      const hashedLink = createHash('sha256')
-        .update(dto.submissionLink)
-        .digest('hex');
+        // Hash the new submission link
+        const hashedLink = createHash('sha256')
+          .update(dto.submissionLink)
+          .digest('hex');
 
-      // Hash the existing submission link for comparison
-      const existingHashedLink = existingSubmission?.submissionLink
-        ? createHash('sha256')
-            .update(existingSubmission.submissionLink)
-            .digest('hex')
-        : undefined;
+        // Hash the existing submission link for comparison
+        const existingHashedLink = existingSubmission?.submissionLink
+          ? createHash('sha256')
+              .update(existingSubmission.submissionLink)
+              .digest('hex')
+          : undefined;
 
-      // Only update on-chain if submission link changed
-      if (dto.submissionLink && existingHashedLink !== hashedLink) {
-        // Set the public key for the Soroban client
-        this.sorobanClient.options.publicKey = user.wallet.publicKey;
+        // Only update on-chain if submission link changed
+        if (dto.submissionLink && existingHashedLink !== hashedLink) {
+          // Set the public key for the Soroban client
+          this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-        const tx = await this.sorobanClient.update_submission({
-          applicant: user.wallet.publicKey,
-          bounty_id: contractBountyId,
-          new_submission_link: hashedLink,
-        });
+          const tx = await this.sorobanClient.update_submission({
+            applicant: user.wallet.publicKey,
+            bounty_id: contractBountyId,
+            new_submission_link: hashedLink,
+          });
 
-        // Sign and send transaction
-        const result = await tx.signAndSend({
-          signTransaction: async (transactionXdr) => {
-            const transaction = StellarSDK.TransactionBuilder.fromXDR(
-              transactionXdr,
-              this.networkPassphrase,
-            ) as StellarSDK.Transaction;
+          // Sign and send transaction
+          const result = await tx.signAndSend({
+            signTransaction: async (transactionXdr) => {
+              const transaction = StellarSDK.TransactionBuilder.fromXDR(
+                transactionXdr,
+                this.networkPassphrase,
+              ) as StellarSDK.Transaction;
 
-            const signedTx = await this.walletSigning.signTransaction(
-              user.wallet!.id,
-              transaction,
+              const signedTx = await this.walletSigning.signTransaction(
+                user.wallet!.id,
+                transaction,
+              );
+
+              return {
+                signedTxXdr: signedTx.toXDR(),
+                signerAddress: user.wallet!.publicKey,
+              };
+            },
+          });
+
+          // Handle transaction result
+          if (!result.result.isOk()) {
+            const error = result.result.unwrapErr();
+            this.logger.error('Contract invocation failed', error);
+            throw new BadRequestException(
+              `Failed to update submission on contract: ${JSON.stringify(error)}`,
             );
+          }
 
-            return {
-              signedTxXdr: signedTx.toXDR(),
-              signerAddress: user.wallet!.publicKey,
-            };
-          },
-        });
+          if (!result.getTransactionResponse) {
+            throw new BadRequestException('Transaction response not available');
+          }
 
-        // Handle transaction result
-        if (!result.result.isOk()) {
-          const error = result.result.unwrapErr();
-          this.logger.error('Contract invocation failed', error);
-          throw new BadRequestException(
-            `Failed to update submission on contract: ${JSON.stringify(error)}`,
+          txHash = result.getTransactionResponse.txHash;
+
+          this.logger.log(
+            `User ${userId} updated submission link for bounty ${dbBountyId}, tx: ${txHash}`,
           );
         }
-
-        if (!result.getTransactionResponse) {
-          throw new BadRequestException('Transaction response not available');
-        }
-
-        txHash = result.getTransactionResponse.txHash;
-
-        this.logger.log(
-          `User ${userId} updated submission link for bounty ${dbBountyId}, tx: ${txHash}`,
-        );
       }
 
       // Update submission in database with validated data
-      await this.prisma.bountySubmission.updateMany({
+      const updatedSubmission = await this.prisma.bountySubmission.update({
         where: {
-          bountyId: bounty.id,
-          userId,
+          bountyId_userId: {
+            bountyId: bounty.id,
+            userId,
+          },
         },
         data: {
-          submissionLink: dto.submissionLink,
-          submission: dto.submissionData || {},
+          submissionLink:
+            dto.submissionLink || existingSubmission.submissionLink,
+          submission:
+            dto.submissionData ||
+            (existingSubmission.submission as Prisma.InputJsonValue),
         },
       });
 
@@ -952,7 +962,10 @@ export class BountiesService {
         `User ${userId} updated submission for bounty ${dbBountyId}`,
       );
 
-      return { message: 'Submission updated successfully' };
+      return {
+        message: 'Submission updated successfully',
+        submission: updatedSubmission,
+      };
     } catch (error) {
       this.logger.error('Failed to update submission', error);
       throw error;
