@@ -201,7 +201,7 @@ model Bounty {
   reward             String       @default("0") // Stored as string for large numbers
   token              String      // Token contract address
   rewardCurrency     String      @map("reward_currency")
-  rewardDistribution Json        @map("reward_distribution")
+  rewardDistribution Json        @map("reward_distribution") // [{"rank": 1, "percentage": 70}, {"rank": 2, "percentage": 20}, {"rank": 3, "percentage": 10}]
   submissionFields   Json?        @map("submission_fields")
   attachments        Json?        // Array of attachment objects: [{filename, url, size, mimetype}]
   skills             String[]     @default([])

@@ -25,10 +25,14 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AdminService } from './admin.service';
 import { BountiesService } from './bounties.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
+import {
+  BountyWinnersResponseDto,
+  SelectWinnersResponseDto,
+} from './dto/bounty-winner-response.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
 import { SelectWinnersDto } from './dto/select-winners.dto';
-import { UpdateBountyDto } from './dto/update-bounty.dto';
 import { UpdateBountyApplicationDto } from './dto/update-bounty-application.dto';
+import { UpdateBountyDto } from './dto/update-bounty.dto';
 
 @ApiTags('Bounties')
 @Controller('bounties')
@@ -437,9 +441,44 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'Winners selected successfully',
+    type: SelectWinnersResponseDto,
     schema: {
       example: {
         message: 'Winners selected successfully',
+        transactionHash: 'abc123def456...',
+        winners: [
+          {
+            userId: 'user-uuid-1',
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/profile.jpg',
+            publicKey:
+              'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+            position: 1,
+            amountWon: 500,
+            currency: 'XLM',
+            percentage: 50,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+          {
+            userId: 'user-uuid-2',
+            username: 'jane_smith',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            profilePicture: 'https://example.com/profile2.jpg',
+            publicKey: 'GYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
+            position: 2,
+            amountWon: 300,
+            currency: 'XLM',
+            percentage: 30,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+        ],
+        totalReward: 1000,
+        currency: 'XLM',
+        bountyTitle: 'Build a DeFi Dashboard',
+        bountyId: 'bounty-uuid-123',
       },
     },
   })
@@ -500,7 +539,59 @@ export class BountyController {
   @ApiOperation({ summary: 'Get bounty winners' })
   @ApiResponse({
     status: 200,
-    description: 'List of winner addresses',
+    description: 'Detailed winner information with rankings and amounts',
+    type: BountyWinnersResponseDto,
+    schema: {
+      example: {
+        winners: [
+          {
+            userId: 'user-uuid-1',
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/profile.jpg',
+            publicKey:
+              'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+            position: 1,
+            amountWon: 500,
+            currency: 'XLM',
+            percentage: 50,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+          {
+            userId: 'user-uuid-2',
+            username: 'jane_smith',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            profilePicture: 'https://example.com/profile2.jpg',
+            publicKey: 'GYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
+            position: 2,
+            amountWon: 300,
+            currency: 'XLM',
+            percentage: 30,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+          {
+            userId: 'user-uuid-3',
+            username: 'bob_wilson',
+            firstName: 'Bob',
+            lastName: 'Wilson',
+            profilePicture: null,
+            publicKey:
+              'GZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ',
+            position: 3,
+            amountWon: 200,
+            currency: 'XLM',
+            percentage: 20,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+        ],
+        totalReward: 1000,
+        currency: 'XLM',
+        bountyTitle: 'Build a DeFi Dashboard',
+        bountyId: 'bounty-uuid-123',
+      },
+    },
   })
   async getBountyWinners(@Param('id') id: string) {
     return this.bountyService.getBountyWinners(id);

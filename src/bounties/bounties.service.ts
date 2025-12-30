@@ -1,3 +1,4 @@
+import { InjectQueue } from '@nestjs/bullmq';
 import {
   BadRequestException,
   ForbiddenException,
@@ -14,6 +15,7 @@ import {
   type Bounty,
 } from '@prisma/client';
 import * as StellarSDK from '@stellar/stellar-sdk';
+import { Queue } from 'bullmq';
 import { createHash } from 'crypto';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { ReputationService } from 'src/reputation/reputation.service';
@@ -30,6 +32,10 @@ import { StellarWalletService } from '../wallet/stellar-wallet.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 import { WalletService } from '../wallet/wallet.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
+import {
+  BountyWinnersResponseDto,
+  SelectWinnersResponseDto,
+} from './dto/bounty-winner-response.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
 import { SelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateBountyApplicationDto } from './dto/update-bounty-application.dto';
@@ -67,6 +73,7 @@ export class BountiesService {
     private walletSigning: WalletSigningService,
     private stellarAccount: StellarAccountService,
     private stellarWallet: StellarWalletService,
+    @InjectQueue('bounty-winner') private bountyWinnerQueue: Queue,
   ) {
     this.contractId = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_CONTRACT_ID,
@@ -275,11 +282,13 @@ export class BountiesService {
         status = BountyStatus.CLOSED;
       }
 
-      // Convert distribution Map to JSON object
-      const distributionObj: Record<number, number> = {};
-      contractBounty.distribution.forEach((value, key) => {
-        distributionObj[key] = value;
+      // Convert distribution Map to array format matching database schema
+      const distributionArray: Array<{ rank: number; percentage: number }> = [];
+      contractBounty.distribution.forEach((percentage, rank) => {
+        distributionArray.push({ rank, percentage });
       });
+      // Sort by rank to ensure consistent ordering
+      distributionArray.sort((a, b) => a.rank - b.rank);
 
       // Convert submission_deadline from u64 (seconds) to Date
       const submissionDeadline = new Date(
@@ -294,7 +303,7 @@ export class BountiesService {
         token: contractBounty.token,
         reward: contractBounty.reward.toString(),
         status,
-        rewardDistribution: distributionObj,
+        rewardDistribution: distributionArray,
         submissionDeadline,
         ownerDetails: sanitizeUser(dbBounty.owner),
       };
@@ -979,7 +988,7 @@ export class BountiesService {
     userId: string,
     dbBountyId: string,
     dto: SelectWinnersDto,
-  ): Promise<{ message: string }> {
+  ): Promise<SelectWinnersResponseDto> {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
@@ -1093,7 +1102,7 @@ export class BountiesService {
         winners: winnerPublicKeys,
       });
 
-      // Sign and send transaction
+      // Sign and send transaction (Payouts are handled by the Soroban contract)
       const result = await tx.signAndSend({
         signTransaction: async (transactionXdr) => {
           const transaction = StellarSDK.TransactionBuilder.fromXDR(
@@ -1134,86 +1143,96 @@ export class BountiesService {
         data: { status: BountyStatus.COMPLETED },
       });
 
-      // Create winner records and process payouts
+      // Fetch bounty details for queue job
       const dbBounty = await this.prisma.bounty.findUnique({
         where: { id: dbBountyId },
       });
 
-      // Parse reward distribution
-      const rewardDistribution = dbBounty!.rewardDistribution as Record<
-        string,
-        number
-      >;
+      // Parse reward distribution (array format: [{rank: 1, percentage: 70}, ...])
+      const rewardDistribution = dbBounty!.rewardDistribution as Array<{
+        rank: number;
+        percentage: number;
+      }>;
       const totalReward = Number(dbBounty!.reward);
       const currency = dbBounty!.rewardCurrency || 'XLM';
 
-      for (const winnerId of dto.winners) {
-        // Find user from already fetched winners
-        const winner = winnerUsers.find((u) => u.id === winnerId);
+      // Prepare winner data for queue
+      const winners = dto.winners.map((winnerId, index) => {
+        const position = index + 1;
+        const distributionEntry = rewardDistribution.find(
+          (d) => d.rank === position,
+        );
+        const percentage = distributionEntry?.percentage || 0;
+        const payoutAmount = (totalReward * percentage) / 100;
 
-        if (winner && winner.wallet) {
-          const position = dto.winners.indexOf(winnerId) + 1;
+        return {
+          userId: winnerId,
+          position,
+          payoutAmount,
+        };
+      });
 
-          // Create winner record
-          await this.prisma.bountyWinner.create({
-            data: {
-              bountyId: dbBounty!.id,
-              userId: winner.id,
-              position,
-              awardedAt: new Date(),
-            },
-          });
+      // Dispatch winner processing to queue
+      await this.bountyWinnerQueue.add(
+        'process-winners',
+        {
+          bountyId: dbBounty!.id,
+          winners,
+          bountyTitle: dbBounty!.title,
+          currency,
+          totalReward,
+        },
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000,
+          },
+        },
+      );
 
-          // Calculate payout amount based on distribution
-          const percentage = rewardDistribution[position.toString()] || 0;
-          const payoutAmount = (totalReward * percentage) / 100;
-
-          // Credit winner's wallet
-          if (payoutAmount > 0) {
-            await this.walletService.processPayout(
-              winner.wallet.id,
-              payoutAmount,
-              currency,
-              dbBounty!.id,
-              position,
-            );
-
-            this.logger.log(
-              `Credited ${payoutAmount} ${currency} to winner ${winner.id} (position ${position})`,
-            );
-          }
-
-          // Award reputation based on position
-          try {
-            let reputationAction = 'BOUNTY_WIN_FIRST';
-            if (position === 2) reputationAction = 'BOUNTY_WIN_SECOND';
-            else if (position === 3) reputationAction = 'BOUNTY_WIN_THIRD';
-
-            await this.reputationService.addReputation(
-              winner.id,
-              reputationAction,
-              {
-                bountyId: dbBounty!.id,
-                bountyTitle: dbBounty!.title,
-                position,
-                reward: payoutAmount,
-                currency,
-              },
-            );
-          } catch (error) {
-            this.logger.error(
-              `Failed to add reputation for winner ${winner.id}`,
-              error,
-            );
-          }
-        }
-      }
+      this.logger.log(
+        `Dispatched winner processing to queue for bounty ${dbBountyId}`,
+      );
 
       this.logger.log(
         `Winners selected for bounty ${dbBountyId}, tx: ${txHash}`,
       );
 
-      return { message: 'Winners selected successfully' };
+      // Build detailed winner response
+      const detailedWinners = dto.winners.map((winnerId, index) => {
+        const position = index + 1;
+        const distributionEntry = rewardDistribution.find(
+          (d) => d.rank === position,
+        );
+        const percentage = distributionEntry?.percentage || 0;
+        const amountWon = (totalReward * percentage) / 100;
+        const winner = winnerUsers.find((u) => u.id === winnerId);
+
+        return {
+          userId: winnerId,
+          username: winner!.username,
+          firstName: winner!.firstName,
+          lastName: winner!.lastName,
+          profilePicture: winner!.profilePicture || undefined,
+          publicKey: winner!.wallet!.publicKey,
+          position,
+          amountWon,
+          currency,
+          percentage,
+          awardedAt: new Date(),
+        };
+      });
+
+      return {
+        message: 'Winners selected successfully',
+        transactionHash: txHash,
+        winners: detailedWinners,
+        totalReward,
+        currency,
+        bountyTitle: dbBounty!.title,
+        bountyId: dbBounty!.id,
+      };
     } catch (error) {
       this.logger.error('Failed to select winners', error);
       throw error;
@@ -1427,7 +1446,9 @@ export class BountiesService {
   /**
    * Get bounty winners
    */
-  async getBountyWinners(dbBountyId: string): Promise<string[]> {
+  async getBountyWinners(
+    dbBountyId: string,
+  ): Promise<BountyWinnersResponseDto> {
     try {
       const bounty = await this.prisma.bounty.findUnique({
         where: { id: dbBountyId },
@@ -1441,16 +1462,60 @@ export class BountiesService {
         throw new ForbiddenException('Bounty is still active');
       }
 
-      const assembled = await this.sorobanClient.get_bounty_winners({
-        bounty_id: bounty.contractBountyId,
+      // Get winner records from database
+      const dbWinners = await this.prisma.bountyWinner.findMany({
+        where: { bountyId: dbBountyId },
+        include: {
+          user: {
+            include: {
+              wallet: true,
+            },
+          },
+        },
+        orderBy: { position: 'asc' },
       });
-      const simulated = await assembled.simulate();
 
-      if (!simulated.result.isOk()) {
-        throw new NotFoundException('Bounty not found');
+      if (dbWinners.length === 0) {
+        throw new NotFoundException('No winners found for this bounty');
       }
 
-      return simulated.result.unwrap();
+      const rewardDistribution = bounty.rewardDistribution as Array<{
+        rank: number;
+        percentage: number;
+      }>;
+      const totalReward = Number(bounty.reward);
+      const currency = bounty.rewardCurrency || 'XLM';
+
+      // Build detailed winner response
+      const winners = dbWinners.map((winner) => {
+        const distributionEntry = rewardDistribution.find(
+          (d) => d.rank === winner.position,
+        );
+        const percentage = distributionEntry?.percentage || 0;
+        const amountWon = (totalReward * percentage) / 100;
+
+        return {
+          userId: winner.user.id,
+          username: winner.user.username,
+          firstName: winner.user.firstName,
+          lastName: winner.user.lastName,
+          profilePicture: winner.user.profilePicture || undefined,
+          publicKey: winner.user.wallet?.publicKey || '',
+          position: winner.position,
+          amountWon,
+          currency,
+          percentage,
+          awardedAt: winner.awardedAt,
+        };
+      });
+
+      return {
+        winners,
+        totalReward,
+        currency,
+        bountyTitle: bounty.title,
+        bountyId: bounty.id,
+      };
     } catch (error) {
       this.logger.error('Failed to get bounty winners', error);
       throw error;

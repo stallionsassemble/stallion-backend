@@ -1,12 +1,14 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { EmailModule } from 'src/email/email.module';
-import { NotificationsModule } from 'src/notifications/notifications.module';
-import { PointsModule } from 'src/points/points.module';
-import { SorobanModule } from 'src/soroban/soroban.module';
-import { WalletModule } from 'src/wallet/wallet.module';
 import { EnvConfig } from '../config/env.config';
+import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { PointsModule } from '../points/points.module';
+import { ReputationModule } from '../reputation/reputation.module';
+import { SorobanModule } from '../soroban/soroban.module';
+import { WalletModule } from '../wallet/wallet.module';
+import { BountyWinnerWorker } from './workers/bounty-winner.worker';
 import { DepositReconcilerWorker } from './workers/deposit-reconciler.worker';
 import { EmailWorker } from './workers/email.worker';
 import { WithdrawalWorker } from './workers/withdrawal.worker';
@@ -17,6 +19,7 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
     forwardRef(() => WalletModule),
     forwardRef(() => NotificationsModule),
     forwardRef(() => EmailModule),
+    forwardRef(() => ReputationModule),
     SorobanModule,
     PointsModule,
     BullModule.forRootAsync({
@@ -39,9 +42,17 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
       {
         name: 'email',
       },
+      {
+        name: 'bounty-winner',
+      },
     ),
   ],
-  providers: [WithdrawalWorker, DepositReconcilerWorker, EmailWorker],
+  providers: [
+    WithdrawalWorker,
+    DepositReconcilerWorker,
+    EmailWorker,
+    BountyWinnerWorker,
+  ],
   exports: [BullModule],
 })
 export class QueueModule {}

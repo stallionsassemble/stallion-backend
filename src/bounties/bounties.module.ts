@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { QueueModule } from '../queues/queue.module';
 import { ReputationModule } from '../reputation/reputation.module';
 import { SorobanModule } from '../soroban/soroban.module';
 import { WalletModule } from '../wallet/wallet.module';
@@ -15,6 +16,7 @@ import { BountiesService } from './bounties.service';
     WalletModule,
     ReputationModule,
     SorobanModule,
+    QueueModule,
   ],
   controllers: [BountyController],
   providers: [BountiesService, AdminService],
