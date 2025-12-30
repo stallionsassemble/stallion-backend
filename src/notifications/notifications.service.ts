@@ -237,6 +237,7 @@ export class NotificationsService {
       WITHDRAWAL_COMPLETED: 'withdrawal-completed',
       WITHDRAWAL_FAILED: 'withdrawal-failed',
       BOUNTY_CREATED: 'bounty-created',
+      BOUNTY_COMPLETED: 'bounty-completed',
       SUBMISSION_RECEIVED: 'submission-received',
       SUBMISSION_APPROVED: 'submission-approved',
       SUBMISSION_REJECTED: 'submission-rejected',
