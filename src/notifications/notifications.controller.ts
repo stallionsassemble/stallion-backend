@@ -45,7 +45,40 @@ export class NotificationsController {
     required: false,
     description: 'Offset for pagination (default: 0)',
   })
-  @ApiResponse({ status: 200, description: 'List of notifications' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of notifications',
+    schema: {
+      example: [
+        {
+          id: 'notif-uuid-1',
+          userId: 'user-uuid',
+          type: 'BOUNTY_COMPLETED',
+          title: 'Bounty Completed',
+          message: 'Your bounty "Build a DeFi Dashboard" has been completed',
+          data: {
+            bountyId: 'bounty-uuid',
+            bountyTitle: 'Build a DeFi Dashboard',
+          },
+          isRead: false,
+          createdAt: '2024-03-01T12:00:00.000Z',
+        },
+        {
+          id: 'notif-uuid-2',
+          userId: 'user-uuid',
+          type: 'NEW_MESSAGE',
+          title: 'New Message',
+          message: 'You have a new message from john_doe',
+          data: {
+            conversationId: 'conv-uuid',
+            senderId: 'user-uuid-2',
+          },
+          isRead: false,
+          createdAt: '2024-03-01T11:30:00.000Z',
+        },
+      ],
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getNotifications(
     @CurrentUser('id') userId: string,
@@ -64,7 +97,15 @@ export class NotificationsController {
     summary: 'Get unread count',
     description: 'Get the number of unread notifications',
   })
-  @ApiResponse({ status: 200, description: 'Unread notification count' })
+  @ApiResponse({
+    status: 200,
+    description: 'Unread notification count',
+    schema: {
+      example: {
+        count: 7,
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUnreadCount(userId);
@@ -76,7 +117,21 @@ export class NotificationsController {
     description: 'Mark a notification as read',
   })
   @ApiParam({ name: 'id', description: 'Notification ID' })
-  @ApiResponse({ status: 200, description: 'Notification marked as read' })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification marked as read',
+    schema: {
+      example: {
+        id: 'notif-uuid',
+        userId: 'user-uuid',
+        type: 'BOUNTY_COMPLETED',
+        title: 'Bounty Completed',
+        message: 'Your bounty has been completed',
+        isRead: true,
+        updatedAt: '2024-03-01T12:30:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
   markAsRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
@@ -88,7 +143,16 @@ export class NotificationsController {
     summary: 'Mark all as read',
     description: 'Mark all notifications as read',
   })
-  @ApiResponse({ status: 200, description: 'All notifications marked as read' })
+  @ApiResponse({
+    status: 200,
+    description: 'All notifications marked as read',
+    schema: {
+      example: {
+        message: 'All notifications marked as read',
+        count: 12,
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   markAllAsRead(@CurrentUser('id') userId: string) {
     return this.notificationsService.markAllAsRead(userId);
@@ -103,6 +167,11 @@ export class NotificationsController {
   @ApiResponse({
     status: 200,
     description: 'Notification deleted successfully',
+    schema: {
+      example: {
+        message: 'Notification deleted successfully',
+      },
+    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
@@ -118,7 +187,24 @@ export class NotificationsController {
     summary: 'Get notification settings',
     description: 'Retrieve user notification preferences',
   })
-  @ApiResponse({ status: 200, description: 'Notification settings' })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification settings',
+    schema: {
+      example: {
+        id: 'settings-uuid',
+        userId: 'user-uuid',
+        emailNotifications: true,
+        pushNotifications: true,
+        bountyUpdates: true,
+        messageNotifications: true,
+        forumReplies: true,
+        reputationChanges: false,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-03-01T00:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getNotificationSettings(@CurrentUser('id') userId: string) {
     return this.notificationsService.getNotificationSettings(userId);
@@ -129,7 +215,23 @@ export class NotificationsController {
     summary: 'Update notification settings',
     description: 'Update user notification preferences',
   })
-  @ApiResponse({ status: 200, description: 'Settings updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Settings updated successfully',
+    schema: {
+      example: {
+        id: 'settings-uuid',
+        userId: 'user-uuid',
+        emailNotifications: true,
+        pushNotifications: false,
+        bountyUpdates: true,
+        messageNotifications: true,
+        forumReplies: true,
+        reputationChanges: false,
+        updatedAt: '2024-03-01T12:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateNotificationSettings(
     @CurrentUser('id') userId: string,
@@ -147,6 +249,15 @@ export class NotificationsController {
   @ApiResponse({
     status: 201,
     description: 'FCM token registered successfully',
+    schema: {
+      example: {
+        id: 'token-uuid',
+        userId: 'user-uuid',
+        token: 'fcm-token-string',
+        deviceType: 'android',
+        createdAt: '2024-03-01T12:00:00.000Z',
+      },
+    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   registerFcmToken(
@@ -162,7 +273,15 @@ export class NotificationsController {
     description: 'Remove a Firebase Cloud Messaging token',
   })
   @ApiParam({ name: 'token', description: 'FCM token to remove' })
-  @ApiResponse({ status: 200, description: 'FCM token removed successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'FCM token removed successfully',
+    schema: {
+      example: {
+        message: 'FCM token removed successfully',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   removeFcmToken(
     @Param('token') token: string,
@@ -176,7 +295,28 @@ export class NotificationsController {
     summary: 'Get FCM tokens',
     description: 'Retrieve all registered FCM tokens for the user',
   })
-  @ApiResponse({ status: 200, description: 'List of FCM tokens' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of FCM tokens',
+    schema: {
+      example: [
+        {
+          id: 'token-uuid-1',
+          userId: 'user-uuid',
+          token: 'fcm-token-string-1',
+          deviceType: 'android',
+          createdAt: '2024-03-01T12:00:00.000Z',
+        },
+        {
+          id: 'token-uuid-2',
+          userId: 'user-uuid',
+          token: 'fcm-token-string-2',
+          deviceType: 'ios',
+          createdAt: '2024-02-15T10:00:00.000Z',
+        },
+      ],
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getUserFcmTokens(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUserFcmTokens(userId);

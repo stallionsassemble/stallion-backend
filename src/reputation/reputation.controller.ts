@@ -23,7 +23,40 @@ export class ReputationController {
     summary: 'Get my reputation',
     description: 'Retrieve reputation details for the authenticated user',
   })
-  @ApiResponse({ status: 200, description: 'User reputation and rank' })
+  @ApiResponse({
+    status: 200,
+    description: 'User reputation and rank',
+    schema: {
+      example: {
+        id: 'rep-uuid',
+        userId: 'user-uuid',
+        score: 1250,
+        level: 5,
+        bountyScore: 800,
+        hackathonScore: 350,
+        communityScore: 100,
+        badges: [
+          {
+            id: 'badge-uuid-1',
+            name: 'First Bounty',
+            description: 'Completed your first bounty',
+            icon: '🎯',
+            earnedAt: '2024-01-15T00:00:00.000Z',
+          },
+          {
+            id: 'badge-uuid-2',
+            name: 'Top Contributor',
+            description: 'Ranked in top 10 contributors',
+            icon: '⭐',
+            earnedAt: '2024-02-01T00:00:00.000Z',
+          },
+        ],
+        rank: 42,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-03-01T00:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMyReputation(@CurrentUser('id') userId: string) {
     const reputation = await this.reputationService.getUserReputation(userId);
@@ -37,7 +70,33 @@ export class ReputationController {
     description: 'Retrieve reputation details for a specific user',
   })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'User reputation and rank' })
+  @ApiResponse({
+    status: 200,
+    description: 'User reputation and rank',
+    schema: {
+      example: {
+        id: 'rep-uuid',
+        userId: 'user-uuid',
+        score: 1250,
+        level: 5,
+        bountyScore: 800,
+        hackathonScore: 350,
+        communityScore: 100,
+        badges: [
+          {
+            id: 'badge-uuid-1',
+            name: 'First Bounty',
+            description: 'Completed your first bounty',
+            icon: '🎯',
+            earnedAt: '2024-01-15T00:00:00.000Z',
+          },
+        ],
+        rank: 42,
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-03-01T00:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserReputation(@Param('userId') userId: string) {
     const reputation = await this.reputationService.getUserReputation(userId);
@@ -60,7 +119,54 @@ export class ReputationController {
     required: false,
     description: 'Filter by category (bounty, hackathon, community)',
   })
-  @ApiResponse({ status: 200, description: 'Leaderboard rankings' })
+  @ApiResponse({
+    status: 200,
+    description: 'Leaderboard rankings',
+    schema: {
+      example: [
+        {
+          rank: 1,
+          userId: 'user-uuid-1',
+          username: 'top_contributor',
+          firstName: 'Alice',
+          lastName: 'Johnson',
+          profilePicture: 'https://example.com/alice.jpg',
+          score: 5420,
+          level: 12,
+          bountyScore: 3200,
+          hackathonScore: 1800,
+          communityScore: 420,
+          badges: [
+            {
+              id: 'badge-uuid',
+              name: 'Legend',
+              icon: '👑',
+            },
+          ],
+        },
+        {
+          rank: 2,
+          userId: 'user-uuid-2',
+          username: 'code_master',
+          firstName: 'Bob',
+          lastName: 'Smith',
+          profilePicture: 'https://example.com/bob.jpg',
+          score: 4850,
+          level: 11,
+          bountyScore: 2900,
+          hackathonScore: 1650,
+          communityScore: 300,
+          badges: [
+            {
+              id: 'badge-uuid-2',
+              name: 'Expert',
+              icon: '🏆',
+            },
+          ],
+        },
+      ],
+    },
+  })
   async getLeaderboard(
     @Query('limit') limit?: string,
     @Query('category') category?: string,
@@ -99,7 +205,41 @@ export class ReputationController {
     required: false,
     description: 'Number of history entries (default: 50)',
   })
-  @ApiResponse({ status: 200, description: 'Reputation history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reputation history',
+    schema: {
+      example: [
+        {
+          id: 'history-uuid-1',
+          userId: 'user-uuid',
+          change: 100,
+          reason: 'Bounty completed',
+          category: 'bounty',
+          referenceId: 'bounty-uuid',
+          createdAt: '2024-03-01T12:00:00.000Z',
+        },
+        {
+          id: 'history-uuid-2',
+          userId: 'user-uuid',
+          change: 50,
+          reason: 'Hackathon participation',
+          category: 'hackathon',
+          referenceId: 'hackathon-uuid',
+          createdAt: '2024-02-28T10:00:00.000Z',
+        },
+        {
+          id: 'history-uuid-3',
+          userId: 'user-uuid',
+          change: 10,
+          reason: 'Forum post upvoted',
+          category: 'community',
+          referenceId: 'post-uuid',
+          createdAt: '2024-02-27T15:30:00.000Z',
+        },
+      ],
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMyHistory(
     @CurrentUser('id') userId: string,
@@ -122,7 +262,23 @@ export class ReputationController {
     required: false,
     description: 'Number of history entries (default: 50)',
   })
-  @ApiResponse({ status: 200, description: 'Reputation history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Reputation history',
+    schema: {
+      example: [
+        {
+          id: 'history-uuid-1',
+          userId: 'user-uuid',
+          change: 100,
+          reason: 'Bounty completed',
+          category: 'bounty',
+          referenceId: 'bounty-uuid',
+          createdAt: '2024-03-01T12:00:00.000Z',
+        },
+      ],
+    },
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserHistory(
     @Param('userId') userId: string,
@@ -139,7 +295,41 @@ export class ReputationController {
     summary: 'Get all badges',
     description: 'Retrieve all available badges in the system',
   })
-  @ApiResponse({ status: 200, description: 'List of all badges' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of all badges',
+    schema: {
+      example: [
+        {
+          id: 'badge-uuid-1',
+          name: 'First Bounty',
+          description: 'Complete your first bounty',
+          icon: '🎯',
+          category: 'bounty',
+          rarity: 'common',
+          requirement: 'Complete 1 bounty',
+        },
+        {
+          id: 'badge-uuid-2',
+          name: 'Bounty Hunter',
+          description: 'Complete 10 bounties',
+          icon: '🏹',
+          category: 'bounty',
+          rarity: 'rare',
+          requirement: 'Complete 10 bounties',
+        },
+        {
+          id: 'badge-uuid-3',
+          name: 'Legend',
+          description: 'Reach level 10',
+          icon: '👑',
+          category: 'achievement',
+          rarity: 'legendary',
+          requirement: 'Reach reputation level 10',
+        },
+      ],
+    },
+  })
   async getAllBadges() {
     return this.reputationService.getAllBadges();
   }
@@ -150,7 +340,23 @@ export class ReputationController {
     description: 'Retrieve detailed information about a specific badge',
   })
   @ApiParam({ name: 'badgeId', description: 'Badge ID' })
-  @ApiResponse({ status: 200, description: 'Badge details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Badge details',
+    schema: {
+      example: {
+        id: 'badge-uuid',
+        name: 'First Bounty',
+        description: 'Complete your first bounty',
+        icon: '🎯',
+        category: 'bounty',
+        rarity: 'common',
+        requirement: 'Complete 1 bounty',
+        earnedBy: 1247,
+        createdAt: '2024-01-01T00:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 404, description: 'Badge not found' })
   async getBadgeInfo(@Param('badgeId') badgeId: string) {
     return this.reputationService.getBadgeInfo(badgeId);
