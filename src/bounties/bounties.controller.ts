@@ -63,6 +63,42 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'List of all bounties from database',
+    schema: {
+      example: [
+        {
+          id: 'clx1a2b3c4d5e6f7g8h9i0',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a modern DeFi analytics dashboard',
+          description: 'Full description of the bounty requirements...',
+          reward: '1000000000',
+          rewardCurrency: 'USDC',
+          skills: ['React', 'TypeScript', 'Web3'],
+          status: 'ACTIVE',
+          submissionDeadline: '2024-12-31T23:59:59.000Z',
+          judgingDeadline: '2025-01-07T23:59:59.000Z',
+          contractBountyId: 1,
+          ownerId: 'user-uuid-123',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+        {
+          id: 'clx2b3c4d5e6f7g8h9i0j1',
+          title: 'Smart Contract Audit',
+          shortDescription: 'Security audit for DeFi protocol',
+          description: 'Comprehensive security audit...',
+          reward: '5000000000',
+          rewardCurrency: 'USDC',
+          skills: ['Solidity', 'Security', 'Smart Contracts'],
+          status: 'ACTIVE',
+          submissionDeadline: '2025-01-15T23:59:59.000Z',
+          judgingDeadline: '2025-01-22T23:59:59.000Z',
+          contractBountyId: 2,
+          ownerId: 'user-uuid-456',
+          createdAt: '2024-01-05T00:00:00.000Z',
+          updatedAt: '2024-01-05T00:00:00.000Z',
+        },
+      ],
+    },
   })
   async getAllBounties() {
     return this.bountyService.getAllBounties();
@@ -75,6 +111,26 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'List of bounties owned by user',
+    schema: {
+      example: [
+        {
+          id: 'clx1a2b3c4d5e6f7g8h9i0',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a modern DeFi analytics dashboard',
+          description: 'Full description...',
+          reward: '1000000000',
+          rewardCurrency: 'USDC',
+          skills: ['React', 'TypeScript', 'Web3'],
+          status: 'ACTIVE',
+          submissionDeadline: '2024-12-31T23:59:59.000Z',
+          judgingDeadline: '2025-01-07T23:59:59.000Z',
+          contractBountyId: 1,
+          ownerId: 'current-user-id',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+    },
   })
   async getMyBounties(@CurrentUser('id') userId: string) {
     return this.bountyService.getOwnerBounties(userId);
@@ -85,9 +141,42 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'List of active bounty IDs',
+    schema: {
+      example: [1, 2, 5, 7, 12],
+    },
   })
   async getActiveBounties() {
     return this.bountyService.getActiveBounties();
+  }
+
+  @Get('user/:id')
+  @ApiOperation({ summary: 'Get bounties owned by a user' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of bounties owned by user',
+    schema: {
+      example: [
+        {
+          id: 'clx1a2b3c4d5e6f7g8h9i0',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a modern DeFi analytics dashboard',
+          description: 'Full description...',
+          reward: '1000000000',
+          rewardCurrency: 'USDC',
+          skills: ['React', 'TypeScript', 'Web3'],
+          status: 'ACTIVE',
+          submissionDeadline: '2024-12-31T23:59:59.000Z',
+          judgingDeadline: '2025-01-07T23:59:59.000Z',
+          contractBountyId: 1,
+          ownerId: 'specified-user-id',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+    },
+  })
+  async getUserBounties(@Param('id') userId: string) {
+    return this.bountyService.getOwnerBounties(userId);
   }
 
   @Get('id/:id')
@@ -95,6 +184,53 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'Bounty details from contract',
+    schema: {
+      example: {
+        id: 'clx1a2b3c4d5e6f7g8h9i0',
+        title: 'Build a DeFi Dashboard',
+        shortDescription: 'Create a modern DeFi analytics dashboard',
+        description:
+          'Full description of the bounty requirements and deliverables...',
+        reward: '1000000000',
+        token: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+        rewardCurrency: 'USDC',
+        skills: ['React', 'TypeScript', 'TailwindCSS', 'Web3'],
+        rewardDistribution: [
+          { rank: 1, percentage: 70 },
+          { rank: 2, percentage: 20 },
+          { rank: 3, percentage: 10 },
+        ],
+        submissionFields: [
+          {
+            name: 'githubUrl',
+            label: 'GitHub Repository URL',
+            type: 'url',
+            required: true,
+          },
+        ],
+        attachments: [
+          {
+            filename: 'requirements.pdf',
+            url: 'https://example.com/files/requirements.pdf',
+            size: 102400,
+            mimetype: 'application/pdf',
+          },
+        ],
+        status: 'ACTIVE',
+        submissionDeadline: '2024-12-31T23:59:59.000Z',
+        judgingDeadline: '2025-01-07T23:59:59.000Z',
+        contractBountyId: 1,
+        txHash: '0x1234567890abcdef...',
+        ownerId: 'user-uuid-123',
+        owner: {
+          id: 'user-uuid-123',
+          username: 'project_owner',
+          email: 'owner@example.com',
+        },
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      },
+    },
   })
   async getBounty(@Param('id') id: string) {
     return this.bountyService.getBounty(id);
@@ -112,8 +248,23 @@ export class BountyController {
     description: 'Bounty created successfully',
     schema: {
       example: {
-        bountyId: 1,
-        txHash: '0x123...',
+        message: 'Bounty created successfully',
+        bounty: {
+          id: 'uuid',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a modern DeFi analytics dashboard',
+          description: 'Full description...',
+          reward: '1000000000',
+          rewardCurrency: 'USDC',
+          skills: ['React', 'TypeScript', 'Web3'],
+          status: 'ACTIVE',
+          submissionDeadline: '2024-12-31T23:59:59.000Z',
+          judgingDeadline: '2025-01-07T23:59:59.000Z',
+          contractBountyId: 1,
+          ownerId: 'user-uuid',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
       },
     },
   })
@@ -134,7 +285,14 @@ export class BountyController {
     description: 'Bounty updated successfully',
     schema: {
       example: {
-        txHash: '0x123...',
+        message: 'Bounty updated successfully',
+        bounty: {
+          id: 'uuid',
+          title: 'Updated Bounty Title',
+          shortDescription: 'Updated description',
+          skills: ['React', 'Node.js'],
+          status: 'ACTIVE',
+        },
       },
     },
   })
@@ -160,7 +318,23 @@ export class BountyController {
     description: 'Bounty closed successfully',
     schema: {
       example: {
-        txHash: '0x123...',
+        message: 'Bounty closed successfully',
+        bounty: {
+          id: 'uuid',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a modern DeFi analytics dashboard',
+          description: 'Full description...',
+          reward: '1000000000',
+          rewardCurrency: 'USDC',
+          skills: ['React', 'TypeScript', 'Web3'],
+          status: 'CLOSED',
+          submissionDeadline: '2024-12-31T23:59:59.000Z',
+          judgingDeadline: '2025-01-07T23:59:59.000Z',
+          contractBountyId: 1,
+          ownerId: 'user-uuid',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
       },
     },
   })
@@ -179,6 +353,11 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'Bounty deleted successfully',
+    schema: {
+      example: {
+        message: 'Bounty deleted successfully',
+      },
+    },
   })
   async deleteBounty(
     @CurrentUser('id') userId: string,
@@ -197,7 +376,16 @@ export class BountyController {
     description: 'Application submitted successfully',
     schema: {
       example: {
-        txHash: '0x123...',
+        message: 'Application submitted successfully',
+        submission: {
+          id: 'uuid',
+          bountyId: 'bounty-uuid',
+          userId: 'user-uuid',
+          submissionLink: 'https://github.com/user/repo',
+          submission: {},
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
       },
     },
   })
@@ -218,6 +406,11 @@ export class BountyController {
   @ApiResponse({
     status: 200,
     description: 'Submission updated successfully',
+    schema: {
+      example: {
+        message: 'Submission updated successfully',
+      },
+    },
   })
   async updateSubmission(
     @CurrentUser('id') userId: string,
@@ -237,7 +430,7 @@ export class BountyController {
     description: 'Winners selected successfully',
     schema: {
       example: {
-        txHash: '0x123...',
+        message: 'Winners selected successfully',
       },
     },
   })

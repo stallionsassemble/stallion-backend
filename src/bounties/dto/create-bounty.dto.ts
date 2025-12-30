@@ -8,10 +8,66 @@ import {
   IsNumber,
   IsObject,
   IsOptional,
+  IsPositive,
   IsString,
   IsUrl,
+  Length,
+  MaxLength,
+  Min,
+  Validate,
   ValidateNested,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+@ValidatorConstraint({ name: 'distributionSum', async: false })
+export class DistributionSumConstraint implements ValidatorConstraintInterface {
+  validate(distribution: RewardDistributionItem[] | undefined) {
+    if (!distribution || distribution.length === 0) {
+      return false;
+    }
+    const total = distribution.reduce((sum, item) => sum + item.percentage, 0);
+    return total === 100;
+  }
+
+  defaultMessage() {
+    return 'Distribution percentages must sum to 100';
+  }
+}
+
+@ValidatorConstraint({ name: 'submissionDeadlineValid', async: false })
+export class SubmissionDeadlineConstraint
+  implements ValidatorConstraintInterface
+{
+  validate(submissionDeadline: string | undefined) {
+    if (!submissionDeadline) {
+      return false;
+    }
+    const deadline = new Date(submissionDeadline);
+    const now = new Date();
+    return deadline > now;
+  }
+
+  defaultMessage() {
+    return 'Submission deadline must be in the future';
+  }
+}
+
+@ValidatorConstraint({ name: 'judgingDeadlineValid', async: false })
+export class JudgingDeadlineConstraint implements ValidatorConstraintInterface {
+  validate(judgingDeadline: string | undefined, args: any) {
+    if (!judgingDeadline) {
+      return false;
+    }
+    const judging = new Date(judgingDeadline);
+    const submission = new Date(args.object.submissionDeadline);
+    return judging > submission;
+  }
+
+  defaultMessage() {
+    return 'Judging deadline must be after submission deadline';
+  }
+}
 
 export class SubmissionFieldItem {
   @ApiProperty({
@@ -19,6 +75,7 @@ export class SubmissionFieldItem {
     example: 'githubUrl',
   })
   @IsString()
+  @Length(1, 50)
   name: string;
 
   @ApiProperty({
@@ -26,6 +83,7 @@ export class SubmissionFieldItem {
     example: 'GitHub Repository URL',
   })
   @IsString()
+  @Length(1, 100)
   label: string;
 
   @ApiProperty({
@@ -45,6 +103,7 @@ export class SubmissionFieldItem {
     example: 'https://github.com/...',
   })
   @IsString()
+  @MaxLength(200)
   @IsOptional()
   placeholder?: string;
 
@@ -61,10 +120,14 @@ export class SubmissionFieldItem {
 export class RewardDistributionItem {
   @ApiProperty({ description: 'Rank position', example: 1 })
   @IsNumber()
+  @IsPositive()
+  @Min(1)
   rank: number;
 
   @ApiProperty({ description: 'Percentage of reward', example: 70 })
   @IsNumber()
+  @IsPositive()
+  @Min(1)
   percentage: number;
 }
 
@@ -74,17 +137,19 @@ export class AttachmentItem {
     example: 'requirements.pdf',
   })
   @IsString()
+  @MaxLength(255)
   filename: string;
 
   @ApiProperty({
     description: 'File URL',
     example: 'http://localhost:3000/uploads/documents/1234567890-abc123.pdf',
   })
-  @IsUrl({ protocols: ['http', 'https'], require_tld: false })
+  @IsUrl()
   url: string;
 
   @ApiProperty({ description: 'File size in bytes', example: 102400 })
   @IsNumber()
+  @IsPositive()
   size: number;
 
   @ApiProperty({
@@ -92,6 +157,7 @@ export class AttachmentItem {
     example: 'application/pdf',
   })
   @IsString()
+  @MaxLength(100)
   mimetype: string;
 }
 
@@ -101,6 +167,7 @@ export class CreateBountyDto {
     example: 'Build a responsive landing page',
   })
   @IsString()
+  @Length(5, 100)
   title: string;
 
   @ApiProperty({
@@ -108,6 +175,7 @@ export class CreateBountyDto {
     example: 'Create a modern landing page with React and TailwindCSS',
   })
   @IsString()
+  @Length(10, 200)
   shortDescription: string;
 
   @ApiProperty({
@@ -116,6 +184,7 @@ export class CreateBountyDto {
       'Full requirements: responsive design, mobile-first, dark mode support...',
   })
   @IsString()
+  @Length(10, 10000)
   @IsOptional()
   description: string;
 
@@ -125,6 +194,8 @@ export class CreateBountyDto {
   })
   @Type(() => Number)
   @IsNumber()
+  @IsPositive()
+  @Min(1)
   reward: number;
 
   @ApiProperty({
@@ -132,15 +203,19 @@ export class CreateBountyDto {
     example: 'USDC',
   })
   @IsString()
+  @Length(2, 10)
   rewardCurrency: string;
 
   @ApiPropertyOptional({
-    description: 'Reward distribution configuration',
-    example: { first: 70, second: 20, third: 10 },
+    description: 'Required skills for the bounty',
+    type: [String],
+    example: ['React', 'TypeScript', 'TailwindCSS', 'Web3'],
   })
-  @IsObject()
+  @IsArray()
+  @IsString({ each: true })
+  @Length(1, 50, { each: true })
   @IsOptional()
-  rewardDistribution?: any;
+  skills?: string[];
 
   @ApiPropertyOptional({
     description:
@@ -203,6 +278,7 @@ export class CreateBountyDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RewardDistributionItem)
+  @Validate(DistributionSumConstraint)
   distribution: RewardDistributionItem[];
 
   @ApiProperty({
@@ -210,6 +286,7 @@ export class CreateBountyDto {
     example: '2024-12-31T23:59:59Z',
   })
   @IsDateString()
+  @Validate(SubmissionDeadlineConstraint)
   submissionDeadline: string;
 
   @ApiProperty({
@@ -217,5 +294,6 @@ export class CreateBountyDto {
     example: '2025-01-15T23:59:59Z',
   })
   @IsDateString()
+  @Validate(JudgingDeadlineConstraint)
   judgingDeadline: string;
 }

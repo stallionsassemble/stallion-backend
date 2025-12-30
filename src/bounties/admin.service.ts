@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -86,18 +87,7 @@ export class AdminService {
     try {
       await this.verifyAdmin(userId);
 
-      const tx = await this.sorobanClient.update_admin({
-        new_admin: newAdminAddress,
-      });
-
-      // Prepare, sign and send transaction
-      const preparedTx = await tx.simulate();
-      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
-        preparedTx.toXDR(),
-        this.networkPassphrase,
-      ) as StellarSDK.Transaction;
-      // Note: Admin operations need a designated admin wallet
-      // For now, using the first admin user's wallet
+      // Get admin user wallet
       const adminUser = await this.prisma.user.findFirst({
         where: { role: 'ADMIN' },
         include: { wallet: true },
@@ -107,17 +97,53 @@ export class AdminService {
         throw new Error('Admin wallet not found');
       }
 
-      const signedTx = await this.walletSigning.signTransaction(
-        adminUser.wallet.id,
-        builtTx,
-      );
+      const walletId = adminUser.wallet.id;
+      const walletPublicKey = adminUser.wallet.publicKey;
 
-      const sendResponse = await this.rpcServer.sendTransaction(signedTx);
-      this.logger.log(
-        `Admin updated to ${newAdminAddress}, tx: ${sendResponse.hash}`,
-      );
+      // Set the public key for the Soroban client
+      this.sorobanClient.options.publicKey = walletPublicKey;
 
-      return { txHash: sendResponse.hash };
+      const tx = await this.sorobanClient.update_admin({
+        new_admin: newAdminAddress,
+      });
+
+      // Sign and send transaction
+      const result = await tx.signAndSend({
+        signTransaction: async (transactionXdr) => {
+          const transaction = StellarSDK.TransactionBuilder.fromXDR(
+            transactionXdr,
+            this.networkPassphrase,
+          ) as StellarSDK.Transaction;
+
+          const signedTx = await this.walletSigning.signTransaction(
+            walletId,
+            transaction,
+          );
+
+          return {
+            signedTxXdr: signedTx.toXDR(),
+            signerAddress: walletPublicKey,
+          };
+        },
+      });
+
+      // Handle transaction result
+      if (!result.result.isOk()) {
+        const error = result.result.unwrapErr();
+        this.logger.error('Contract invocation failed', error);
+        throw new BadRequestException(
+          `Failed to update admin on contract: ${JSON.stringify(error)}`,
+        );
+      }
+
+      if (!result.getTransactionResponse) {
+        throw new BadRequestException('Transaction response not available');
+      }
+
+      const txHash = result.getTransactionResponse.txHash;
+      this.logger.log(`Admin updated to ${newAdminAddress}, tx: ${txHash}`);
+
+      return { txHash };
     } catch (error) {
       this.logger.error('Failed to update admin', error);
       throw error;
@@ -134,18 +160,7 @@ export class AdminService {
     try {
       await this.verifyAdmin(userId);
 
-      const tx = await this.sorobanClient.update_fee_account({
-        new_fee_account: newFeeAccount,
-      });
-
-      // Prepare, sign and send transaction
-      const preparedTx = await tx.simulate();
-      const builtTx = StellarSDK.TransactionBuilder.fromXDR(
-        preparedTx.toXDR(),
-        this.networkPassphrase,
-      ) as StellarSDK.Transaction;
-      // Note: Admin operations need a designated admin wallet
-      // For now, using the first admin user's wallet
+      // Get admin user wallet
       const adminUser = await this.prisma.user.findFirst({
         where: { role: 'ADMIN' },
         include: { wallet: true },
@@ -155,17 +170,53 @@ export class AdminService {
         throw new Error('Admin wallet not found');
       }
 
-      const signedTx = await this.walletSigning.signTransaction(
-        adminUser.wallet.id,
-        builtTx,
-      );
+      const walletId = adminUser.wallet.id;
+      const walletPublicKey = adminUser.wallet.publicKey;
 
-      const sendResponse = await this.rpcServer.sendTransaction(signedTx);
-      this.logger.log(
-        `Fee account updated to ${newFeeAccount}, tx: ${sendResponse.hash}`,
-      );
+      // Set the public key for the Soroban client
+      this.sorobanClient.options.publicKey = walletPublicKey;
 
-      return { txHash: sendResponse.hash };
+      const tx = await this.sorobanClient.update_fee_account({
+        new_fee_account: newFeeAccount,
+      });
+
+      // Sign and send transaction
+      const result = await tx.signAndSend({
+        signTransaction: async (transactionXdr) => {
+          const transaction = StellarSDK.TransactionBuilder.fromXDR(
+            transactionXdr,
+            this.networkPassphrase,
+          ) as StellarSDK.Transaction;
+
+          const signedTx = await this.walletSigning.signTransaction(
+            walletId,
+            transaction,
+          );
+
+          return {
+            signedTxXdr: signedTx.toXDR(),
+            signerAddress: walletPublicKey,
+          };
+        },
+      });
+
+      // Handle transaction result
+      if (!result.result.isOk()) {
+        const error = result.result.unwrapErr();
+        this.logger.error('Contract invocation failed', error);
+        throw new BadRequestException(
+          `Failed to update fee account on contract: ${JSON.stringify(error)}`,
+        );
+      }
+
+      if (!result.getTransactionResponse) {
+        throw new BadRequestException('Transaction response not available');
+      }
+
+      const txHash = result.getTransactionResponse.txHash;
+      this.logger.log(`Fee account updated to ${newFeeAccount}, tx: ${txHash}`);
+
+      return { txHash };
     } catch (error) {
       this.logger.error('Failed to update fee account', error);
       throw error;

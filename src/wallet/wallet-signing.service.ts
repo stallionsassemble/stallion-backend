@@ -2,12 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   Asset,
+  hash,
   Horizon,
   Keypair,
   Networks,
   Operation,
   Transaction,
   TransactionBuilder,
+  xdr,
 } from '@stellar/stellar-sdk';
 import { StellarWalletService } from './stellar-wallet.service';
 
@@ -92,6 +94,26 @@ export class WalletSigningService {
     try {
       keypair = await this.stellarWallet.getDecryptedKeypair(walletId);
 
+      // Sign Soroban auth entries if present
+      const publicKey = keypair.publicKey();
+
+      for (const op of transaction.operations) {
+        if (op.type === 'invokeHostFunction' && (op as any).auth) {
+          const authEntries = (op as any).auth;
+
+          for (let i = 0; i < authEntries.length; i++) {
+            // Use SDK helper to sign auth entries
+            authEntries[i] = this.signAuthEntry(
+              authEntries[i],
+              keypair,
+              publicKey,
+              transaction.networkPassphrase,
+            );
+          }
+        }
+      }
+
+      // Sign the transaction envelope
       transaction.sign(keypair);
 
       this.logger.log(`Transaction signed for wallet ${walletId}`);
@@ -108,6 +130,73 @@ export class WalletSigningService {
         keypair = null;
       }
     }
+  }
+
+  private signAuthEntry(
+    entry: xdr.SorobanAuthorizationEntry,
+    keypair: Keypair,
+    publicKey: string,
+    networkPassphrase: string,
+  ): xdr.SorobanAuthorizationEntry {
+    const credentials = entry.credentials();
+
+    if (credentials.switch().name !== 'sorobanCredentialsAddress') {
+      return entry;
+    }
+
+    const addressCredentials = credentials.address();
+    const address = addressCredentials.address();
+
+    // Check if this entry is for our keypair
+    const needsSigning =
+      address.switch().name === 'scAddressTypeAccount' &&
+      address.accountId().ed25519().toString('hex') ===
+        keypair.rawPublicKey().toString('hex');
+
+    if (!needsSigning) {
+      return entry;
+    }
+
+    // Create signature preimage
+    const preimage = xdr.HashIdPreimage.envelopeTypeSorobanAuthorization(
+      new xdr.HashIdPreimageSorobanAuthorization({
+        networkId: hash(Buffer.from(networkPassphrase, 'utf-8')),
+        nonce: addressCredentials.nonce(),
+        signatureExpirationLedger:
+          addressCredentials.signatureExpirationLedger(),
+        invocation: entry.rootInvocation(),
+      }),
+    );
+
+    // Sign the payload
+    const payload = hash(preimage.toXDR());
+    const signature = keypair.sign(payload);
+
+    // Create signed credentials
+    const signedCredentials = new xdr.SorobanAddressCredentials({
+      address: address,
+      nonce: addressCredentials.nonce(),
+      signatureExpirationLedger: addressCredentials.signatureExpirationLedger(),
+      signature: xdr.ScVal.scvVec([
+        xdr.ScVal.scvMap([
+          new xdr.ScMapEntry({
+            key: xdr.ScVal.scvSymbol('public_key'),
+            val: xdr.ScVal.scvBytes(keypair.rawPublicKey()),
+          }),
+          new xdr.ScMapEntry({
+            key: xdr.ScVal.scvSymbol('signature'),
+            val: xdr.ScVal.scvBytes(signature),
+          }),
+        ]),
+      ]),
+    });
+
+    // Return new auth entry with signed credentials
+    return new xdr.SorobanAuthorizationEntry({
+      credentials:
+        xdr.SorobanCredentials.sorobanCredentialsAddress(signedCredentials),
+      rootInvocation: entry.rootInvocation(),
+    });
   }
 
   async getAccountBalance(publicKey: string): Promise<string> {

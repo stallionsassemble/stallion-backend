@@ -5,49 +5,17 @@ import {
   IsDateString,
   IsOptional,
   IsString,
+  Length,
   Validate,
   ValidateNested,
-  ValidatorConstraint,
-  ValidatorConstraintInterface,
 } from 'class-validator';
 import {
   AttachmentItem,
+  DistributionSumConstraint,
   RewardDistributionItem,
+  SubmissionDeadlineConstraint,
   SubmissionFieldItem,
 } from './create-bounty.dto';
-
-@ValidatorConstraint({ name: 'distributionSum', async: false })
-export class DistributionSumConstraint implements ValidatorConstraintInterface {
-  validate(distribution: RewardDistributionItem[] | undefined) {
-    if (!distribution || distribution.length === 0) {
-      return true; // Optional field, skip validation if not provided
-    }
-    const total = distribution.reduce((sum, item) => sum + item.percentage, 0);
-    return total === 100;
-  }
-
-  defaultMessage() {
-    return 'Distribution percentages must sum to 100';
-  }
-}
-
-@ValidatorConstraint({ name: 'submissionDeadlineValid', async: false })
-export class SubmissionDeadlineConstraint
-  implements ValidatorConstraintInterface
-{
-  validate(submissionDeadline: string | undefined) {
-    if (!submissionDeadline) {
-      return true; // Optional field
-    }
-    const deadline = new Date(submissionDeadline);
-    const now = new Date();
-    return deadline > now;
-  }
-
-  defaultMessage() {
-    return 'Submission deadline cannot be in the past';
-  }
-}
 
 export class UpdateBountyDto {
   @ApiPropertyOptional({
@@ -55,6 +23,7 @@ export class UpdateBountyDto {
     example: 'Build a responsive landing page (Updated)',
   })
   @IsString()
+  @Length(5, 100)
   @IsOptional()
   title?: string;
 
@@ -63,6 +32,7 @@ export class UpdateBountyDto {
     example: 'Create a modern landing page with React and TailwindCSS',
   })
   @IsString()
+  @Length(10, 200)
   @IsOptional()
   shortDescription?: string;
 
@@ -72,15 +42,20 @@ export class UpdateBountyDto {
       'Full requirements: responsive design, mobile-first, dark mode support...',
   })
   @IsString()
+  @Length(10, 10000)
   @IsOptional()
   description?: string;
 
   @ApiPropertyOptional({
-    description: 'Updated reward distribution configuration',
-    example: { first: 70, second: 20, third: 10 },
+    description: 'Updated required skills for the bounty',
+    type: [String],
+    example: ['React', 'TypeScript', 'TailwindCSS', 'Web3'],
   })
+  @IsArray()
+  @IsString({ each: true })
+  @Length(1, 50, { each: true })
   @IsOptional()
-  rewardDistribution?: any;
+  skills?: string[];
 
   @ApiPropertyOptional({
     description:
