@@ -65,15 +65,55 @@ export class WalletService {
     walletId: string,
     amount: number,
     currency: string,
-    destination: string,
+    payoutMethodId?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUnique({
         where: { id: walletId },
+        include: { users: true },
       });
 
       if (!wallet) {
         throw new NotFoundException('Wallet not found');
+      }
+
+      if (!wallet.users || wallet.users.length === 0) {
+        throw new NotFoundException('No user associated with this wallet');
+      }
+
+      const userId = wallet.users[0].id;
+
+      // Resolve destination from payout method
+      let destination: string;
+      if (payoutMethodId) {
+        const payoutMethod = await tx.payoutMethod.findFirst({
+          where: {
+            id: payoutMethodId,
+            userId,
+          },
+        });
+
+        if (!payoutMethod) {
+          throw new NotFoundException('Payout method not found');
+        }
+
+        destination = payoutMethod.publicKey;
+      } else {
+        // Use default payout method
+        const defaultPayoutMethod = await tx.payoutMethod.findFirst({
+          where: {
+            userId,
+            isDefault: true,
+          },
+        });
+
+        if (!defaultPayoutMethod) {
+          throw new NotFoundException(
+            'No default payout method found. Please add a payout method first.',
+          );
+        }
+
+        destination = defaultPayoutMethod.publicKey;
       }
 
       // Check available balance for the specific currency

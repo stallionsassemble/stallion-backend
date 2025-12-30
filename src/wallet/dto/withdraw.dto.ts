@@ -1,6 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNumber, IsString, Min } from 'class-validator';
+import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class WithdrawDto {
   @ApiProperty({
@@ -20,10 +20,12 @@ export class WithdrawDto {
   @IsString()
   currency: string;
 
-  @ApiProperty({
-    description: 'Destination Stellar address',
-    example: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  @ApiPropertyOptional({
+    description:
+      'Payout method ID (if not provided, default payout method will be used)',
+    example: 'payout-method-uuid',
   })
+  @IsOptional()
   @IsString()
-  destination: string;
+  payoutMethodId?: string;
 }

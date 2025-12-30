@@ -100,6 +100,14 @@ export class BountiesService {
   }
 
   /**
+   * Get supported currencies
+   * Returns list of supported currencies with their token addresses for the current network
+   */
+  getSupportedCurrencies(): SupportedCurrency[] {
+    return getSupportedCurrencies(this.networkPassphrase);
+  }
+
+  /**
    * Get all bounties
    * Returns database bounties based on contract bounty IDs
    */
@@ -309,6 +317,213 @@ export class BountiesService {
       };
     } catch (error) {
       this.logger.error('Failed to get bounty', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get bounty submissions (from contract)
+   */
+  async getBountySubmissions(dbBountyId: string): Promise<Map<string, string>> {
+    try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      const assembled = await this.sorobanClient.get_bounty_submissions({
+        bounty_id: bounty.contractBountyId,
+      });
+      const simulated = await assembled.simulate();
+
+      if (!simulated.result.isOk()) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      return simulated.result.unwrap();
+    } catch (error) {
+      this.logger.error('Failed to get bounty submissions', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get detailed bounty submissions from database
+   * Includes submission data and user information
+   */
+  async getBountySubmissionsDetailed(dbBountyId: string) {
+    try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      const submissions = await this.prisma.bountySubmission.findMany({
+        where: { bountyId: bounty.id },
+        include: {
+          user: {
+            include: {
+              wallet: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return submissions.map((submission) => ({
+        id: submission.id,
+        submissionLink: submission.submissionLink,
+        submissionData: submission.submission,
+        status: submission.status,
+        createdAt: submission.createdAt,
+        updatedAt: submission.updatedAt,
+        user: sanitizeUser(submission.user),
+      }));
+    } catch (error) {
+      this.logger.error('Failed to get detailed bounty submissions', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get bounty applicants
+   */
+  async getBountyApplicants(dbBountyId: string): Promise<string[]> {
+    try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      const assembled = await this.sorobanClient.get_bounty_applicants({
+        bounty_id: bounty.contractBountyId,
+      });
+      const simulated = await assembled.simulate();
+
+      if (!simulated.result.isOk()) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      return simulated.result.unwrap();
+    } catch (error) {
+      this.logger.error('Failed to get bounty applicants', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get bounty winners
+   */
+  async getBountyWinners(
+    dbBountyId: string,
+  ): Promise<BountyWinnersResponseDto> {
+    try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      if (bounty.status === BountyStatus.ACTIVE) {
+        throw new ForbiddenException('Bounty is still active');
+      }
+
+      // Get winner records from database
+      const dbWinners = await this.prisma.bountyWinner.findMany({
+        where: { bountyId: dbBountyId },
+        include: {
+          user: {
+            include: {
+              wallet: true,
+            },
+          },
+        },
+        orderBy: { position: 'asc' },
+      });
+
+      if (dbWinners.length === 0) {
+        throw new NotFoundException('No winners found for this bounty');
+      }
+
+      const rewardDistribution = bounty.rewardDistribution as Array<{
+        rank: number;
+        percentage: number;
+      }>;
+      const totalReward = Number(bounty.reward);
+      const currency = bounty.rewardCurrency || 'XLM';
+
+      // Build detailed winner response
+      const winners = dbWinners.map((winner) => {
+        const distributionEntry = rewardDistribution.find(
+          (d) => d.rank === winner.position,
+        );
+        const percentage = distributionEntry?.percentage || 0;
+        const amountWon = (totalReward * percentage) / 100;
+
+        return {
+          userId: winner.user.id,
+          username: winner.user.username,
+          firstName: winner.user.firstName,
+          lastName: winner.user.lastName,
+          profilePicture: winner.user.profilePicture || undefined,
+          publicKey: winner.user.wallet?.publicKey || '',
+          position: winner.position,
+          amountWon,
+          currency,
+          percentage,
+          awardedAt: winner.awardedAt,
+        };
+      });
+
+      return {
+        winners,
+        totalReward,
+        currency,
+        bountyTitle: bounty.title,
+        bountyId: bounty.id,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get bounty winners', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get bounty status
+   */
+  async getBountyStatus(dbBountyId: string): Promise<Status> {
+    try {
+      const bounty = await this.prisma.bounty.findUnique({
+        where: { id: dbBountyId },
+      });
+
+      if (!bounty || bounty.contractBountyId === null) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      const assembled = await this.sorobanClient.get_bounty_status({
+        bounty_id: bounty.contractBountyId,
+      });
+      const simulated = await assembled.simulate();
+
+      if (!simulated.result.isOk()) {
+        throw new NotFoundException('Bounty not found');
+      }
+
+      return simulated.result.unwrap();
+    } catch (error) {
+      this.logger.error('Failed to get bounty status', error);
       throw error;
     }
   }
@@ -1342,220 +1557,5 @@ export class BountiesService {
       this.logger.error('Failed to close bounty', error);
       throw error;
     }
-  }
-
-  /**
-   * Get bounty submissions (from contract)
-   */
-  async getBountySubmissions(dbBountyId: string): Promise<Map<string, string>> {
-    try {
-      const bounty = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
-
-      if (!bounty || bounty.contractBountyId === null) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: bounty.contractBountyId,
-      });
-      const simulated = await assembled.simulate();
-
-      if (!simulated.result.isOk()) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      return simulated.result.unwrap();
-    } catch (error) {
-      this.logger.error('Failed to get bounty submissions', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get detailed bounty submissions from database
-   * Includes submission data and user information
-   */
-  async getBountySubmissionsDetailed(dbBountyId: string) {
-    try {
-      const bounty = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
-
-      if (!bounty) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      const submissions = await this.prisma.bountySubmission.findMany({
-        where: { bountyId: bounty.id },
-        include: {
-          user: {
-            include: {
-              wallet: true,
-            },
-          },
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      return submissions.map((submission) => ({
-        id: submission.id,
-        submissionLink: submission.submissionLink,
-        submissionData: submission.submission,
-        status: submission.status,
-        createdAt: submission.createdAt,
-        updatedAt: submission.updatedAt,
-        user: sanitizeUser(submission.user),
-      }));
-    } catch (error) {
-      this.logger.error('Failed to get detailed bounty submissions', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get bounty applicants
-   */
-  async getBountyApplicants(dbBountyId: string): Promise<string[]> {
-    try {
-      const bounty = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
-
-      if (!bounty || bounty.contractBountyId === null) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      const assembled = await this.sorobanClient.get_bounty_applicants({
-        bounty_id: bounty.contractBountyId,
-      });
-      const simulated = await assembled.simulate();
-
-      if (!simulated.result.isOk()) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      return simulated.result.unwrap();
-    } catch (error) {
-      this.logger.error('Failed to get bounty applicants', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get bounty winners
-   */
-  async getBountyWinners(
-    dbBountyId: string,
-  ): Promise<BountyWinnersResponseDto> {
-    try {
-      const bounty = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
-
-      if (!bounty || bounty.contractBountyId === null) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      if (bounty.status === BountyStatus.ACTIVE) {
-        throw new ForbiddenException('Bounty is still active');
-      }
-
-      // Get winner records from database
-      const dbWinners = await this.prisma.bountyWinner.findMany({
-        where: { bountyId: dbBountyId },
-        include: {
-          user: {
-            include: {
-              wallet: true,
-            },
-          },
-        },
-        orderBy: { position: 'asc' },
-      });
-
-      if (dbWinners.length === 0) {
-        throw new NotFoundException('No winners found for this bounty');
-      }
-
-      const rewardDistribution = bounty.rewardDistribution as Array<{
-        rank: number;
-        percentage: number;
-      }>;
-      const totalReward = Number(bounty.reward);
-      const currency = bounty.rewardCurrency || 'XLM';
-
-      // Build detailed winner response
-      const winners = dbWinners.map((winner) => {
-        const distributionEntry = rewardDistribution.find(
-          (d) => d.rank === winner.position,
-        );
-        const percentage = distributionEntry?.percentage || 0;
-        const amountWon = (totalReward * percentage) / 100;
-
-        return {
-          userId: winner.user.id,
-          username: winner.user.username,
-          firstName: winner.user.firstName,
-          lastName: winner.user.lastName,
-          profilePicture: winner.user.profilePicture || undefined,
-          publicKey: winner.user.wallet?.publicKey || '',
-          position: winner.position,
-          amountWon,
-          currency,
-          percentage,
-          awardedAt: winner.awardedAt,
-        };
-      });
-
-      return {
-        winners,
-        totalReward,
-        currency,
-        bountyTitle: bounty.title,
-        bountyId: bounty.id,
-      };
-    } catch (error) {
-      this.logger.error('Failed to get bounty winners', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get bounty status
-   */
-  async getBountyStatus(dbBountyId: string): Promise<Status> {
-    try {
-      const bounty = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
-
-      if (!bounty || bounty.contractBountyId === null) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      const assembled = await this.sorobanClient.get_bounty_status({
-        bounty_id: bounty.contractBountyId,
-      });
-      const simulated = await assembled.simulate();
-
-      if (!simulated.result.isOk()) {
-        throw new NotFoundException('Bounty not found');
-      }
-
-      return simulated.result.unwrap();
-    } catch (error) {
-      this.logger.error('Failed to get bounty status', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get supported currencies
-   * Returns list of supported currencies with their token addresses for the current network
-   */
-  getSupportedCurrencies(): SupportedCurrency[] {
-    return getSupportedCurrencies(this.networkPassphrase);
   }
 }

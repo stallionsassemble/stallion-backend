@@ -7,46 +7,46 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  username  String?  @unique
-  
+  id       String  @id @default(cuid())
+  email    String  @unique
+  username String? @unique
+
   // Profile fields - common
-  firstName String?  @map("first_name")
-  lastName  String?  @map("last_name")
-  location  String?
-  skills    String[] @default([])
-  profilePicture String? @map("profile_picture")
-  socials   Json?    // { linkedin: 'url', github: 'url', twitter: 'url' }
-  
+  firstName      String?  @map("first_name")
+  lastName       String?  @map("last_name")
+  location       String?
+  skills         String[] @default([])
+  profilePicture String?  @map("profile_picture")
+  socials        Json? // { linkedin: 'url', github: 'url', twitter: 'url' }
+
   // Role-specific fields
-  role      Role     @default(CONTRIBUTOR)
-  
+  role Role @default(CONTRIBUTOR)
+
   // Project Owner specific
-  companyName     String? @map("company_name")
-  entityName      String? @map("entity_name")
-  phoneNumber     String? @map("phone_number")
-  industry        String?
-  companyBio      String? @map("company_bio")
-  companyLogo     String? @map("company_logo")
-  
+  companyName String? @map("company_name")
+  entityName  String? @map("entity_name")
+  phoneNumber String? @map("phone_number")
+  industry    String?
+  companyBio  String? @map("company_bio")
+  companyLogo String? @map("company_logo")
+
   // Settings
   emailNotifications Boolean @default(true) @map("email_notifications")
-  
+
   // Profile completion status
   profileCompleted Boolean @default(false) @map("profile_completed")
-  
+
   // MFA fields
-  totpSecret      String?  @map("totp_secret")
-  mfaEnabled     Boolean  @default(false) @map("mfa_enabled")
-  backupCodes     String[] @default([]) @map("backup_codes")
-  
+  totpSecret  String?  @map("totp_secret")
+  mfaEnabled  Boolean  @default(false) @map("mfa_enabled")
+  backupCodes String[] @default([]) @map("backup_codes")
+
   // Refresh token
-  refreshToken    String?  @map("refreshToken")
-  
+  refreshToken String? @map("refreshToken")
+
   // Verification
-  emailVerified   Boolean  @default(false) @map("email_verified")
-  
+  emailVerified Boolean @default(false) @map("email_verified")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -59,22 +59,23 @@ model User {
   winners     BountyWinner[]
   bounties    Bounty[]
   passkeys    Passkey[]
-  
+  payoutMethods PayoutMethod[]
+
   // Forum relations
   forumThreads   ForumThread[]
   forumPosts     ForumPost[]
   forumReactions ForumReaction[]
-  
+
   // Chat relations
   conversationParticipants ConversationParticipant[]
   messages                 Message[]
   messageReadReceipts      MessageReadReceipt[]
-  
+
   // Notification relations
   notifications        Notification[]
   notificationSettings NotificationSettings?
   fcmTokens            FcmToken[]
-  
+
   // Hackathon relations
   hackathons           Hackathon[]
   hackathonSubmissions HackathonSubmission[]
@@ -88,28 +89,27 @@ model User {
 }
 
 model Passkey {
-  id                String   @id @default(cuid())
-  userId            String   @map("user_id")
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  credentialId      String   @unique @map("credential_id")
-  publicKey         String   @map("public_key")
-  counter           BigInt   @default(0)
-  deviceType        String   @map("device_type")
-  backedUp          Boolean  @default(false) @map("backed_up")
-  transports        String[] @default([])
-  
-  name              String?  // User-friendly name for the passkey
-  lastUsedAt        DateTime? @map("last_used_at")
-  
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  credentialId String   @unique @map("credential_id")
+  publicKey    String   @map("public_key")
+  counter      BigInt   @default(0)
+  deviceType   String   @map("device_type")
+  backedUp     Boolean  @default(false) @map("backed_up")
+  transports   String[] @default([])
+
+  name       String? // User-friendly name for the passkey
+  lastUsedAt DateTime? @map("last_used_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([userId])
   @@index([credentialId])
   @@map("passkeys")
 }
-
 
 model UserPoint {
   id        String   @id @default(cuid())
@@ -143,33 +143,33 @@ model Point {
 }
 
 model UserReputation {
-  id                String              @id @default(cuid())
-  score             Int                 @default(0) // Overall reputation score
-  level             ReputationLevel     @default(NEWCOMER)
-  
+  id    String          @id @default(cuid())
+  score Int             @default(0) // Overall reputation score
+  level ReputationLevel @default(NEWCOMER)
+
   // Reputation breakdown
-  bountyScore       Int                 @default(0) @map("bounty_score")
-  hackathonScore    Int                 @default(0) @map("hackathon_score")
-  communityScore    Int                 @default(0) @map("community_score")
-  
+  bountyScore    Int @default(0) @map("bounty_score")
+  hackathonScore Int @default(0) @map("hackathon_score")
+  communityScore Int @default(0) @map("community_score")
+
   // Statistics
-  totalBounties     Int                 @default(0) @map("total_bounties")
-  wonBounties       Int                 @default(0) @map("won_bounties")
-  totalHackathons   Int                 @default(0) @map("total_hackathons")
-  wonHackathons     Int                 @default(0) @map("won_hackathons")
-  forumPosts        Int                 @default(0) @map("forum_posts")
-  helpfulVotes      Int                 @default(0) @map("helpful_votes")
-  
+  totalBounties   Int @default(0) @map("total_bounties")
+  wonBounties     Int @default(0) @map("won_bounties")
+  totalHackathons Int @default(0) @map("total_hackathons")
+  wonHackathons   Int @default(0) @map("won_hackathons")
+  forumPosts      Int @default(0) @map("forum_posts")
+  helpfulVotes    Int @default(0) @map("helpful_votes")
+
   // Badges
-  badges            String[]            @default([])
-  
-  updatedAt         DateTime            @updatedAt @map("updated_at")
-  createdAt         DateTime            @default(now()) @map("created_at")
+  badges String[] @default([])
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  userId            String              @unique @map("user_id")
-  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  history           ReputationHistory[]
+  userId  String              @unique @map("user_id")
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  history ReputationHistory[]
 
   @@index([score(sort: Desc)])
   @@index([level])
@@ -177,12 +177,12 @@ model UserReputation {
 }
 
 model ReputationHistory {
-  id          String   @id @default(cuid())
-  change      Int      // Positive or negative change
-  reason      String
-  category    ReputationCategory
-  metadata    Json?    // Additional context
-  createdAt   DateTime @default(now()) @map("created_at")
+  id        String             @id @default(cuid())
+  change    Int // Positive or negative change
+  reason    String
+  category  ReputationCategory
+  metadata  Json? // Additional context
+  createdAt DateTime           @default(now()) @map("created_at")
 
   // Relations
   reputationId String         @map("reputation_id")
@@ -196,20 +196,20 @@ model ReputationHistory {
 model Bounty {
   id                 String       @id @default(cuid())
   title              String
-  shortDescription   String      @map("short_description")
+  shortDescription   String       @map("short_description")
   description        String
   reward             String       @default("0") // Stored as string for large numbers
-  token              String      // Token contract address
-  rewardCurrency     String      @map("reward_currency")
-  rewardDistribution Json        @map("reward_distribution") // [{"rank": 1, "percentage": 70}, {"rank": 2, "percentage": 20}, {"rank": 3, "percentage": 10}]
+  token              String // Token contract address
+  rewardCurrency     String       @map("reward_currency")
+  rewardDistribution Json         @map("reward_distribution") // [{"rank": 1, "percentage": 70}, {"rank": 2, "percentage": 20}, {"rank": 3, "percentage": 10}]
   submissionFields   Json?        @map("submission_fields")
-  attachments        Json?        // Array of attachment objects: [{filename, url, size, mimetype}]
+  attachments        Json? // Array of attachment objects: [{filename, url, size, mimetype}]
   skills             String[]     @default([])
   status             BountyStatus @default(ACTIVE)
-  contractBountyId   Int         @unique @map("contract_bounty_id") // ID from Soroban contract
-  txHash             String      @map("tx_hash") // Transaction hash from Soroban
-  submissionDeadline DateTime    @map("submission_deadline")
-  judgingDeadline    DateTime    @map("judging_deadline")
+  contractBountyId   Int          @unique @map("contract_bounty_id") // ID from Soroban contract
+  txHash             String       @map("tx_hash") // Transaction hash from Soroban
+  submissionDeadline DateTime     @map("submission_deadline")
+  judgingDeadline    DateTime     @map("judging_deadline")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -230,7 +230,7 @@ model Bounty {
 model BountySubmission {
   id             String           @id @default(cuid())
   submission     Json?
-  submissionLink String          @map("submission_link")
+  submissionLink String           @map("submission_link")
   status         SubmissionStatus @default(PENDING)
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
@@ -241,7 +241,7 @@ model BountySubmission {
   bountyId String @map("bounty_id")
   bounty   Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
 
-@@unique([bountyId, userId])
+  @@unique([bountyId, userId])
   @@index([bountyId, status])
   @@index([userId])
   @@index([status])
@@ -267,21 +267,39 @@ model BountyWinner {
 }
 
 model Wallet {
-  id                    String   @id @default(cuid())
-  publicKey             String   @unique @map("public_key")
-  encryptedPrivateKey   String   @map("encrypted_private_key")
-  encryptedDataKey      String   @map("encrypted_data_key")
-  isActivated           Boolean  @default(false) @map("is_activated")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  id                  String   @id @default(cuid())
+  publicKey           String   @unique @map("public_key")
+  encryptedPrivateKey String   @map("encrypted_private_key")
+  encryptedDataKey    String   @map("encrypted_data_key")
+  isActivated         Boolean  @default(false) @map("is_activated")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   // Relations
-  users        User[]
-  transactions Transaction[]
+  users         User[]
+  transactions  Transaction[]
 
   @@index([publicKey])
   @@index([isActivated])
   @@map("wallets")
+}
+
+model PayoutMethod {
+  id        String   @id @default(cuid())
+  name      String // User-friendly name for the payout method
+  publicKey String   @map("public_key") // Stellar public key to withdraw to
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  userId String @map("user_id")
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isDefault])
+  @@unique([name, userId])
+  @@map("payout_methods")
 }
 
 model Transaction {
@@ -389,23 +407,23 @@ model ForumCategory {
 }
 
 model ForumThread {
-  id          String       @id @default(cuid())
-  title       String
-  slug        String       @unique
-  isPinned    Boolean      @default(false) @map("is_pinned")
-  isLocked    Boolean      @default(false) @map("is_locked")
-  viewCount   Int          @default(0) @map("view_count")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  isPinned  Boolean  @default(false) @map("is_pinned")
+  isLocked  Boolean  @default(false) @map("is_locked")
+  viewCount Int      @default(0) @map("view_count")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  categoryId  String       @map("category_id")
-  category    ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  
-  authorId    String       @map("author_id")
-  author      User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId String        @map("category_id")
+  category   ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
 
-  posts       ForumPost[]
-  tags        ForumThreadTag[]
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  posts ForumPost[]
+  tags  ForumThreadTag[]
 
   @@index([categoryId, isPinned, updatedAt(sort: Desc)])
   @@index([authorId])
@@ -421,11 +439,11 @@ model ForumPost {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  threadId  String   @map("thread_id")
-  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  
-  authorId  String   @map("author_id")
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  threadId String      @map("thread_id")
+  thread   ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   reactions ForumReaction[]
 
@@ -439,11 +457,11 @@ model ForumReaction {
   emoji     String
   createdAt DateTime @default(now()) @map("created_at")
 
-  postId    String   @map("post_id")
-  post      ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  postId String    @map("post_id")
+  post   ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([postId, userId, emoji])
   @@index([postId])
@@ -458,18 +476,18 @@ model ForumTag {
   color     String?
   createdAt DateTime @default(now()) @map("created_at")
 
-  threads   ForumThreadTag[]
+  threads ForumThreadTag[]
 
   @@index([slug])
   @@map("forum_tags")
 }
 
 model ForumThreadTag {
-  threadId  String      @map("thread_id")
-  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  
-  tagId     String      @map("tag_id")
-  tag       ForumTag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  threadId String      @map("thread_id")
+  thread   ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  tagId String   @map("tag_id")
+  tag   ForumTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([threadId, tagId])
   @@map("forum_thread_tags")
@@ -480,15 +498,15 @@ model ForumThreadTag {
 // ============================================
 
 model Conversation {
-  id            String           @id @default(cuid())
-  type          ConversationType @default(DIRECT)
-  name          String?
-  avatar        String?
-  createdAt     DateTime         @default(now()) @map("created_at")
-  updatedAt     DateTime         @updatedAt @map("updated_at")
+  id        String           @id @default(cuid())
+  type      ConversationType @default(DIRECT)
+  name      String?
+  avatar    String?
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
 
-  participants  ConversationParticipant[]
-  messages      Message[]
+  participants ConversationParticipant[]
+  messages     Message[]
 
   @@index([type])
   @@index([updatedAt(sort: Desc)])
@@ -496,17 +514,17 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  id              String       @id @default(cuid())
-  role            ParticipantRole @default(MEMBER)
-  lastReadAt      DateTime?    @map("last_read_at")
-  joinedAt        DateTime     @default(now()) @map("joined_at")
-  leftAt          DateTime?    @map("left_at")
-  
-  conversationId  String       @map("conversation_id")
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  userId          String       @map("user_id")
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String          @id @default(cuid())
+  role       ParticipantRole @default(MEMBER)
+  lastReadAt DateTime?       @map("last_read_at")
+  joinedAt   DateTime        @default(now()) @map("joined_at")
+  leftAt     DateTime?       @map("left_at")
+
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@index([userId])
@@ -515,22 +533,22 @@ model ConversationParticipant {
 }
 
 model Message {
-  id              String       @id @default(cuid())
-  content         String
-  type            MessageType  @default(TEXT)
-  attachments     Json?
-  isEdited        Boolean      @default(false) @map("is_edited")
-  isDeleted       Boolean      @default(false) @map("is_deleted")
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  id          String      @id @default(cuid())
+  content     String
+  type        MessageType @default(TEXT)
+  attachments Json?
+  isEdited    Boolean     @default(false) @map("is_edited")
+  isDeleted   Boolean     @default(false) @map("is_deleted")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
 
-  conversationId  String       @map("conversation_id")
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  
-  senderId        String       @map("sender_id")
-  sender          User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
-  readReceipts    MessageReadReceipt[]
+  senderId String @map("sender_id")
+  sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  readReceipts MessageReadReceipt[]
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
@@ -538,14 +556,14 @@ model Message {
 }
 
 model MessageReadReceipt {
-  id        String   @id @default(cuid())
-  readAt    DateTime @default(now()) @map("read_at")
+  id     String   @id @default(cuid())
+  readAt DateTime @default(now()) @map("read_at")
 
-  messageId String   @map("message_id")
-  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messageId String  @map("message_id")
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
   @@index([messageId])
@@ -596,30 +614,30 @@ model Notification {
 }
 
 model NotificationSettings {
-  id        String   @id @default(cuid())
-  userId    String   @unique @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   // Chat notifications
-  chatInApp   Boolean @default(true) @map("chat_in_app")
-  chatEmail   Boolean @default(true) @map("chat_email")
-  
+  chatInApp Boolean @default(true) @map("chat_in_app")
+  chatEmail Boolean @default(true) @map("chat_email")
+
   // Wallet notifications
   walletInApp Boolean @default(true) @map("wallet_in_app")
   walletEmail Boolean @default(true) @map("wallet_email")
-  
+
   // Bounty notifications
   bountyInApp Boolean @default(true) @map("bounty_in_app")
   bountyEmail Boolean @default(true) @map("bounty_email")
-  
+
   // Forum notifications
-  forumInApp  Boolean @default(true) @map("forum_in_app")
-  forumEmail  Boolean @default(false) @map("forum_email")
-  
+  forumInApp Boolean @default(true) @map("forum_in_app")
+  forumEmail Boolean @default(false) @map("forum_email")
+
   // System notifications
   systemInApp Boolean @default(true) @map("system_in_app")
   systemEmail Boolean @default(true) @map("system_email")
-  
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -651,12 +669,12 @@ enum NotificationType {
   NEW_MESSAGE
   NEW_CONVERSATION
   MENTION
-  
+
   // Wallet notifications
   DEPOSIT_RECEIVED
   WITHDRAWAL_COMPLETED
   WITHDRAWAL_FAILED
-  
+
   // Bounty notifications
   BOUNTY_CREATED
   BOUNTY_COMPLETED
@@ -665,16 +683,16 @@ enum NotificationType {
   SUBMISSION_REJECTED
   BOUNTY_WINNER
   PAYOUT_RECEIVED
-  
+
   // Forum notifications
   THREAD_REPLY
   POST_REACTION
   THREAD_MENTION
-  
+
   // System notifications
   SYSTEM_ANNOUNCEMENT
   ACCOUNT_UPDATE
-  
+
   // Hackathon notifications
   HACKATHON_CREATED
   HACKATHON_STARTING_SOON
@@ -687,38 +705,38 @@ enum NotificationType {
 // ============================================
 
 model Hackathon {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   title       String
-  slug        String   @unique
-  description String   @db.Text
-  
-  startDate   DateTime @map("start_date")
-  endDate     DateTime @map("end_date")
-  
-  totalReward Decimal  @map("total_reward") @db.Decimal(20, 7)
-  currency    String   @default("XLM")
-  
+  slug        String @unique
+  description String @db.Text
+
+  startDate DateTime @map("start_date")
+  endDate   DateTime @map("end_date")
+
+  totalReward Decimal @map("total_reward") @db.Decimal(20, 7)
+  currency    String  @default("XLM")
+
   // Settings
   allowMultipleTrackSubmissions Boolean @default(false) @map("allow_multiple_track_submissions")
   maxSubmissionsPerUser         Int     @default(1) @map("max_submissions_per_user")
-  
+
   // Metadata
-  coverImage  String?  @map("cover_image")
-  rules       String?  @db.Text
-  prizes      Json?    // Additional prize information
-  
-  status      HackathonStatus @default(DRAFT)
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
-  ownerId     String   @map("owner_id")
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  
+  coverImage String? @map("cover_image")
+  rules      String? @db.Text
+  prizes     Json? // Additional prize information
+
+  status HackathonStatus @default(DRAFT)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ownerId String @map("owner_id")
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
   tracks      HackathonTrack[]
   submissions HackathonSubmission[]
   winners     HackathonWinner[]
-  
+
   @@index([ownerId])
   @@index([status, startDate])
   @@index([slug])
@@ -726,70 +744,70 @@ model Hackathon {
 }
 
 model HackathonTrack {
-  id          String   @id @default(cuid())
+  id          String @id @default(cuid())
   name        String
-  description String   @db.Text
-  
-  prizePool   Decimal  @map("prize_pool") @db.Decimal(20, 7)
-  
+  description String @db.Text
+
+  prizePool Decimal @map("prize_pool") @db.Decimal(20, 7)
+
   // Reward distribution (e.g., [50, 30, 20] for 1st, 2nd, 3rd place percentages)
   rewardDistribution Json @map("reward_distribution")
-  
+
   // Submission requirements
   submissionFields Json @map("submission_fields") // Array of field definitions
-  
+
   // Track settings
-  maxSubmissions Int?   @map("max_submissions") // Max submissions for this track
+  maxSubmissions Int?    @map("max_submissions") // Max submissions for this track
   isMainTrack    Boolean @default(false) @map("is_main_track")
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  
-  hackathonId String   @map("hackathon_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  hackathonId String    @map("hackathon_id")
   hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
-  
+
   submissions HackathonSubmission[]
   winners     HackathonWinner[]
-  
+
   @@index([hackathonId])
   @@index([hackathonId, isMainTrack])
   @@map("hackathon_tracks")
 }
 
 model HackathonSubmission {
-  id          String   @id @default(cuid())
-  
+  id String @id @default(cuid())
+
   // Submission data based on track's submissionFields
-  submissionData Json   @map("submission_data")
-  
+  submissionData Json @map("submission_data")
+
   // Additional metadata
-  projectName    String? @map("project_name")
-  projectUrl     String? @map("project_url")
-  repositoryUrl  String? @map("repository_url")
-  videoUrl       String? @map("video_url")
-  description    String? @db.Text
-  
-  status      HackathonSubmissionStatus @default(PENDING)
-  
+  projectName   String? @map("project_name")
+  projectUrl    String? @map("project_url")
+  repositoryUrl String? @map("repository_url")
+  videoUrl      String? @map("video_url")
+  description   String? @db.Text
+
+  status HackathonSubmissionStatus @default(PENDING)
+
   // Judging
-  score       Decimal? @db.Decimal(10, 2)
-  feedback    String?  @db.Text
-  
+  score    Decimal? @db.Decimal(10, 2)
+  feedback String?  @db.Text
+
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
   submittedAt DateTime @default(now()) @map("submitted_at")
-  
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  hackathonId String   @map("hackathon_id")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  hackathonId String    @map("hackathon_id")
   hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
-  
-  trackId     String   @map("track_id")
-  track       HackathonTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  
-  winner      HackathonWinner?
-  
+
+  trackId String         @map("track_id")
+  track   HackathonTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  winner HackathonWinner?
+
   @@unique([userId, hackathonId, trackId])
   @@index([userId])
   @@index([hackathonId, status])
@@ -798,30 +816,30 @@ model HackathonSubmission {
 }
 
 model HackathonWinner {
-  id          String   @id @default(cuid())
-  
-  position    Int      // 1st, 2nd, 3rd, etc.
-  prizeAmount Decimal  @map("prize_amount") @db.Decimal(20, 7)
-  
+  id String @id @default(cuid())
+
+  position    Int // 1st, 2nd, 3rd, etc.
+  prizeAmount Decimal @map("prize_amount") @db.Decimal(20, 7)
+
   // Payout tracking
-  isPaid      Boolean  @default(false) @map("is_paid")
-  paidAt      DateTime? @map("paid_at")
-  txHash      String?  @map("tx_hash")
-  
-  createdAt   DateTime @default(now()) @map("created_at")
-  
-  userId      String   @map("user_id")
-  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
-  
-  hackathonId String   @map("hackathon_id")
+  isPaid Boolean   @default(false) @map("is_paid")
+  paidAt DateTime? @map("paid_at")
+  txHash String?   @map("tx_hash")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  hackathonId String    @map("hackathon_id")
   hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Restrict)
-  
-  trackId     String   @map("track_id")
-  track       HackathonTrack @relation(fields: [trackId], references: [id], onDelete: Restrict)
-  
-  submissionId String  @unique @map("submission_id")
+
+  trackId String         @map("track_id")
+  track   HackathonTrack @relation(fields: [trackId], references: [id], onDelete: Restrict)
+
+  submissionId String              @unique @map("submission_id")
   submission   HackathonSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
-  
+
   @@unique([hackathonId, trackId, position])
   @@index([userId])
   @@index([hackathonId])
@@ -850,13 +868,13 @@ enum HackathonSubmissionStatus {
 }
 
 enum ReputationLevel {
-  NEWCOMER      // 0-99
-  CONTRIBUTOR   // 100-499
-  REGULAR       // 500-999
-  VETERAN       // 1000-2499
-  EXPERT        // 2500-4999
-  MASTER        // 5000-9999
-  LEGEND        // 10000+
+  NEWCOMER // 0-99
+  CONTRIBUTOR // 100-499
+  REGULAR // 500-999
+  VETERAN // 1000-2499
+  EXPERT // 2500-4999
+  MASTER // 5000-9999
+  LEGEND // 10000+
 }
 
 enum ReputationCategory {

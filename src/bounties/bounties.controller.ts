@@ -241,6 +241,113 @@ export class BountyController {
     return this.bountyService.getBounty(id);
   }
 
+  @Get(':id/submissions')
+  @ApiOperation({
+    summary: 'Get detailed bounty submissions',
+    description:
+      'Get submissions with full data including submission fields and user information',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Detailed submissions with user info and submission data',
+    schema: {
+      example: [
+        {
+          id: 'submission-id',
+          submissionLink: 'https://github.com/user/repo',
+          submissionData: {
+            githubRepo: 'https://github.com/user/repo',
+            liveDemo: 'https://demo.example.com',
+            estimatedHours: 40,
+          },
+          status: 'PENDING',
+          createdAt: '2024-01-01T00:00:00Z',
+          updatedAt: '2024-01-01T00:00:00Z',
+          user: {
+            id: 'user-id',
+            username: 'username',
+            email: 'user@example.com',
+          },
+        },
+      ],
+    },
+  })
+  async getBountySubmissionsDetailed(@Param('id') id: string) {
+    return this.bountyService.getBountySubmissionsDetailed(id);
+  }
+
+  @Get(':id/applicants')
+  @ApiOperation({ summary: 'Get bounty applicants' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of applicant addresses',
+  })
+  async getBountyApplicants(@Param('id') id: string) {
+    return this.bountyService.getBountyApplicants(id);
+  }
+
+  @Get(':id/winners')
+  @ApiOperation({ summary: 'Get bounty winners' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detailed winner information with rankings and amounts',
+    type: BountyWinnersResponseDto,
+    schema: {
+      example: {
+        winners: [
+          {
+            userId: 'user-uuid-1',
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/profile.jpg',
+            publicKey:
+              'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+            position: 1,
+            amountWon: 500,
+            currency: 'XLM',
+            percentage: 50,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+          {
+            userId: 'user-uuid-2',
+            username: 'jane_smith',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            profilePicture: 'https://example.com/profile2.jpg',
+            publicKey: 'GYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
+            position: 2,
+            amountWon: 300,
+            currency: 'XLM',
+            percentage: 30,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+          {
+            userId: 'user-uuid-3',
+            username: 'bob_wilson',
+            firstName: 'Bob',
+            lastName: 'Wilson',
+            profilePicture: null,
+            publicKey:
+              'GZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ',
+            position: 3,
+            amountWon: 200,
+            currency: 'XLM',
+            percentage: 20,
+            awardedAt: '2024-03-01T12:00:00.000Z',
+          },
+        ],
+        totalReward: 1000,
+        currency: 'XLM',
+        bountyTitle: 'Build a DeFi Dashboard',
+        bountyId: 'bounty-uuid-123',
+      },
+    },
+  })
+  async getBountyWinners(@Param('id') id: string) {
+    return this.bountyService.getBountyWinners(id);
+  }
+
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
@@ -488,113 +595,6 @@ export class BountyController {
     @Body() dto: SelectWinnersDto,
   ) {
     return this.bountyService.selectWinners(userId, id, dto);
-  }
-
-  @Get(':id/submissions')
-  @ApiOperation({
-    summary: 'Get detailed bounty submissions',
-    description:
-      'Get submissions with full data including submission fields and user information',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Detailed submissions with user info and submission data',
-    schema: {
-      example: [
-        {
-          id: 'submission-id',
-          submissionLink: 'https://github.com/user/repo',
-          submissionData: {
-            githubRepo: 'https://github.com/user/repo',
-            liveDemo: 'https://demo.example.com',
-            estimatedHours: 40,
-          },
-          status: 'PENDING',
-          createdAt: '2024-01-01T00:00:00Z',
-          updatedAt: '2024-01-01T00:00:00Z',
-          user: {
-            id: 'user-id',
-            username: 'username',
-            email: 'user@example.com',
-          },
-        },
-      ],
-    },
-  })
-  async getBountySubmissionsDetailed(@Param('id') id: string) {
-    return this.bountyService.getBountySubmissionsDetailed(id);
-  }
-
-  @Get(':id/applicants')
-  @ApiOperation({ summary: 'Get bounty applicants' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of applicant addresses',
-  })
-  async getBountyApplicants(@Param('id') id: string) {
-    return this.bountyService.getBountyApplicants(id);
-  }
-
-  @Get(':id/winners')
-  @ApiOperation({ summary: 'Get bounty winners' })
-  @ApiResponse({
-    status: 200,
-    description: 'Detailed winner information with rankings and amounts',
-    type: BountyWinnersResponseDto,
-    schema: {
-      example: {
-        winners: [
-          {
-            userId: 'user-uuid-1',
-            username: 'john_doe',
-            firstName: 'John',
-            lastName: 'Doe',
-            profilePicture: 'https://example.com/profile.jpg',
-            publicKey:
-              'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
-            position: 1,
-            amountWon: 500,
-            currency: 'XLM',
-            percentage: 50,
-            awardedAt: '2024-03-01T12:00:00.000Z',
-          },
-          {
-            userId: 'user-uuid-2',
-            username: 'jane_smith',
-            firstName: 'Jane',
-            lastName: 'Smith',
-            profilePicture: 'https://example.com/profile2.jpg',
-            publicKey: 'GYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY',
-            position: 2,
-            amountWon: 300,
-            currency: 'XLM',
-            percentage: 30,
-            awardedAt: '2024-03-01T12:00:00.000Z',
-          },
-          {
-            userId: 'user-uuid-3',
-            username: 'bob_wilson',
-            firstName: 'Bob',
-            lastName: 'Wilson',
-            profilePicture: null,
-            publicKey:
-              'GZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ',
-            position: 3,
-            amountWon: 200,
-            currency: 'XLM',
-            percentage: 20,
-            awardedAt: '2024-03-01T12:00:00.000Z',
-          },
-        ],
-        totalReward: 1000,
-        currency: 'XLM',
-        bountyTitle: 'Build a DeFi Dashboard',
-        bountyId: 'bounty-uuid-123',
-      },
-    },
-  })
-  async getBountyWinners(@Param('id') id: string) {
-    return this.bountyService.getBountyWinners(id);
   }
 
   // Admin endpoints

@@ -116,7 +116,7 @@ export class WalletController {
       wallet.id,
       withdrawDto.amount,
       withdrawDto.currency,
-      withdrawDto.destination,
+      withdrawDto.payoutMethodId,
     );
   }
 
