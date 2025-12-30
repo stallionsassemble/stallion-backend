@@ -1437,6 +1437,10 @@ export class BountiesService {
         throw new NotFoundException('Bounty not found');
       }
 
+      if (bounty.status === BountyStatus.ACTIVE) {
+        throw new ForbiddenException('Bounty is still active');
+      }
+
       const assembled = await this.sorobanClient.get_bounty_winners({
         bounty_id: bounty.contractBountyId,
       });
