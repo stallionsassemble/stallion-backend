@@ -14,6 +14,7 @@ model User {
   // Profile fields - common
   firstName      String?  @map("first_name")
   lastName       String?  @map("last_name")
+  bio            String?
   location       String?
   skills         String[] @default([])
   profilePicture String?  @map("profile_picture")

@@ -19,6 +19,15 @@ export class UpdateProjectOwnerProfileDto {
   lastName?: string;
 
   @ApiPropertyOptional({
+    description: 'Bio',
+    example:
+      'Experienced project manager with a focus on blockchain technology',
+  })
+  @IsString()
+  @IsOptional()
+  bio?: string;
+
+  @ApiPropertyOptional({
     description: 'Username',
     example: 'janesmith',
   })

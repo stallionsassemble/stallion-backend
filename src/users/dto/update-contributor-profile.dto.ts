@@ -19,6 +19,15 @@ export class UpdateContributorProfileDto {
   lastName?: string;
 
   @ApiPropertyOptional({
+    description: 'Bio',
+    example:
+      'Full-stack developer passionate about web3 and decentralized applications',
+  })
+  @IsString()
+  @IsOptional()
+  bio?: string;
+
+  @ApiPropertyOptional({
     description: 'Username',
     example: 'johndoe',
   })

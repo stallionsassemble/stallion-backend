@@ -33,6 +33,13 @@ export class ProfileResponseDto {
   lastName?: string;
 
   @ApiPropertyOptional({
+    description: 'Bio',
+    example:
+      'Full-stack developer passionate about web3 and decentralized applications',
+  })
+  bio?: string;
+
+  @ApiPropertyOptional({
     description: 'Location',
     example: 'San Francisco, CA',
   })
