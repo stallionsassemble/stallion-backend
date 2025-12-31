@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { WsException } from '@nestjs/websockets';
 import { Socket } from 'socket.io';
 import { EnvConfig } from '../../config/env.config';
 
@@ -25,18 +26,23 @@ export class WsAuthGuard implements CanActivate {
 
       if (!token) {
         this.logger.warn('No token provided in WebSocket connection');
-        return false;
+        throw new WsException('Unauthorized: No token provided');
       }
 
       const payload = await this.jwtService.verifyAsync(token, {
         secret: this.configService.getOrThrow<string>(EnvConfig.JWT_SECRET),
       });
 
-      (client as any).userId = payload.userId;
+      // Set userId on socket from JWT payload
+      (client as any).userId = payload.sub;
+
       return true;
     } catch (error) {
       this.logger.error(`WebSocket authentication failed: ${error.message}`);
-      return false;
+      if (error instanceof WsException) {
+        throw error;
+      }
+      throw new WsException('Unauthorized: Invalid token');
     }
   }
 

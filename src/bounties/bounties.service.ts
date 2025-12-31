@@ -76,12 +76,8 @@ export class BountiesService {
     const rpcUrl = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_RPC_URL,
     );
-
-    this.logger.log(
-      'BountiesService initialized with individual wallet signing',
-    );
     this.networkPassphrase =
-      this.configService.get<string>(EnvConfig.SOROBAN_NETWORK) ||
+      this.configService.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
       'Test SDF Network ; September 2015';
 
     // Initialize Soroban client
@@ -90,6 +86,8 @@ export class BountiesService {
       networkPassphrase: this.networkPassphrase,
       rpcUrl,
     });
+
+    this.logger.log('Bounties service initialized');
   }
 
   /**

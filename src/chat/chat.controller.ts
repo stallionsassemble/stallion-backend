@@ -1,14 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -20,10 +10,6 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
-import { AddParticipantsDto } from './dto/add-participants.dto';
-import { CreateConversationDto } from './dto/create-conversation.dto';
-import { SendMessageDto } from './dto/send-message.dto';
-import { UpdateMessageDto } from './dto/update-message.dto';
 
 @ApiTags('Chat')
 @Controller('chat')
@@ -34,71 +20,6 @@ export class ChatController {
     private readonly chatService: ChatService,
     private readonly chatGateway: ChatGateway,
   ) {}
-
-  @Post('conversations')
-  @ApiOperation({
-    summary: 'Create conversation',
-    description: 'Create a new chat conversation with participants',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Conversation created successfully',
-    schema: {
-      example: {
-        id: 'conv-uuid',
-        name: 'Project Discussion',
-        isGroup: true,
-        createdAt: '2024-01-01T00:00:00.000Z',
-        updatedAt: '2024-01-01T00:00:00.000Z',
-        participants: [
-          {
-            id: 'part-uuid-1',
-            userId: 'user-uuid-1',
-            conversationId: 'conv-uuid',
-            joinedAt: '2024-01-01T00:00:00.000Z',
-            user: {
-              id: 'user-uuid-1',
-              username: 'john_doe',
-              firstName: 'John',
-              lastName: 'Doe',
-              profilePicture: 'https://example.com/profile.jpg',
-            },
-          },
-          {
-            id: 'part-uuid-2',
-            userId: 'user-uuid-2',
-            conversationId: 'conv-uuid',
-            joinedAt: '2024-01-01T00:00:00.000Z',
-            user: {
-              id: 'user-uuid-2',
-              username: 'jane_smith',
-              firstName: 'Jane',
-              lastName: 'Smith',
-              profilePicture: 'https://example.com/profile2.jpg',
-            },
-          },
-        ],
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async createConversation(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CreateConversationDto,
-  ) {
-    const conversation = await this.chatService.createConversation(userId, dto);
-
-    for (const participant of conversation.participants) {
-      if (participant.userId !== userId) {
-        this.chatGateway.notifyNewConversation(
-          participant.userId,
-          conversation,
-        );
-      }
-    }
-
-    return conversation;
-  }
 
   @Get('conversations')
   @ApiOperation({
@@ -194,166 +115,6 @@ export class ChatController {
     return this.chatService.getConversation(id, userId);
   }
 
-  @Post('conversations/:id/participants')
-  @ApiOperation({
-    summary: 'Add participants',
-    description: 'Add new participants to an existing conversation',
-  })
-  @ApiParam({ name: 'id', description: 'Conversation ID' })
-  @ApiResponse({
-    status: 201,
-    description: 'Participants added successfully',
-    schema: {
-      example: {
-        message: 'Participants added successfully',
-        conversation: {
-          id: 'conv-uuid',
-          participants: [
-            {
-              userId: 'user-uuid-1',
-              user: { username: 'john_doe' },
-            },
-            {
-              userId: 'user-uuid-2',
-              user: { username: 'jane_smith' },
-            },
-          ],
-        },
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
-  addParticipants(@Param('id') id: string, @Body() dto: AddParticipantsDto) {
-    return this.chatService.addParticipants(id, dto);
-  }
-
-  @Post('conversations/:id/leave')
-  @ApiOperation({
-    summary: 'Leave conversation',
-    description: 'Remove yourself from a conversation',
-  })
-  @ApiParam({ name: 'id', description: 'Conversation ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Left conversation successfully',
-    schema: {
-      example: {
-        message: 'Left conversation successfully',
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
-  leaveConversation(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.chatService.leaveConversation(id, userId);
-  }
-
-  @Post('messages')
-  @ApiOperation({
-    summary: 'Send message',
-    description: 'Send a new message in a conversation',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Message sent successfully',
-    schema: {
-      example: {
-        id: 'msg-uuid',
-        content: 'Hello everyone!',
-        senderId: 'user-uuid',
-        conversationId: 'conv-uuid',
-        createdAt: '2024-01-01T12:00:00.000Z',
-        updatedAt: '2024-01-01T12:00:00.000Z',
-        isRead: false,
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  sendMessage(@CurrentUser('id') userId: string, @Body() dto: SendMessageDto) {
-    return this.chatService.sendMessage(userId, dto);
-  }
-
-  @Patch('messages/:id')
-  @ApiOperation({
-    summary: 'Update message',
-    description: 'Edit an existing message',
-  })
-  @ApiParam({ name: 'id', description: 'Message ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Message updated successfully',
-    schema: {
-      example: {
-        id: 'msg-uuid',
-        content: 'Updated message content',
-        senderId: 'user-uuid',
-        conversationId: 'conv-uuid',
-        createdAt: '2024-01-01T12:00:00.000Z',
-        updatedAt: '2024-01-01T12:30:00.000Z',
-        isRead: true,
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Message not found' })
-  updateMessage(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-    @Body() dto: UpdateMessageDto,
-  ) {
-    return this.chatService.updateMessage(id, userId, dto);
-  }
-
-  @Delete('messages/:id')
-  @ApiOperation({
-    summary: 'Delete message',
-    description: 'Delete a message from a conversation',
-  })
-  @ApiParam({ name: 'id', description: 'Message ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Message deleted successfully',
-    schema: {
-      example: {
-        message: 'Message deleted successfully',
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Message not found' })
-  deleteMessage(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.chatService.deleteMessage(id, userId);
-  }
-
-  @Post('conversations/:id/read')
-  @ApiOperation({
-    summary: 'Mark as read',
-    description: 'Mark messages in a conversation as read',
-  })
-  @ApiParam({ name: 'id', description: 'Conversation ID' })
-  @ApiResponse({
-    status: 200,
-    description: 'Marked as read successfully',
-    schema: {
-      example: {
-        message: 'Marked as read successfully',
-        updatedCount: 5,
-      },
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  markAsRead(
-    @Param('id') conversationId: string,
-    @CurrentUser('id') userId: string,
-    @Body() body?: { messageId?: string },
-  ) {
-    return this.chatService.markAsRead(conversationId, userId, body?.messageId);
-  }
-
   @Get('conversations/:id/unread-count')
   @ApiOperation({
     summary: 'Get unread count',
@@ -371,11 +132,17 @@ export class ChatController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getUnreadCount(
+  async getUnreadCount(
     @Param('id') conversationId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.chatService.getUnreadCount(conversationId, userId);
+    return {
+      conversationId,
+      unreadCount: await this.chatService.getUnreadCount(
+        conversationId,
+        userId,
+      ),
+    };
   }
 
   @Get('conversations/:id/search')

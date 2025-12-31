@@ -5,12 +5,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConversationType, ParticipantRole } from '@prisma/client';
+import { ConversationType, MessageType, ParticipantRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { AddParticipantsDto } from './dto/add-participants.dto';
-import { CreateConversationDto } from './dto/create-conversation.dto';
-import { SendMessageDto } from './dto/send-message.dto';
-import { UpdateMessageDto } from './dto/update-message.dto';
+import { SendMessageWsDto } from './dto/websocket-events.dto';
+import {
+  ConversationResponse,
+  MessageResponse,
+} from './interfaces/chat.interfaces';
 
 @Injectable()
 export class ChatService {
@@ -18,56 +19,84 @@ export class ChatService {
 
   constructor(private prisma: PrismaService) {}
 
-  async createConversation(userId: string, dto: CreateConversationDto) {
-    if (
-      dto.type === ConversationType.DIRECT &&
-      dto.participantIds.length !== 1
-    ) {
-      throw new BadRequestException(
-        'Direct conversations must have exactly one other participant',
-      );
+  /**
+   * Find or create a direct conversation between two users
+   * This is automatically called when sending a message
+   */
+  async findOrCreateDirectConversation(
+    userId1: string,
+    userId2: string,
+  ): Promise<ConversationResponse> {
+    if (userId1 === userId2) {
+      throw new BadRequestException('Cannot create conversation with yourself');
     }
 
-    if (!dto.participantIds.includes(userId)) {
-      dto.participantIds.push(userId);
+    // Check if conversation already exists
+    const existing = await this.findDirectConversation(userId1, userId2);
+    if (existing) {
+      return existing;
     }
 
-    if (dto.type === ConversationType.DIRECT) {
-      const existingConversation = await this.findDirectConversation(
-        userId,
-        dto.participantIds[0] === userId
-          ? dto.participantIds[1]
-          : dto.participantIds[0],
-      );
-
-      if (existingConversation) {
-        return existingConversation;
-      }
-    }
-
+    // Create new direct conversation
     return this.prisma.$transaction(async (tx) => {
       const conversation = await tx.conversation.create({
         data: {
-          type: dto.type,
-          name: dto.name,
-          avatar: dto.avatar,
+          type: ConversationType.DIRECT,
         },
       });
 
-      for (const participantId of dto.participantIds) {
-        await tx.conversationParticipant.create({
-          data: {
+      // Add both participants
+      await tx.conversationParticipant.createMany({
+        data: [
+          {
             conversationId: conversation.id,
-            userId: participantId,
-            role:
-              participantId === userId
-                ? ParticipantRole.ADMIN
-                : ParticipantRole.MEMBER,
+            userId: userId1,
+            role: ParticipantRole.MEMBER,
           },
-        });
-      }
+          {
+            conversationId: conversation.id,
+            userId: userId2,
+            role: ParticipantRole.MEMBER,
+          },
+        ],
+      });
 
-      return this.getConversation(conversation.id, userId);
+      // Fetch the created conversation with participants using transaction context
+      const result = await tx.conversation.findUnique({
+        where: { id: conversation.id },
+        include: {
+          participants: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePicture: true,
+                },
+              },
+            },
+          },
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              sender: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePicture: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return result as ConversationResponse;
     });
   }
 
@@ -75,13 +104,22 @@ export class ChatService {
     const conversations = await this.prisma.conversation.findMany({
       where: {
         type: ConversationType.DIRECT,
-        participants: {
-          every: {
-            userId: {
-              in: [userId1, userId2],
+        AND: [
+          {
+            participants: {
+              some: {
+                userId: userId1,
+              },
             },
           },
-        },
+          {
+            participants: {
+              some: {
+                userId: userId2,
+              },
+            },
+          },
+        ],
       },
       include: {
         participants: {
@@ -100,6 +138,17 @@ export class ChatService {
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1,
+          include: {
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                profilePicture: true,
+              },
+            },
+          },
         },
       },
     });
@@ -161,16 +210,18 @@ export class ChatService {
       },
     });
 
-    return participants.map((p) => {
-      const conversation = p.conversation;
-      const unreadCount = this.getUnreadCount(conversation.id, userId);
+    return Promise.all(
+      participants.map(async (p) => {
+        const conversation = p.conversation;
+        const unreadCount = await this.getUnreadCount(conversation.id, userId);
 
-      return {
-        ...conversation,
-        unreadCount,
-        lastReadAt: p.lastReadAt,
-      };
-    });
+        return {
+          ...conversation,
+          unreadCount,
+          lastReadAt: p.lastReadAt,
+        };
+      }),
+    );
   }
 
   async getConversation(conversationId: string, userId: string) {
@@ -223,6 +274,22 @@ export class ChatService {
                 profilePicture: true,
               },
             },
+            replyToMessage: {
+              select: {
+                id: true,
+                content: true,
+                isDeleted: true,
+                senderId: true,
+                sender: {
+                  select: {
+                    id: true,
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
             readReceipts: {
               include: {
                 user: {
@@ -245,29 +312,51 @@ export class ChatService {
     return conversation;
   }
 
-  async sendMessage(userId: string, dto: SendMessageDto) {
-    const participant = await this.prisma.conversationParticipant.findUnique({
-      where: {
-        conversationId_userId: {
-          conversationId: dto.conversationId,
-          userId,
-        },
-      },
+  /**
+   * Send a direct message to another user
+   * Automatically creates conversation if it doesn't exist
+   */
+  async sendDirectMessage(
+    senderId: string,
+    dto: SendMessageWsDto,
+  ): Promise<MessageResponse> {
+    // Validate recipient exists
+    const recipient = await this.prisma.user.findUnique({
+      where: { id: dto.recipientId },
     });
 
-    if (!participant || participant.leftAt) {
-      throw new ForbiddenException(
-        'You are not a participant in this conversation',
-      );
+    if (!recipient) {
+      throw new NotFoundException('Recipient not found');
     }
 
+    // Validate replyToMessage if provided
+    if (dto.replyToMessageId) {
+      const replyToMessage = await this.prisma.message.findUnique({
+        where: { id: dto.replyToMessageId },
+      });
+
+      if (!replyToMessage) {
+        throw new BadRequestException('Reply message not found');
+      }
+    }
+
+    // Find or create conversation
+    const conversation = await this.findOrCreateDirectConversation(
+      senderId,
+      dto.recipientId,
+    );
+
+    // Create message
     const message = await this.prisma.message.create({
       data: {
-        conversationId: dto.conversationId,
-        senderId: userId,
+        conversationId: conversation.id,
+        senderId,
         content: dto.content,
-        type: dto.type || 'TEXT',
-        attachments: dto.attachments,
+        type: (dto.type as MessageType) || MessageType.TEXT,
+        attachments: dto.attachments
+          ? JSON.parse(JSON.stringify(dto.attachments))
+          : null,
+        replyToMessageId: dto.replyToMessageId || null,
       },
       include: {
         sender: {
@@ -279,29 +368,43 @@ export class ChatService {
             profilePicture: true,
           },
         },
+        replyToMessage: {
+          select: {
+            id: true,
+            content: true,
+            isDeleted: true,
+            senderId: true,
+            sender: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
       },
     });
 
+    // Update conversation timestamp
     await this.prisma.conversation.update({
-      where: { id: dto.conversationId },
+      where: { id: conversation.id },
       data: { updatedAt: new Date() },
     });
 
+    // Auto-mark as read for sender
     await this.prisma.messageReadReceipt.create({
       data: {
         messageId: message.id,
-        userId,
+        userId: senderId,
       },
     });
 
-    return message;
+    return message as MessageResponse;
   }
 
-  async updateMessage(
-    messageId: string,
-    userId: string,
-    dto: UpdateMessageDto,
-  ) {
+  async updateMessage(messageId: string, userId: string, content: string) {
     const message = await this.prisma.message.findUnique({
       where: { id: messageId },
     });
@@ -321,7 +424,7 @@ export class ChatService {
     return this.prisma.message.update({
       where: { id: messageId },
       data: {
-        content: dto.content,
+        content,
         isEdited: true,
       },
       include: {
@@ -413,64 +516,36 @@ export class ChatService {
     return { message: 'Marked as read' };
   }
 
-  async addParticipants(userId: string, dto: AddParticipantsDto) {
-    const participant = await this.prisma.conversationParticipant.findUnique({
+  /**
+   * Get the other participant in a direct conversation
+   */
+  async getOtherParticipant(
+    conversationId: string,
+    userId: string,
+  ): Promise<string> {
+    const participants = await this.prisma.conversationParticipant.findMany({
       where: {
-        conversationId_userId: {
-          conversationId: dto.conversationId,
-          userId,
-        },
+        conversationId,
+        leftAt: null,
+      },
+      select: {
+        userId: true,
       },
     });
 
-    if (!participant || participant.role !== ParticipantRole.ADMIN) {
-      throw new ForbiddenException('Only admins can add participants');
+    const otherParticipant = participants.find((p) => p.userId !== userId);
+    if (!otherParticipant) {
+      throw new NotFoundException('Other participant not found');
     }
 
-    const conversation = await this.prisma.conversation.findUnique({
-      where: { id: dto.conversationId },
-    });
-
-    if (conversation?.type === ConversationType.DIRECT) {
-      throw new BadRequestException(
-        'Cannot add participants to direct conversations',
-      );
-    }
-
-    for (const newUserId of dto.userIds) {
-      const existing = await this.prisma.conversationParticipant.findUnique({
-        where: {
-          conversationId_userId: {
-            conversationId: dto.conversationId,
-            userId: newUserId,
-          },
-        },
-      });
-
-      if (!existing) {
-        await this.prisma.conversationParticipant.create({
-          data: {
-            conversationId: dto.conversationId,
-            userId: newUserId,
-            role: ParticipantRole.MEMBER,
-          },
-        });
-
-        await this.prisma.message.create({
-          data: {
-            conversationId: dto.conversationId,
-            senderId: userId,
-            content: `Added user to the conversation`,
-            type: 'SYSTEM',
-          },
-        });
-      }
-    }
-
-    return { message: 'Participants added successfully' };
+    return otherParticipant.userId;
   }
 
-  async leaveConversation(conversationId: string, userId: string) {
+  /**
+   * Delete a conversation (marks participant as left)
+   * In 1-on-1 chats, this is like archiving/hiding the conversation
+   */
+  async deleteConversation(conversationId: string, userId: string) {
     const participant = await this.prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {
@@ -481,7 +556,7 @@ export class ChatService {
     });
 
     if (!participant) {
-      throw new NotFoundException('Participant not found');
+      throw new NotFoundException('Conversation not found');
     }
 
     await this.prisma.conversationParticipant.update({
@@ -496,16 +571,7 @@ export class ChatService {
       },
     });
 
-    await this.prisma.message.create({
-      data: {
-        conversationId,
-        senderId: userId,
-        content: 'Left the conversation',
-        type: 'SYSTEM',
-      },
-    });
-
-    return { message: 'Left conversation successfully' };
+    return { message: 'Conversation deleted successfully' };
   }
 
   async getUnreadCount(

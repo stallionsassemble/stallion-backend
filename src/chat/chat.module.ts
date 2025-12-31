@@ -6,6 +6,8 @@ import { ChatController } from './chat.controller';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
 import { WsAuthGuard } from './guards/ws-auth.guard';
+import { ChatNotificationService } from './services/chat-notification.service';
+import { ChatStateService } from './services/chat-state.service';
 
 @Module({
   imports: [
@@ -20,7 +22,13 @@ import { WsAuthGuard } from './guards/ws-auth.guard';
     }),
   ],
   controllers: [ChatController],
-  providers: [ChatService, ChatGateway, WsAuthGuard],
+  providers: [
+    ChatService,
+    ChatGateway,
+    ChatStateService,
+    ChatNotificationService,
+    WsAuthGuard,
+  ],
   exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

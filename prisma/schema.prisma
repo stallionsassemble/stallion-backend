@@ -556,10 +556,16 @@ model Message {
   senderId String @map("sender_id")
   sender   User   @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
+  // Reply functionality
+  replyToMessageId String?  @map("reply_to_message_id")
+  replyToMessage   Message? @relation("MessageReplies", fields: [replyToMessageId], references: [id], onDelete: SetNull)
+  replies          Message[] @relation("MessageReplies")
+
   readReceipts MessageReadReceipt[]
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
+  @@index([replyToMessageId])
   @@map("messages")
 }
 
