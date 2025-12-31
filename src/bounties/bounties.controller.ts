@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -30,6 +31,10 @@ import {
   SelectWinnersResponseDto,
 } from './dto/bounty-winner-response.dto';
 import { CreateBountyDto } from './dto/create-bounty.dto';
+import {
+  GetBountiesQueryDto,
+  PaginatedBountiesResponseDto,
+} from './dto/get-bounties-query.dto';
 import { SelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateBountyApplicationDto } from './dto/update-bounty-application.dto';
 import { UpdateBountyDto } from './dto/update-bounty.dto';
@@ -64,49 +69,48 @@ export class BountyController {
   }
 
   @Get('all')
-  @ApiOperation({ summary: 'Get all bounties' })
+  @ApiOperation({
+    summary: 'Get all bounties with pagination, sorting, and filtering',
+    description:
+      'Retrieve bounties with support for pagination, sorting by various fields, and filtering by status, currency, skills, reward range, and search terms',
+  })
   @ApiResponse({
     status: 200,
-    description: 'List of all bounties from database',
+    description: 'Paginated list of bounties',
+    type: PaginatedBountiesResponseDto,
     schema: {
-      example: [
-        {
-          id: 'clx1a2b3c4d5e6f7g8h9i0',
-          title: 'Build a DeFi Dashboard',
-          shortDescription: 'Create a modern DeFi analytics dashboard',
-          description: 'Full description of the bounty requirements...',
-          reward: '1000000000',
-          rewardCurrency: 'USDC',
-          skills: ['React', 'TypeScript', 'Web3'],
-          status: 'ACTIVE',
-          submissionDeadline: '2024-12-31T23:59:59.000Z',
-          judgingDeadline: '2025-01-07T23:59:59.000Z',
-          contractBountyId: 1,
-          ownerId: 'user-uuid-123',
-          createdAt: '2024-01-01T00:00:00.000Z',
-          updatedAt: '2024-01-01T00:00:00.000Z',
+      example: {
+        data: [
+          {
+            id: 'clx1a2b3c4d5e6f7g8h9i0',
+            title: 'Build a DeFi Dashboard',
+            shortDescription: 'Create a modern DeFi analytics dashboard',
+            description: 'Full description of the bounty requirements...',
+            reward: '1000000000',
+            rewardCurrency: 'USDC',
+            skills: ['React', 'TypeScript', 'Web3'],
+            status: 'ACTIVE',
+            submissionDeadline: '2024-12-31T23:59:59.000Z',
+            judgingDeadline: '2025-01-07T23:59:59.000Z',
+            contractBountyId: 1,
+            ownerId: 'user-uuid-123',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-01T00:00:00.000Z',
+          },
+        ],
+        meta: {
+          total: 100,
+          page: 1,
+          limit: 10,
+          totalPages: 10,
+          hasNextPage: true,
+          hasPreviousPage: false,
         },
-        {
-          id: 'clx2b3c4d5e6f7g8h9i0j1',
-          title: 'Smart Contract Audit',
-          shortDescription: 'Security audit for DeFi protocol',
-          description: 'Comprehensive security audit...',
-          reward: '5000000000',
-          rewardCurrency: 'USDC',
-          skills: ['Solidity', 'Security', 'Smart Contracts'],
-          status: 'ACTIVE',
-          submissionDeadline: '2025-01-15T23:59:59.000Z',
-          judgingDeadline: '2025-01-22T23:59:59.000Z',
-          contractBountyId: 2,
-          ownerId: 'user-uuid-456',
-          createdAt: '2024-01-05T00:00:00.000Z',
-          updatedAt: '2024-01-05T00:00:00.000Z',
-        },
-      ],
+      },
     },
   })
-  async getAllBounties() {
-    return this.bountyService.getAllBounties();
+  async getAllBounties(@Query() query: GetBountiesQueryDto) {
+    return this.bountyService.getAllBounties(query);
   }
 
   @Get()

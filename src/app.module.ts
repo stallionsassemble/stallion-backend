@@ -12,6 +12,7 @@ import { HackathonsModule } from './hackathons/hackathons.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { PasskeyModule } from './passkey/passkey.module';
 import { PointsModule } from './points/points.module';
+import { ProjectsModule } from './projects/projects.module';
 import { QueueModule } from './queues/queue.module';
 import { ReputationModule } from './reputation/reputation.module';
 import { SettingsModule } from './settings/settings.module';
@@ -43,6 +44,7 @@ import { WalletModule } from './wallet/wallet.module';
     ChatModule,
     NotificationsModule,
     HackathonsModule,
+    ProjectsModule,
     UploadModule,
     CronModule,
   ],

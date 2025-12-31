@@ -31,6 +31,7 @@ async function bootstrap() {
     .addTag('Authentication', 'User authentication and authorization')
     .addTag('Users', 'User management and profiles')
     .addTag('Bounties', 'Bounty creation and management')
+    .addTag('Projects', 'Project creation and management')
     .addTag('Hackathons', 'Hackathon creation, management, and submissions')
     .addTag('Chat', 'Real-time messaging and conversations')
     .addTag('Forum', 'Community forum threads and discussions')

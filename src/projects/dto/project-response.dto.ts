@@ -1,0 +1,221 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  ApplicationStatus,
+  MilestoneStatus,
+  ProjectActivityType,
+  ProjectStatus,
+  ProjectType,
+} from '@prisma/client';
+
+export class ProjectResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiProperty()
+  shortDescription: string;
+
+  @ApiProperty()
+  description: string;
+
+  @ApiProperty({ type: [String] })
+  requirements: string[];
+
+  @ApiProperty({ type: [String] })
+  deliverables: string[];
+
+  @ApiProperty({ type: [String] })
+  skills: string[];
+
+  @ApiPropertyOptional()
+  attachments?: any;
+
+  @ApiProperty()
+  reward: string;
+
+  @ApiProperty()
+  currency: string;
+
+  @ApiProperty()
+  deadline: Date;
+
+  @ApiProperty({ enum: ProjectStatus })
+  status: ProjectStatus;
+
+  @ApiProperty({ enum: ProjectType })
+  type: ProjectType;
+
+  @ApiProperty()
+  peopleNeeded: number;
+
+  @ApiProperty()
+  acceptedCount: number;
+
+  @ApiPropertyOptional()
+  contractProjectId?: number;
+
+  @ApiPropertyOptional()
+  txHash?: string;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiProperty()
+  ownerId: string;
+
+  @ApiPropertyOptional()
+  owner?: {
+    id: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    companyName: string | null;
+    profilePicture: string | null;
+  };
+}
+
+export class ApplicationResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  coverLetter: string;
+
+  @ApiPropertyOptional()
+  estimatedCompletionTime?: number;
+
+  @ApiProperty({ type: [String] })
+  portfolioLinks: string[];
+
+  @ApiPropertyOptional()
+  attachments?: any;
+
+  @ApiProperty({ enum: ApplicationStatus })
+  status: ApplicationStatus;
+
+  @ApiPropertyOptional()
+  rejectionReason?: string;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiProperty()
+  projectId: string;
+
+  @ApiProperty()
+  userId: string;
+
+  @ApiPropertyOptional()
+  user?: {
+    id: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    profilePicture: string | null;
+    skills: string[];
+  };
+
+  @ApiPropertyOptional()
+  project?: ProjectResponseDto;
+}
+
+export class MilestoneResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiProperty()
+  description: string;
+
+  @ApiProperty()
+  amount: string;
+
+  @ApiProperty()
+  dueDate: Date;
+
+  @ApiProperty({ enum: MilestoneStatus })
+  status: MilestoneStatus;
+
+  @ApiProperty()
+  order: number;
+
+  @ApiPropertyOptional()
+  submissionNote?: string;
+
+  @ApiPropertyOptional()
+  submissionUrl?: string;
+
+  @ApiPropertyOptional()
+  submittedAt?: Date;
+
+  @ApiPropertyOptional()
+  reviewNote?: string;
+
+  @ApiPropertyOptional()
+  reviewedAt?: Date;
+
+  @ApiPropertyOptional()
+  revisionNote?: string;
+
+  @ApiPropertyOptional()
+  txHash?: string;
+
+  @ApiPropertyOptional()
+  paidAt?: Date;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiProperty()
+  projectId: string;
+
+  @ApiProperty()
+  applicationId: string;
+
+  @ApiProperty()
+  contributorId: string;
+}
+
+export class ActivityResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ enum: ProjectActivityType })
+  type: ProjectActivityType;
+
+  @ApiProperty()
+  message: string;
+
+  @ApiPropertyOptional()
+  metadata?: any;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  projectId: string;
+
+  @ApiProperty()
+  userId: string;
+
+  @ApiPropertyOptional()
+  user?: {
+    id: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+}

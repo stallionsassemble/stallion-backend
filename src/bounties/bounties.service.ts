@@ -23,14 +23,10 @@ import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
 import type { Status } from '../soroban/contract-bindings';
-import {
-  networks,
-  Client as SorobanClient,
-} from '../soroban/contract-bindings';
+import { Client as SorobanClient } from '../soroban/contract-bindings';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from '../wallet/stellar-wallet.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
-import { WalletService } from '../wallet/wallet.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
 import {
   BountyWinnersResponseDto,
@@ -68,7 +64,6 @@ export class BountiesService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
-    private walletService: WalletService,
     private reputationService: ReputationService,
     private walletSigning: WalletSigningService,
     private stellarAccount: StellarAccountService,
@@ -78,9 +73,6 @@ export class BountiesService {
     this.contractId = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_CONTRACT_ID,
     );
-    const network = this.configService.getOrThrow<string>(
-      EnvConfig.SOROBAN_NETWORK,
-    );
     const rpcUrl = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_RPC_URL,
     );
@@ -89,7 +81,8 @@ export class BountiesService {
       'BountiesService initialized with individual wallet signing',
     );
     this.networkPassphrase =
-      networks[network as keyof typeof networks].networkPassphrase;
+      this.configService.get<string>(EnvConfig.SOROBAN_NETWORK) ||
+      'Test SDF Network ; September 2015';
 
     // Initialize Soroban client
     this.sorobanClient = new SorobanClient({
@@ -108,39 +101,124 @@ export class BountiesService {
   }
 
   /**
-   * Get all bounties
-   * Returns database bounties based on contract bounty IDs
+   * Get all bounties with pagination, sorting, and filtering
    */
-  async getAllBounties(): Promise<Bounty[]> {
+  async getAllBounties(query: {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    status?: string;
+    currency?: string;
+    skills?: string[];
+    search?: string;
+    ownerId?: string;
+    minReward?: string;
+    maxReward?: string;
+  }): Promise<{
+    data: Bounty[];
+    meta: {
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      hasNextPage: boolean;
+      hasPreviousPage: boolean;
+    };
+  }> {
     try {
-      const assembled = await this.sorobanClient.get_bounties();
-      const simulated = await assembled.simulate();
-      const contractBountyIds = simulated.result.map(Number);
+      const page = query.page || 1;
+      const limit = query.limit || 10;
+      const skip = (page - 1) * limit;
+      const sortBy = query.sortBy || 'createdAt';
+      const sortOrder = query.sortOrder || 'desc';
 
-      // Fetch bounties from database based on contract IDs
-      const bounties = await this.prisma.bounty.findMany({
-        where: {
-          contractBountyId: {
-            in: contractBountyIds,
-          },
-        },
-        include: {
-          owner: true,
-        },
-        orderBy: {
-          createdAt: 'desc',
-        },
-      });
+      const where: any = {};
 
-      // Sanitize owner data
-      bounties.map((bounty) => {
-        return {
-          ...bounty,
-          owner: sanitizeUser(bounty.owner),
+      if (query.status) {
+        where.status = query.status;
+      }
+
+      if (query.currency) {
+        where.rewardCurrency = query.currency;
+      }
+
+      if (query.skills && query.skills.length > 0) {
+        where.skills = {
+          hasSome: query.skills,
         };
-      });
+      }
 
-      return bounties;
+      if (query.search) {
+        where.OR = [
+          {
+            title: {
+              contains: query.search,
+              mode: 'insensitive',
+            },
+          },
+          {
+            description: {
+              contains: query.search,
+              mode: 'insensitive',
+            },
+          },
+          {
+            shortDescription: {
+              contains: query.search,
+              mode: 'insensitive',
+            },
+          },
+        ];
+      }
+
+      if (query.ownerId) {
+        where.ownerId = query.ownerId;
+      }
+
+      if (query.minReward || query.maxReward) {
+        where.reward = {};
+        if (query.minReward) {
+          where.reward.gte = query.minReward;
+        }
+        if (query.maxReward) {
+          where.reward.lte = query.maxReward;
+        }
+      }
+
+      const [bounties, total] = await Promise.all([
+        this.prisma.bounty.findMany({
+          where,
+          include: {
+            owner: true,
+          },
+          orderBy: {
+            [sortBy]: sortOrder,
+          },
+          skip,
+          take: limit,
+        }),
+        this.prisma.bounty.count({ where }),
+      ]);
+
+      const sanitizedBounties = bounties.map((bounty) => ({
+        ...bounty,
+        owner: sanitizeUser(bounty.owner),
+      }));
+
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        data: sanitizedBounties,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPreviousPage: page > 1,
+        },
+      };
     } catch (error) {
       this.logger.error('Failed to get bounties', error);
       throw error;
@@ -652,6 +730,8 @@ export class BountiesService {
           title: dto.title,
           shortDescription: dto.shortDescription,
           description: dto.description,
+          requirements: dto.requirements || [],
+          deliverables: dto.deliverables || [],
           reward: dto.reward.toString(),
           token: tokenAddress,
           rewardCurrency: dto.rewardCurrency,
@@ -790,6 +870,8 @@ export class BountiesService {
             shortDescription: dto.shortDescription,
           }),
           ...(dto.description && { description: dto.description }),
+          ...(dto.requirements && { requirements: dto.requirements }),
+          ...(dto.deliverables && { deliverables: dto.deliverables }),
           ...(dto.skills && { skills: dto.skills }),
           ...(dto.distribution && {
             rewardDistribution:

@@ -188,6 +188,36 @@ export class CreateBountyDto {
   @IsOptional()
   description: string;
 
+  @ApiPropertyOptional({
+    description: 'Bounty requirements',
+    type: [String],
+    example: [
+      'Responsive design that works on mobile, tablet, and desktop',
+      'Dark mode support',
+      'Accessibility compliance (WCAG 2.1)',
+    ],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @Length(1, 500, { each: true })
+  @IsOptional()
+  requirements?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Expected deliverables',
+    type: [String],
+    example: [
+      'Source code in GitHub repository',
+      'Deployed demo on Vercel/Netlify',
+      'README with setup instructions',
+    ],
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @Length(1, 500, { each: true })
+  @IsOptional()
+  deliverables?: string[];
+
   @ApiProperty({
     description: 'Reward amount',
     example: 500,

@@ -9,10 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
-import {
-  Client as SorobanClient,
-  networks,
-} from '../soroban/contract-bindings';
+import { Client as SorobanClient } from '../soroban/contract-bindings';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 /**
@@ -45,7 +42,9 @@ export class AdminService {
     // Initialize Soroban RPC server
     this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
     this.networkPassphrase =
-      networks[network as keyof typeof networks].networkPassphrase;
+      network === 'testnet'
+        ? 'Test SDF Network ; September 2015'
+        : 'Public Global Stellar Network ; September 2015';
 
     // Initialize Soroban client
     this.sorobanClient = new SorobanClient({

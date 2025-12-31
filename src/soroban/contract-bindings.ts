@@ -17,13 +17,6 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-export const networks = {
-  testnet: {
-    networkPassphrase: 'Test SDF Network ; September 2015',
-    contractId: 'CAX2BG7RMYZDXGBJAFS7VGM2IQPYFF5V4OPXQW3UBAIWMQRXLQRNGUHX',
-  },
-} as const;
-
 export const Errors = {
   1: { message: 'OnlyOwner' },
   2: { message: 'InactiveBounty' },
@@ -43,6 +36,16 @@ export const Errors = {
   16: { message: 'BountyHasSubmissions' },
   17: { message: 'InvalidDeadlineUpdate' },
   18: { message: 'InvalidReward' },
+  19: { message: 'Unauthorized' },
+  20: { message: 'ProjectNotFound' },
+  21: { message: 'InvalidProjectType' },
+  22: { message: 'MilestoneNotFound' },
+  23: { message: 'MilestoneAlreadyPaid' },
+  24: { message: 'InsufficientEscrow' },
+  25: { message: 'InvalidAmount' },
+  26: { message: 'ProjectNotActive' },
+  27: { message: 'InvalidMilestones' },
+  28: { message: 'DeadlinePassed' },
 };
 
 export interface Bounty {
@@ -64,6 +67,37 @@ export type Status =
   | { tag: 'Completed'; values: void }
   | { tag: 'Closed'; values: void };
 
+export interface Project {
+  deadline: u64;
+  milestones: Array<MilestoneInfo>;
+  owner: string;
+  project_type: ProjectType;
+  remaining_escrow: i128;
+  status: ProjectStatus;
+  token: string;
+  total_reward: i128;
+}
+
+export type ProjectType =
+  | { tag: 'Gig'; values: void }
+  | { tag: 'Job'; values: void };
+
+export interface MilestoneData {
+  amount: i128;
+  order: u32;
+}
+
+export interface MilestoneInfo {
+  amount: i128;
+  is_paid: boolean;
+  order: u32;
+}
+
+export type ProjectStatus =
+  | { tag: 'Active'; values: void }
+  | { tag: 'Completed'; values: void }
+  | { tag: 'Cancelled'; values: void };
+
 export interface Client {
   /**
    * Construct and simulate a get_bounty transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -72,6 +106,14 @@ export interface Client {
     { bounty_id }: { bounty_id: u32 },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<Bounty>>>;
+
+  /**
+   * Construct and simulate a get_project transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_project: (
+    { project_id }: { project_id: u32 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<Project>>>;
 
   /**
    * Construct and simulate a close_bounty transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -85,6 +127,13 @@ export interface Client {
    * Construct and simulate a get_bounties transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_bounties: (
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
+
+  /**
+   * Construct and simulate a get_projects transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_projects: (
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Array<u32>>>;
 
@@ -217,6 +266,56 @@ export interface Client {
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
+   * Construct and simulate a cancel_project_gig transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  cancel_project_gig: (
+    { owner, project_id }: { owner: string; project_id: u32 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<i128>>>;
+
+  /**
+   * Construct and simulate a create_project_gig transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  create_project_gig: (
+    {
+      owner,
+      token,
+      total_reward,
+      milestones,
+      deadline,
+      platform_fee,
+    }: {
+      owner: string;
+      token: string;
+      total_reward: i128;
+      milestones: Array<MilestoneData>;
+      deadline: u64;
+      platform_fee: i128;
+    },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<u32>>>;
+
+  /**
+   * Construct and simulate a create_project_job transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  create_project_job: (
+    {
+      owner,
+      token,
+      reward_amount,
+      platform_fee,
+      deadline,
+    }: {
+      owner: string;
+      token: string;
+      reward_amount: i128;
+      platform_fee: i128;
+      deadline: u64;
+    },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<u32>>>;
+
+  /**
    * Construct and simulate a get_bounties_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_bounties_count: (
@@ -235,6 +334,14 @@ export interface Client {
    * Construct and simulate a get_owner_bounties transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_owner_bounties: (
+    { owner }: { owner: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
+
+  /**
+   * Construct and simulate a get_owner_projects transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_owner_projects: (
     { owner }: { owner: string },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Array<u32>>>;
@@ -287,6 +394,14 @@ export interface Client {
   ) => Promise<AssembledTransaction<Result<Map<string, string>>>>;
 
   /**
+   * Construct and simulate a get_projects_by_status transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_projects_by_status: (
+    { status }: { status: ProjectStatus },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
+
+  /**
    * Construct and simulate a get_user_bounties_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_user_bounties_count: (
@@ -301,6 +416,26 @@ export interface Client {
     { owner }: { owner: string },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<u32>>;
+
+  /**
+   * Construct and simulate a release_milestone_payment transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  release_milestone_payment: (
+    {
+      owner,
+      project_id,
+      milestone_order,
+      contributor,
+      amount,
+    }: {
+      owner: string;
+      project_id: u32;
+      milestone_order: u32;
+      contributor: string;
+      amount: i128;
+    },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a get_bounties_by_token_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -339,8 +474,10 @@ export class Client extends ContractClient {
     super(
       new ContractSpec([
         'AAAAAAAAAAAAAAAKZ2V0X2JvdW50eQAAAAAAAQAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAH0AAAAAZCb3VudHkAAAAAAAM=',
+        'AAAAAAAAAAAAAAALZ2V0X3Byb2plY3QAAAAAAQAAAAAAAAAKcHJvamVjdF9pZAAAAAAABAAAAAEAAAPpAAAH0AAAAAdQcm9qZWN0AAAAAAM=',
         'AAAAAAAAAAAAAAAMY2xvc2VfYm91bnR5AAAAAgAAAAAAAAAFb3duZXIAAAAAAAATAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAQAAA+kAAAPtAAAAAAAAAAM=',
         'AAAAAAAAAAAAAAAMZ2V0X2JvdW50aWVzAAAAAAAAAAEAAAPqAAAABA==',
+        'AAAAAAAAAAAAAAAMZ2V0X3Byb2plY3RzAAAAAAAAAAEAAAPqAAAABA==',
         'AAAAAAAAAAAAAAAMdXBkYXRlX2FkbWluAAAAAQAAAAAAAAAJbmV3X2FkbWluAAAAAAAAEwAAAAEAAAPpAAAAEwAAAAM=',
         'AAAAAAAAAAAAAAANY2hlY2tfanVkZ2luZwAAAAAAAAEAAAAAAAAACWJvdW50eV9pZAAAAAAAAAQAAAABAAAD6QAAA+0AAAAAAAAAAw==',
         'AAAAAAAAAAAAAAANY3JlYXRlX2JvdW50eQAAAAAAAAcAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAAAAAAZyZXdhcmQAAAAAAAsAAAAAAAAADGRpc3RyaWJ1dGlvbgAAA+oAAAPtAAAAAgAAAAQAAAAEAAAAAAAAABNzdWJtaXNzaW9uX2RlYWRsaW5lAAAAAAYAAAAAAAAAEGp1ZGdpbmdfZGVhZGxpbmUAAAAGAAAAAAAAAAV0aXRsZQAAAAAAABAAAAABAAAD6QAAAAQAAAAD',
@@ -353,30 +490,43 @@ export class Client extends ContractClient {
         'AAAAAAAAAAAAAAARZ2V0X2JvdW50eV9zdGF0dXMAAAAAAAABAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAQAAA+kAAAfQAAAABlN0YXR1cwAAAAAAAw==',
         'AAAAAAAAAAAAAAARZ2V0X3VzZXJfYm91bnRpZXMAAAAAAAABAAAAAAAAAAR1c2VyAAAAEwAAAAEAAAPqAAAABA==',
         'AAAAAAAAAAAAAAARdXBkYXRlX3N1Ym1pc3Npb24AAAAAAAADAAAAAAAAAAlhcHBsaWNhbnQAAAAAAAATAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAAAAABNuZXdfc3VibWlzc2lvbl9saW5rAAAAABAAAAABAAAD6QAAA+0AAAAAAAAAAw==',
+        'AAAAAAAAAAAAAAASY2FuY2VsX3Byb2plY3RfZ2lnAAAAAAACAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACnByb2plY3RfaWQAAAAAAAQAAAABAAAD6QAAAAsAAAAD',
+        'AAAAAAAAAAAAAAASY3JlYXRlX3Byb2plY3RfZ2lnAAAAAAAGAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfcmV3YXJkAAAACwAAAAAAAAAKbWlsZXN0b25lcwAAAAAD6gAAB9AAAAANTWlsZXN0b25lRGF0YQAAAAAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAAAAAAxwbGF0Zm9ybV9mZWUAAAALAAAAAQAAA+kAAAAEAAAAAw==',
+        'AAAAAAAAAAAAAAASY3JlYXRlX3Byb2plY3Rfam9iAAAAAAAFAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAANcmV3YXJkX2Ftb3VudAAAAAAAAAsAAAAAAAAADHBsYXRmb3JtX2ZlZQAAAAsAAAAAAAAACGRlYWRsaW5lAAAABgAAAAEAAAPpAAAABAAAAAM=',
         'AAAAAAAAAAAAAAASZ2V0X2JvdW50aWVzX2NvdW50AAAAAAAAAAAAAQAAAAQ=',
         'AAAAAAAAAAAAAAASZ2V0X2JvdW50eV93aW5uZXJzAAAAAAABAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAQAAA+kAAAPqAAAAEwAAAAM=',
         'AAAAAAAAAAAAAAASZ2V0X293bmVyX2JvdW50aWVzAAAAAAABAAAAAAAAAAVvd25lcgAAAAAAABMAAAABAAAD6gAAAAQ=',
+        'AAAAAAAAAAAAAAASZ2V0X293bmVyX3Byb2plY3RzAAAAAAABAAAAAAAAAAVvd25lcgAAAAAAABMAAAABAAAD6gAAAAQ=',
         'AAAAAAAAAAAAAAASdXBkYXRlX2ZlZV9hY2NvdW50AAAAAAABAAAAAAAAAA9uZXdfZmVlX2FjY291bnQAAAAAEwAAAAEAAAPpAAAAEwAAAAM=',
         'AAAAAAAAAAAAAAATZ2V0X2FjdGl2ZV9ib3VudGllcwAAAAAAAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAVZ2V0X2JvdW50aWVzX2J5X3Rva2VuAAAAAAAAAQAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAVZ2V0X2JvdW50eV9hcHBsaWNhbnRzAAAAAAAAAQAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD6gAAABMAAAAD',
         'AAAAAAAAAAAAAAAWZ2V0X2JvdW50aWVzX2J5X3N0YXR1cwAAAAAAAQAAAAAAAAAGc3RhdHVzAAAAAAfQAAAABlN0YXR1cwAAAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAWZ2V0X2JvdW50eV9zdWJtaXNzaW9ucwAAAAAAAQAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD7AAAABMAAAAQAAAAAw==',
+        'AAAAAAAAAAAAAAAWZ2V0X3Byb2plY3RzX2J5X3N0YXR1cwAAAAAAAQAAAAAAAAAGc3RhdHVzAAAAAAfQAAAADVByb2plY3RTdGF0dXMAAAAAAAABAAAD6gAAAAQ=',
         'AAAAAAAAAAAAAAAXZ2V0X3VzZXJfYm91bnRpZXNfY291bnQAAAAAAQAAAAAAAAAEdXNlcgAAABMAAAABAAAABA==',
         'AAAAAAAAAAAAAAAYZ2V0X293bmVyX2JvdW50aWVzX2NvdW50AAAAAQAAAAAAAAAFb3duZXIAAAAAAAATAAAAAQAAAAQ=',
+        'AAAAAAAAAAAAAAAZcmVsZWFzZV9taWxlc3RvbmVfcGF5bWVudAAAAAAAAAUAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAKcHJvamVjdF9pZAAAAAAABAAAAAAAAAAPbWlsZXN0b25lX29yZGVyAAAAAAQAAAAAAAAAC2NvbnRyaWJ1dG9yAAAAABMAAAAAAAAABmFtb3VudAAAAAAACwAAAAEAAAPpAAAD7QAAAAAAAAAD',
         'AAAAAAAAAAAAAAAbZ2V0X2JvdW50aWVzX2J5X3Rva2VuX2NvdW50AAAAAAEAAAAAAAAABXRva2VuAAAAAAAAEwAAAAEAAAAE',
         'AAAAAAAAAAAAAAAcZ2V0X2JvdW50aWVzX2J5X3N0YXR1c19jb3VudAAAAAEAAAAAAAAABnN0YXR1cwAAAAAH0AAAAAZTdGF0dXMAAAAAAAEAAAAE',
-        'AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAEgAAAAAAAAAJT25seU93bmVyAAAAAAAAAQAAAAAAAAAOSW5hY3RpdmVCb3VudHkAAAAAAAIAAAAAAAAAFEJvdW50eURlYWRsaW5lUGFzc2VkAAAAAwAAAAAAAAAOQm91bnR5Tm90Rm91bmQAAAAAAAQAAAAAAAAAElN1Ym1pc3Npb25Ob3RGb3VuZAAAAAAABQAAAAAAAAAVSnVkZ2luZ0RlYWRsaW5lUGFzc2VkAAAAAAAABgAAAAAAAAAYRGlzdHJpYnV0aW9uTXVzdFN1bVRvMTAwAAAABwAAAAAAAAArQ2Fubm90U2VsZWN0V2lubmVyc0JlZm9yZVN1Ym1pc3Npb25EZWFkbGluZQAAAAAIAAAAAAAAACxKdWRnaW5nRGVhZGxpbmVNdXN0QmVBZnRlclN1Ym1pc3Npb25EZWFkbGluZQAAAAkAAAAAAAAAEE5vdEVub3VnaFdpbm5lcnMAAAAKAAAAAAAAAA1JbnRlcm5hbEVycm9yAAAAAAAACwAAAAAAAAAITm90QWRtaW4AAAAMAAAAAAAAABFBZG1pbkNhbm5vdEJlWmVybwAAAAAAAA0AAAAAAAAAFkZlZUFjY291bnRDYW5ub3RCZVplcm8AAAAAAA4AAAAAAAAADlNhbWVGZWVBY2NvdW50AAAAAAAPAAAAAAAAABRCb3VudHlIYXNTdWJtaXNzaW9ucwAAABAAAAAAAAAAFUludmFsaWREZWFkbGluZVVwZGF0ZQAAAAAAABEAAAAAAAAADUludmFsaWRSZXdhcmQAAAAAAAAS',
+        'AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAHAAAAAAAAAAJT25seU93bmVyAAAAAAAAAQAAAAAAAAAOSW5hY3RpdmVCb3VudHkAAAAAAAIAAAAAAAAAFEJvdW50eURlYWRsaW5lUGFzc2VkAAAAAwAAAAAAAAAOQm91bnR5Tm90Rm91bmQAAAAAAAQAAAAAAAAAElN1Ym1pc3Npb25Ob3RGb3VuZAAAAAAABQAAAAAAAAAVSnVkZ2luZ0RlYWRsaW5lUGFzc2VkAAAAAAAABgAAAAAAAAAYRGlzdHJpYnV0aW9uTXVzdFN1bVRvMTAwAAAABwAAAAAAAAArQ2Fubm90U2VsZWN0V2lubmVyc0JlZm9yZVN1Ym1pc3Npb25EZWFkbGluZQAAAAAIAAAAAAAAACxKdWRnaW5nRGVhZGxpbmVNdXN0QmVBZnRlclN1Ym1pc3Npb25EZWFkbGluZQAAAAkAAAAAAAAAEE5vdEVub3VnaFdpbm5lcnMAAAAKAAAAAAAAAA1JbnRlcm5hbEVycm9yAAAAAAAACwAAAAAAAAAITm90QWRtaW4AAAAMAAAAAAAAABFBZG1pbkNhbm5vdEJlWmVybwAAAAAAAA0AAAAAAAAAFkZlZUFjY291bnRDYW5ub3RCZVplcm8AAAAAAA4AAAAAAAAADlNhbWVGZWVBY2NvdW50AAAAAAAPAAAAAAAAABRCb3VudHlIYXNTdWJtaXNzaW9ucwAAABAAAAAAAAAAFUludmFsaWREZWFkbGluZVVwZGF0ZQAAAAAAABEAAAAAAAAADUludmFsaWRSZXdhcmQAAAAAAAASAAAAAAAAAAxVbmF1dGhvcml6ZWQAAAATAAAAAAAAAA9Qcm9qZWN0Tm90Rm91bmQAAAAAFAAAAAAAAAASSW52YWxpZFByb2plY3RUeXBlAAAAAAAVAAAAAAAAABFNaWxlc3RvbmVOb3RGb3VuZAAAAAAAABYAAAAAAAAAFE1pbGVzdG9uZUFscmVhZHlQYWlkAAAAFwAAAAAAAAASSW5zdWZmaWNpZW50RXNjcm93AAAAAAAYAAAAAAAAAA1JbnZhbGlkQW1vdW50AAAAAAAAGQAAAAAAAAAQUHJvamVjdE5vdEFjdGl2ZQAAABoAAAAAAAAAEUludmFsaWRNaWxlc3RvbmVzAAAAAAAAGwAAAAAAAAAORGVhZGxpbmVQYXNzZWQAAAAAABw=',
         'AAAAAQAAAAAAAAAAAAAABkJvdW50eQAAAAAACwAAAAAAAAAKYXBwbGljYW50cwAAAAAD6gAAABMAAAAAAAAADGRpc3RyaWJ1dGlvbgAAA+wAAAAEAAAABAAAAAAAAAAQanVkZ2luZ19kZWFkbGluZQAAAAYAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAGcmV3YXJkAAAAAAALAAAAAAAAAAZzdGF0dXMAAAAAB9AAAAAGU3RhdHVzAAAAAAAAAAAAE3N1Ym1pc3Npb25fZGVhZGxpbmUAAAAABgAAAAAAAAALc3VibWlzc2lvbnMAAAAD7AAAABMAAAAQAAAAAAAAAAV0aXRsZQAAAAAAABAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAHd2lubmVycwAAAAPqAAAAEw==',
         'AAAAAgAAAAAAAAAAAAAABlN0YXR1cwAAAAAAAwAAAAAAAAAAAAAABkFjdGl2ZQAAAAAAAAAAAAAAAAAJQ29tcGxldGVkAAAAAAAAAAAAAAAAAAAGQ2xvc2VkAAA=',
+        'AAAAAQAAAAAAAAAAAAAAB1Byb2plY3QAAAAACAAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAAAAAAptaWxlc3RvbmVzAAAAAAPqAAAH0AAAAA1NaWxlc3RvbmVJbmZvAAAAAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAADHByb2plY3RfdHlwZQAAB9AAAAALUHJvamVjdFR5cGUAAAAAAAAAABByZW1haW5pbmdfZXNjcm93AAAACwAAAAAAAAAGc3RhdHVzAAAAAAfQAAAADVByb2plY3RTdGF0dXMAAAAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfcmV3YXJkAAAACw==',
+        'AAAAAgAAAAAAAAAAAAAAC1Byb2plY3RUeXBlAAAAAAIAAAAAAAAAAAAAAANHaWcAAAAAAAAAAAAAAAADSm9iAA==',
+        'AAAAAQAAAAAAAAAAAAAADU1pbGVzdG9uZURhdGEAAAAAAAACAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAAAAAABW9yZGVyAAAAAAAABA==',
+        'AAAAAQAAAAAAAAAAAAAADU1pbGVzdG9uZUluZm8AAAAAAAADAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAAAAAAB2lzX3BhaWQAAAAAAQAAAAAAAAAFb3JkZXIAAAAAAAAE',
+        'AAAAAgAAAAAAAAAAAAAADVByb2plY3RTdGF0dXMAAAAAAAADAAAAAAAAAAAAAAAGQWN0aXZlAAAAAAAAAAAAAAAAAAlDb21wbGV0ZWQAAAAAAAAAAAAAAAAAAAlDYW5jZWxsZWQAAAA=',
       ]),
       options,
     );
   }
   public readonly fromJSON = {
     get_bounty: this.txFromJSON<Result<Bounty>>,
+    get_project: this.txFromJSON<Result<Project>>,
     close_bounty: this.txFromJSON<Result<void>>,
     get_bounties: this.txFromJSON<Array<u32>>,
+    get_projects: this.txFromJSON<Array<u32>>,
     update_admin: this.txFromJSON<Result<string>>,
     check_judging: this.txFromJSON<Result<void>>,
     create_bounty: this.txFromJSON<Result<u32>>,
@@ -388,17 +538,23 @@ export class Client extends ContractClient {
     get_bounty_status: this.txFromJSON<Result<Status>>,
     get_user_bounties: this.txFromJSON<Array<u32>>,
     update_submission: this.txFromJSON<Result<void>>,
+    cancel_project_gig: this.txFromJSON<Result<i128>>,
+    create_project_gig: this.txFromJSON<Result<u32>>,
+    create_project_job: this.txFromJSON<Result<u32>>,
     get_bounties_count: this.txFromJSON<u32>,
     get_bounty_winners: this.txFromJSON<Result<Array<string>>>,
     get_owner_bounties: this.txFromJSON<Array<u32>>,
+    get_owner_projects: this.txFromJSON<Array<u32>>,
     update_fee_account: this.txFromJSON<Result<string>>,
     get_active_bounties: this.txFromJSON<Array<u32>>,
     get_bounties_by_token: this.txFromJSON<Array<u32>>,
     get_bounty_applicants: this.txFromJSON<Result<Array<string>>>,
     get_bounties_by_status: this.txFromJSON<Array<u32>>,
     get_bounty_submissions: this.txFromJSON<Result<Map<string, string>>>,
+    get_projects_by_status: this.txFromJSON<Array<u32>>,
     get_user_bounties_count: this.txFromJSON<u32>,
     get_owner_bounties_count: this.txFromJSON<u32>,
+    release_milestone_payment: this.txFromJSON<Result<void>>,
     get_bounties_by_token_count: this.txFromJSON<u32>,
     get_bounties_by_status_count: this.txFromJSON<u32>,
   };

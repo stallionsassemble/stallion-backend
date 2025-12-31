@@ -1,41 +1,17 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Role } from '@prisma/client';
+import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateContributorProfileDto } from './dto/update-contributor-profile.dto';
+import { UpdateProjectOwnerProfileDto } from './dto/update-project-owner-profile.dto';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
-
-  async findAll() {
-    return this.prisma.user.findMany({
-      include: {
-        userPoints: true,
-        wallet: true,
-      },
-    });
-  }
-
-  async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id },
-      include: {
-        userPoints: {
-          include: {
-            points: true,
-          },
-        },
-        wallet: true,
-        submissions: true,
-        winners: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException(`User with ID ${id} not found`);
-    }
-
-    return user;
-  }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
@@ -47,23 +23,83 @@ export class UsersService {
     });
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto) {
-    const user = await this.findOne(id);
+  /**
+   * Update contributor profile
+   */
+  async updateContributorProfile(
+    userId: string,
+    dto: UpdateContributorProfileDto,
+  ): Promise<SanitizedUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
 
-    return this.prisma.user.update({
-      where: { id: user.id },
-      data: updateUserDto,
-      include: {
-        userPoints: true,
-        wallet: true,
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.role !== Role.CONTRIBUTOR) {
+      throw new BadRequestException(
+        'Only contributors can update contributor profile',
+      );
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        username: dto.username,
+        location: dto.location,
+        skills: dto.skills,
+        profilePicture: dto.profilePicture,
+        socials: dto.socials,
       },
     });
+
+    return sanitizeUser(updatedUser);
   }
 
-  async remove(id: string) {
-    const user = await this.findOne(id);
-    return this.prisma.user.delete({
-      where: { id: user.id },
+  /**
+   * Update project owner profile
+   */
+  async updateProjectOwnerProfile(
+    userId: string,
+    dto: UpdateProjectOwnerProfileDto,
+  ): Promise<SanitizedUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
     });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.role !== Role.PROJECT_OWNER) {
+      throw new BadRequestException(
+        'Only project owners can update project owner profile',
+      );
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        username: dto.username,
+        companyName: dto.companyName,
+        entityName: dto.entityName,
+        phoneNumber: dto.phoneNumber,
+        industry: dto.industry,
+        companyBio: dto.companyBio,
+        companyLogo: dto.companyLogo,
+        location: dto.location,
+        skills: dto.skills,
+        profilePicture: dto.profilePicture,
+        socials: dto.socials,
+      },
+    });
+
+    return sanitizeUser(updatedUser);
   }
 }

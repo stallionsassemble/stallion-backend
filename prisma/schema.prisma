@@ -81,6 +81,12 @@ model User {
   hackathonSubmissions HackathonSubmission[]
   hackathonWinners     HackathonWinner[]
 
+  // Project relations
+  ownedProjects       Project[]            @relation("ProjectOwner")
+  projectApplications ProjectApplication[]
+  projectMilestones   ProjectMilestone[]
+  projectActivities   ProjectActivity[]
+
   @@index([role])
   @@index([createdAt])
   @@index([username])
@@ -198,6 +204,8 @@ model Bounty {
   title              String
   shortDescription   String       @map("short_description")
   description        String
+  requirements       String[]     @default([])
+  deliverables       String[]     @default([])
   reward             String       @default("0") // Stored as string for large numbers
   token              String // Token contract address
   rewardCurrency     String       @map("reward_currency")
@@ -885,4 +893,192 @@ enum ReputationCategory {
   QUALITY
   CONSISTENCY
   BADGE
+}
+
+// ============================================
+// PROJECT MODELS
+// ============================================
+
+model Project {
+  id               String      @id @default(cuid())
+  title            String
+  shortDescription String      @map("short_description")
+  description      String      @db.Text
+  requirements     String[]    @default([])
+  deliverables     String[]    @default([])
+  skills           String[]    @default([])
+  attachments      Json? // Array of attachment objects: [{filename, url, size, mimetype}]
+  reward           String      @default("0") // Stored as string for large numbers
+  currency         String
+  deadline         DateTime
+  status           ProjectStatus @default(OPEN)
+  type             ProjectType
+  peopleNeeded     Int         @default(1) @map("people_needed") // Number of positions available
+
+  // Smart contract fields (GIG only)
+  contractProjectId Int?      @unique @map("contract_project_id") // ID from Soroban contract
+  txHash            String?   @map("tx_hash") // Transaction hash from Soroban
+  escrowContractId  String?   @map("escrow_contract_id") // Escrow contract ID for GIG
+
+  // Tracking
+  acceptedCount Int @default(0) @map("accepted_count") // Number of accepted contributors
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ownerId      String               @map("owner_id")
+  owner        User                 @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  applications ProjectApplication[]
+  milestones   ProjectMilestone[]
+  activities   ProjectActivity[]
+
+  @@index([status, createdAt(sort: Desc)])
+  @@index([type, status])
+  @@index([ownerId])
+  @@index([createdAt(sort: Desc)])
+  @@index([deadline])
+  @@map("projects")
+}
+
+model ProjectApplication {
+  id                    String                @id @default(cuid())
+  coverLetter           String                @db.Text
+  estimatedCompletionTime Int?                @map("estimated_completion_time") // In days, required for GIG
+  portfolioLinks        String[]              @default([]) @map("portfolio_links")
+  attachments           Json? // Array of attachment objects
+  status                ApplicationStatus     @default(PENDING)
+  rejectionReason       String?               @map("rejection_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  milestones ProjectMilestone[]
+
+  @@unique([projectId, userId])
+  @@index([projectId, status])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@map("project_applications")
+}
+
+model ProjectMilestone {
+  id          String            @id @default(cuid())
+  title       String
+  description String            @db.Text
+  amount      String            @default("0") // Stored as string for large numbers
+  dueDate     DateTime          @map("due_date")
+  status      MilestoneStatus   @default(PENDING)
+  order       Int // Order of milestone in the project
+
+  // Submission
+  submissionNote String?   @map("submission_note") @db.Text
+  submissionUrl  String?   @map("submission_url")
+  submittedAt    DateTime? @map("submitted_at")
+
+  // Review
+  reviewNote   String?   @map("review_note") @db.Text
+  reviewedAt   DateTime? @map("reviewed_at")
+  revisionNote String?   @map("revision_note") @db.Text
+
+  // Payment
+  txHash String?   @map("tx_hash") // Transaction hash from payment
+  paidAt DateTime? @map("paid_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  applicationId String             @map("application_id")
+  application   ProjectApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  contributorId String @map("contributor_id")
+  contributor   User   @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, status])
+  @@index([applicationId])
+  @@index([contributorId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("project_milestones")
+}
+
+model ProjectActivity {
+  id       String              @id @default(cuid())
+  type     ProjectActivityType
+  message  String
+  metadata Json? // Additional context about the activity
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@index([userId])
+  @@index([type])
+  @@map("project_activities")
+}
+
+// ============================================
+// PROJECT ENUMS
+// ============================================
+
+enum ProjectType {
+  GIG // Milestone-based, paid via smart contract
+  JOB // Opportunity listing, no escrow
+}
+
+enum ProjectStatus {
+  OPEN // Accepting applications
+  IN_PROGRESS // Work in progress (GIG only, locked to contributor)
+  COMPLETED // All work completed
+  CANCELLED // Cancelled by owner
+  CLOSED // Closed without completion
+}
+
+enum ApplicationStatus {
+  PENDING // Awaiting review
+  ACCEPTED // Accepted by owner
+  REJECTED // Rejected by owner
+  WITHDRAWN // Withdrawn by applicant
+}
+
+enum MilestoneStatus {
+  PENDING // Not yet started
+  IN_PROGRESS // Being worked on
+  SUBMITTED // Submitted for review
+  REVISION_REQUESTED // Owner requested changes
+  APPROVED // Approved by owner
+  PAID // Payment released
+}
+
+enum ProjectActivityType {
+  PROJECT_CREATED
+  APPLICATION_SUBMITTED
+  APPLICATION_ACCEPTED
+  APPLICATION_REJECTED
+  APPLICATION_WITHDRAWN
+  MILESTONE_CREATED
+  MILESTONE_SUBMITTED
+  MILESTONE_APPROVED
+  MILESTONE_REVISION_REQUESTED
+  MILESTONE_PAID
+  PROJECT_COMPLETED
+  PROJECT_CANCELLED
 }

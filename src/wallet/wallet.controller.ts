@@ -9,7 +9,6 @@ import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { EnvConfig } from '../config/env.config';
-import { networks } from '../soroban/contract-bindings';
 import { SetupTrustlineDto } from './dto/setup-trustline.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
@@ -148,9 +147,9 @@ export class WalletController {
   ) {
     const wallet = await this.walletService.getWalletByUserId(userId);
     const configService = this.walletService['configService'];
-    const network = configService.getOrThrow<string>(EnvConfig.SOROBAN_NETWORK);
-    const networkPassphrase =
-      networks[network as keyof typeof networks].networkPassphrase;
+    const networkPassphrase = configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
+    );
 
     return this.walletService.setupTrustlineForCurrency(
       wallet.id,

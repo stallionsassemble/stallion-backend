@@ -17,13 +17,19 @@ import {
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PasskeyService } from '../passkey/passkey.service';
+import { UpdateContributorProfileDto } from '../users/dto/update-contributor-profile.dto';
+import { UpdateProjectOwnerProfileDto } from '../users/dto/update-project-owner-profile.dto';
+import { UsersService } from '../users/users.service';
 
 @ApiTags('Settings')
 @Controller('settings')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('JWT-auth')
 export class SettingsController {
-  constructor(private readonly passkeyService: PasskeyService) {}
+  constructor(
+    private readonly passkeyService: PasskeyService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Get('passkeys')
   @ApiOperation({
@@ -98,5 +104,51 @@ export class SettingsController {
     @Param('id') id: string,
   ) {
     return this.passkeyService.deletePasskey(userId, id);
+  }
+
+  @Patch('profile/contributor')
+  @ApiOperation({
+    summary: 'Update contributor profile',
+    description:
+      'Update profile settings for contributors. Only accessible by users with CONTRIBUTOR role.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request or user is not a contributor',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async updateContributorProfile(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateContributorProfileDto,
+  ) {
+    return this.usersService.updateContributorProfile(userId, dto);
+  }
+
+  @Patch('profile/project-owner')
+  @ApiOperation({
+    summary: 'Update project owner profile',
+    description:
+      'Update profile settings for project owners. Only accessible by users with PROJECT_OWNER role.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request or user is not a project owner',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async updateProjectOwnerProfile(
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateProjectOwnerProfileDto,
+  ) {
+    return this.usersService.updateProjectOwnerProfile(userId, dto);
   }
 }
