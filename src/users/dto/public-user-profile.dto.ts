@@ -82,4 +82,10 @@ export class PublicUserProfileDto {
     example: 'Technology',
   })
   industry?: string;
+
+  @ApiPropertyOptional({
+    description: 'User creation date',
+    example: '2023-01-01T00:00:00.000Z',
+  })
+  createdAt?: Date;
 }

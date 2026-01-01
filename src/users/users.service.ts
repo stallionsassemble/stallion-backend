@@ -47,6 +47,7 @@ export class UsersService {
         companyBio: true,
         companyLogo: true,
         industry: true,
+        createdAt: true,
       },
     });
 
