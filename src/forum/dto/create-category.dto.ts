@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class CreateCategoryDto {
   @ApiProperty({
@@ -31,14 +31,6 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   icon?: string;
-
-  @ApiPropertyOptional({
-    description: 'Display order of the category',
-    example: 1,
-  })
-  @IsOptional()
-  @IsInt()
-  order?: number;
 
   @ApiPropertyOptional({
     description: 'Whether the category is active',

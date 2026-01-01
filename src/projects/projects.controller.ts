@@ -106,7 +106,7 @@ export class ProjectsController {
     return this.projectsService.getProject(id);
   }
 
-  @Delete(':id')
+  @Patch(':id/cancel')
   @ApiOperation({
     summary: 'Cancel a project',
     description: 'Cancel a project. Only accessible by the project owner.',
@@ -115,6 +115,7 @@ export class ProjectsController {
   @ApiResponse({
     status: 200,
     description: 'Project cancelled successfully',
+    type: ProjectResponseDto,
   })
   @ApiResponse({
     status: 403,

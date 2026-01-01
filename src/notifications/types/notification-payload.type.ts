@@ -32,6 +32,7 @@ export enum NotificationCategory {
   FORUM = 'forum',
   HACKATHON = 'hackathon',
   SYSTEM = 'system',
+  ACHIEVEMENT = 'achievement',
 }
 
 export const NotificationTypeToCategory: Record<
@@ -61,6 +62,12 @@ export const NotificationTypeToCategory: Record<
   THREAD_REPLY: NotificationCategory.FORUM,
   POST_REACTION: NotificationCategory.FORUM,
   THREAD_MENTION: NotificationCategory.FORUM,
+  POST_COMMENT: NotificationCategory.FORUM,
+  COMMENT_REPLY: NotificationCategory.FORUM,
+
+  // Reputation
+  BADGE_EARNED: NotificationCategory.ACHIEVEMENT,
+  LEVEL_UP: NotificationCategory.ACHIEVEMENT,
 
   // Hackathon
   HACKATHON_CREATED: NotificationCategory.HACKATHON,

@@ -1,5 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ReputationNotifications } from '../notifications/helpers/notification-helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   REPUTATION_ACTIONS,
   REPUTATION_BADGES,
@@ -10,7 +12,10 @@ import {
 export class ReputationService {
   private readonly logger = new Logger(ReputationService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async getUserReputation(userId: string) {
     let reputation = await this.prisma.userReputation.findUnique({
@@ -144,6 +149,21 @@ export class ReputationService {
         `User ${userId} leveled up from ${oldLevel} to ${newLevel}`,
       );
       await this.checkLevelBadges(userId, newLevel);
+
+      // Send level up notification
+      try {
+        await this.notificationsService.sendNotification(
+          ReputationNotifications.levelUp(userId, newLevel, {
+            oldLevel,
+            newLevel,
+            score: newScore,
+          }),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send level up notification: ${error.message}`,
+        );
+      }
     }
 
     await this.checkBadges(userId);
@@ -205,6 +225,33 @@ export class ReputationService {
       this.logger.log(
         `User ${userId} earned new badges: ${newBadges.join(', ')}`,
       );
+
+      // Send badge earned notifications
+      for (const badgeId of newBadges) {
+        const badge = Object.values(REPUTATION_BADGES).find(
+          (b) => b.id === badgeId,
+        );
+        if (badge) {
+          try {
+            await this.notificationsService.sendNotification(
+              ReputationNotifications.badgeEarned(
+                userId,
+                badge.name,
+                badge.icon,
+                {
+                  badgeId: badge.id,
+                  badgeName: badge.name,
+                  badgeDescription: badge.description,
+                },
+              ),
+            );
+          } catch (error) {
+            this.logger.error(
+              `Failed to send badge notification: ${error.message}`,
+            );
+          }
+        }
+      }
     }
   }
 
@@ -255,10 +302,36 @@ export class ReputationService {
       this.logger.log(
         `User ${userId} earned level badge: ${badgeId} for reaching ${newLevel}`,
       );
+
+      // Send badge notification for level milestone badge
+      const badge = Object.values(REPUTATION_BADGES).find(
+        (b) => b.id === badgeId,
+      );
+      if (badge) {
+        try {
+          await this.notificationsService.sendNotification(
+            ReputationNotifications.badgeEarned(
+              userId,
+              badge.name,
+              badge.icon,
+              {
+                badgeId: badge.id,
+                badgeName: badge.name,
+                badgeDescription: badge.description,
+                level: newLevel,
+              },
+            ),
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to send level badge notification: ${error.message}`,
+          );
+        }
+      }
     }
   }
 
-  async getLeaderboard(limit = 50, category?: string) {
+  async getLeaderboard(page = 1, limit = 50, category?: string) {
     const orderBy: any = { score: 'desc' };
 
     if (category === 'bounty') {
@@ -269,21 +342,37 @@ export class ReputationService {
       orderBy.communityScore = 'desc';
     }
 
-    return this.prisma.userReputation.findMany({
-      take: limit,
-      orderBy,
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            profilePicture: true,
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.userReputation.findMany({
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              profilePicture: true,
+            },
           },
         },
+      }),
+      this.prisma.userReputation.count(),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
       },
-    });
+    };
   }
 
   async getUserRank(userId: string) {
@@ -303,7 +392,7 @@ export class ReputationService {
     return rank + 1;
   }
 
-  async getReputationHistory(userId: string, limit = 50) {
+  async getReputationHistory(userId: string, page = 1, limit = 50) {
     const reputation = await this.prisma.userReputation.findUnique({
       where: { userId },
     });
@@ -312,11 +401,29 @@ export class ReputationService {
       throw new NotFoundException('Reputation not found');
     }
 
-    return this.prisma.reputationHistory.findMany({
-      where: { reputationId: reputation.id },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.reputationHistory.findMany({
+        where: { reputationId: reputation.id },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      this.prisma.reputationHistory.count({
+        where: { reputationId: reputation.id },
+      }),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getBadgeInfo(badgeId: string) {

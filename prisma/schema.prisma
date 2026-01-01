@@ -63,9 +63,12 @@ model User {
   payoutMethods PayoutMethod[]
 
   // Forum relations
-  forumThreads   ForumThread[]
-  forumPosts     ForumPost[]
-  forumReactions ForumReaction[]
+  forumCategories ForumCategory[]  @relation("ForumCategoryCreator")
+  forumThreads    ForumThread[]
+  forumPosts      ForumPost[]
+  forumComments   ForumComment[]
+  forumReactions  ForumReaction[]
+  pinnedThreads   UserThreadPin[]
 
   // Chat relations
   conversationParticipants ConversationParticipant[]
@@ -403,15 +406,18 @@ model ForumCategory {
   slug        String   @unique
   description String?
   icon        String?
-  order       Int      @default(0)
   isActive    Boolean  @default(true) @map("is_active")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  creatorId String @map("creator_id")
+  creator   User   @relation("ForumCategoryCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+
   threads ForumThread[]
 
   @@index([slug])
-  @@index([order])
+  @@index([creatorId])
+  @@index([createdAt])
   @@map("forum_categories")
 }
 
@@ -419,7 +425,6 @@ model ForumThread {
   id        String   @id @default(cuid())
   title     String
   slug      String   @unique
-  isPinned  Boolean  @default(false) @map("is_pinned")
   isLocked  Boolean  @default(false) @map("is_locked")
   viewCount Int      @default(0) @map("view_count")
   createdAt DateTime @default(now()) @map("created_at")
@@ -431,10 +436,11 @@ model ForumThread {
   authorId String @map("author_id")
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
-  posts ForumPost[]
-  tags  ForumThreadTag[]
+  posts      ForumPost[]
+  tags       ForumThreadTag[]
+  pinnedBy   UserThreadPin[]
 
-  @@index([categoryId, isPinned, updatedAt(sort: Desc)])
+  @@index([categoryId, updatedAt(sort: Desc)])
   @@index([authorId])
   @@index([slug])
   @@index([createdAt(sort: Desc)])
@@ -455,10 +461,35 @@ model ForumPost {
   author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   reactions ForumReaction[]
+  comments  ForumComment[]
 
   @@index([threadId, createdAt])
   @@index([authorId])
   @@map("forum_posts")
+}
+
+model ForumComment {
+  id        String   @id @default(cuid())
+  content   String
+  isEdited  Boolean  @default(false) @map("is_edited")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  postId String    @map("post_id")
+  post   ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Self-referential relation for nested comments
+  parentId      String?        @map("parent_id")
+  parent        ForumComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       ForumComment[] @relation("CommentReplies")
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("forum_comments")
 }
 
 model ForumReaction {
@@ -500,6 +531,21 @@ model ForumThreadTag {
 
   @@id([threadId, tagId])
   @@map("forum_thread_tags")
+}
+
+model UserThreadPin {
+  userId    String      @map("user_id")
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  threadId  String      @map("thread_id")
+  thread    ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  pinnedAt  DateTime    @default(now()) @map("pinned_at")
+
+  @@id([userId, threadId])
+  @@index([userId])
+  @@index([threadId])
+  @@map("user_thread_pins")
 }
 
 // ============================================
@@ -703,6 +749,12 @@ enum NotificationType {
   THREAD_REPLY
   POST_REACTION
   THREAD_MENTION
+  POST_COMMENT
+  COMMENT_REPLY
+
+  // Reputation notifications
+  BADGE_EARNED
+  LEVEL_UP
 
   // System notifications
   SYSTEM_ANNOUNCEMENT

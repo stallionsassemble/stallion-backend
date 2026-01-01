@@ -464,16 +464,10 @@ export class BountyController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, OwnerGuard)
   @ApiBearerAuth('JWT-auth')
-  @HttpCode(200)
   @ApiOperation({ summary: 'Delete bounty' })
   @ApiResponse({
-    status: 200,
+    status: 204,
     description: 'Bounty deleted successfully',
-    schema: {
-      example: {
-        message: 'Bounty deleted successfully',
-      },
-    },
   })
   async deleteBounty(
     @CurrentUser('id') userId: string,

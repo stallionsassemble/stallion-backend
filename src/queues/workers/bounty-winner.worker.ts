@@ -2,6 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { BountyNotifications } from '../../notifications/helpers/notification-helper';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { ReputationService } from '../../reputation/reputation.service';
 
@@ -90,22 +91,13 @@ export class BountyWinnerWorker extends WorkerHost {
 
         // Send notification to winner
         try {
-          await this.notificationsService.sendNotification({
-            userId: winner.userId,
-            type: 'BOUNTY_COMPLETED',
-            title: 'Congratulations! You won a bounty',
-            message: `You placed #${winner.position} in "${bountyTitle}" and earned ${winner.payoutAmount} ${currency}`,
-            data: {
-              bountyId,
+          await this.notificationsService.sendNotification(
+            BountyNotifications.bountyWinner(
+              winner.userId,
               bountyTitle,
-              position: winner.position,
-              reward: winner.payoutAmount,
-              currency,
-            },
-            sendInApp: true,
-            sendEmail: true,
-            sendPush: true,
-          });
+              winner.position,
+            ),
+          );
 
           this.logger.log(`Sent notification to winner ${winner.userId}`);
         } catch (error) {

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString } from 'class-validator';
 
 export class CreateThreadDto {
   @ApiProperty({
@@ -40,12 +40,4 @@ export class CreateThreadDto {
   @IsArray()
   @IsString({ each: true })
   tags?: string[];
-
-  @ApiPropertyOptional({
-    description: 'Whether the thread should be pinned',
-    example: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  isPinned?: boolean;
 }

@@ -165,13 +165,8 @@ export class NotificationsController {
   })
   @ApiParam({ name: 'id', description: 'Notification ID' })
   @ApiResponse({
-    status: 200,
+    status: 204,
     description: 'Notification deleted successfully',
-    schema: {
-      example: {
-        message: 'Notification deleted successfully',
-      },
-    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
@@ -274,13 +269,8 @@ export class NotificationsController {
   })
   @ApiParam({ name: 'token', description: 'FCM token to remove' })
   @ApiResponse({
-    status: 200,
+    status: 204,
     description: 'FCM token removed successfully',
-    schema: {
-      example: {
-        message: 'FCM token removed successfully',
-      },
-    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   removeFcmToken(

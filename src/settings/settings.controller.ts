@@ -86,13 +86,8 @@ export class SettingsController {
   })
   @ApiParam({ name: 'id', description: 'Passkey ID' })
   @ApiResponse({
-    status: 200,
+    status: 204,
     description: 'Passkey deleted successfully',
-    schema: {
-      example: {
-        message: 'Passkey deleted successfully',
-      },
-    },
   })
   @ApiResponse({
     status: 400,

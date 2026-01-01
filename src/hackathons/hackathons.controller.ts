@@ -131,7 +131,7 @@ export class HackathonsController {
     description: 'Delete a hackathon (only by owner)',
   })
   @ApiParam({ name: 'id', description: 'Hackathon ID' })
-  @ApiResponse({ status: 200, description: 'Hackathon deleted successfully' })
+  @ApiResponse({ status: 204, description: 'Hackathon deleted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
   deleteHackathon(@Param('id') id: string, @CurrentUser('id') userId: string) {
@@ -222,7 +222,7 @@ export class HackathonsController {
     description: 'Delete a hackathon submission (only by submitter)',
   })
   @ApiParam({ name: 'id', description: 'Submission ID' })
-  @ApiResponse({ status: 200, description: 'Submission deleted successfully' })
+  @ApiResponse({ status: 204, description: 'Submission deleted successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Submission not found' })
   deleteSubmission(@Param('id') id: string, @CurrentUser('id') userId: string) {

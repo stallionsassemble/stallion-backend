@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Horizon } from '@stellar/stellar-sdk';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { WalletNotifications } from '../../notifications/helpers/notification-helper';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { StellarAccountService } from '../../soroban/stellar-account.service';
 import { WalletService } from '../../wallet/wallet.service';
@@ -109,7 +110,7 @@ export class DepositReconcilerWorker extends WorkerHost {
                   ? 'XLM'
                   : paymentOp.asset_code || 'UNKNOWN';
 
-              const transaction = await this.walletService.processDeposit(
+              await this.walletService.processDeposit(
                 txResponse.hash,
                 wallet.id,
                 amount,
@@ -123,18 +124,13 @@ export class DepositReconcilerWorker extends WorkerHost {
               if (wallet.users.length > 0) {
                 try {
                   for (const user of wallet.users) {
-                    await this.notificationsService.sendNotification({
-                      userId: user.id,
-                      type: 'DEPOSIT_RECEIVED',
-                      title: 'Deposit Received',
-                      message: `You received ${amount} ${currency}`,
-                      data: {
-                        amount: amount.toString(),
+                    await this.notificationsService.sendNotification(
+                      WalletNotifications.depositReceived(
+                        user.id,
+                        amount.toString(),
                         currency,
-                        transactionId: transaction.id,
-                        txHash: txResponse.hash,
-                      },
-                    });
+                      ),
+                    );
                   }
                 } catch (error) {
                   this.logger.error(

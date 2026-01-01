@@ -21,8 +21,10 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { AddReactionDto } from './dto/add-reaction.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateThreadDto } from './dto/create-thread.dto';
+import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
 import { ForumService } from './forum.service';
@@ -55,18 +57,22 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  createCategory(@Body() dto: CreateCategoryDto) {
-    return this.forumService.createCategory(dto);
+  createCategory(
+    @Body() dto: CreateCategoryDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.forumService.createCategory(userId, dto);
   }
 
   @Get('categories')
   @ApiOperation({
     summary: 'Get all categories',
-    description: 'Retrieve all forum categories',
+    description:
+      'Retrieve all forum categories sorted by popularity (thread count, post count) and creation date',
   })
   @ApiResponse({
     status: 200,
-    description: 'List of categories',
+    description: 'List of categories sorted by popularity',
     schema: {
       example: [
         {
@@ -75,9 +81,13 @@ export class ForumController {
           slug: 'general-discussion',
           description: 'General topics and discussions',
           icon: '💬',
-          threadCount: 42,
-          postCount: 156,
+          isActive: true,
           createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+          creatorId: 'user-uuid',
+          _count: {
+            threads: 42,
+          },
         },
         {
           id: 'cat-uuid-2',
@@ -85,9 +95,13 @@ export class ForumController {
           slug: 'technical-help',
           description: 'Get help with technical issues',
           icon: '🛠️',
-          threadCount: 28,
-          postCount: 89,
+          isActive: true,
           createdAt: '2024-01-02T00:00:00.000Z',
+          updatedAt: '2024-01-02T00:00:00.000Z',
+          creatorId: 'user-uuid',
+          _count: {
+            threads: 28,
+          },
         },
       ],
     },
@@ -99,7 +113,8 @@ export class ForumController {
   @Get('categories/:slug')
   @ApiOperation({
     summary: 'Get category by slug',
-    description: 'Retrieve a specific category with its threads',
+    description:
+      'Retrieve a specific category with its threads. If authenticated, includes user-specific pin status.',
   })
   @ApiParam({ name: 'slug', description: 'Category slug' })
   @ApiResponse({
@@ -134,8 +149,31 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  getCategory(@Param('slug') slug: string) {
-    return this.forumService.getCategory(slug);
+  getCategory(@Param('slug') slug: string, @CurrentUser('id') userId?: string) {
+    return this.forumService.getCategory(slug, userId);
+  }
+
+  @Delete('categories/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Delete category',
+    description: 'Delete a forum category (only if it has no threads)',
+  })
+  @ApiParam({ name: 'id', description: 'Category ID' })
+  @ApiResponse({
+    status: 204,
+    description: 'Category deleted successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Category has existing threads' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - not the category creator',
+  })
+  @ApiResponse({ status: 404, description: 'Category not found' })
+  deleteCategory(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.forumService.deleteCategory(id, userId);
   }
 
   @Post('threads')
@@ -216,6 +254,44 @@ export class ForumController {
     @Query('categoryId') categoryId?: string,
   ) {
     return this.forumService.searchThreads(query, categoryId);
+  }
+
+  @Get('threads/pinned')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get my pinned threads',
+    description: 'Retrieve all threads pinned by the current user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of pinned threads',
+    schema: {
+      example: [
+        {
+          id: 'thread-uuid',
+          title: 'Important thread',
+          slug: 'important-thread',
+          author: {
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+          },
+          category: {
+            name: 'General Discussion',
+            slug: 'general-discussion',
+          },
+          postCount: 12,
+          viewCount: 156,
+          pinnedAt: '2024-01-01T00:00:00.000Z',
+          createdAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  getUserPinnedThreads(@CurrentUser('id') userId: string) {
+    return this.forumService.getUserPinnedThreads(userId);
   }
 
   @Get('threads/:slug')
@@ -321,18 +397,38 @@ export class ForumController {
   })
   @ApiParam({ name: 'id', description: 'Thread ID' })
   @ApiResponse({
-    status: 200,
+    status: 204,
     description: 'Thread deleted successfully',
-    schema: {
-      example: {
-        message: 'Thread deleted successfully',
-      },
-    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Thread not found' })
   deleteThread(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.forumService.deleteThread(id, userId);
+  }
+
+  @Patch('threads/:id/pin')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Toggle pin thread',
+    description: 'Pin or unpin a thread for the current user',
+  })
+  @ApiParam({ name: 'id', description: 'Thread ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Thread pin status toggled successfully',
+    schema: {
+      example: {
+        message: 'Thread pinned successfully',
+        action: 'pinned',
+        isPinned: true,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Thread not found' })
+  togglePinThread(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.forumService.togglePinThread(userId, id);
   }
 
   @Post('posts')
@@ -399,13 +495,8 @@ export class ForumController {
   })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({
-    status: 200,
+    status: 204,
     description: 'Post deleted successfully',
-    schema: {
-      example: {
-        message: 'Post deleted successfully',
-      },
-    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
@@ -413,11 +504,60 @@ export class ForumController {
     return this.forumService.deletePost(id, userId);
   }
 
-  @Post('reactions')
+  @Get('posts/:id/reactions')
+  @ApiOperation({
+    summary: 'Get post reactions',
+    description: 'Retrieve all reactions for a post with consolidated counts',
+  })
+  @ApiParam({ name: 'id', description: 'Post ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Post reactions retrieved successfully',
+    schema: {
+      example: {
+        postId: 'post-uuid',
+        reactions: [
+          {
+            emoji: '👍',
+            count: 5,
+            users: [
+              {
+                id: 'user-uuid-1',
+                username: 'john_doe',
+                firstName: 'John',
+                lastName: 'Doe',
+                profilePicture: 'https://example.com/pic.jpg',
+              },
+            ],
+          },
+          {
+            emoji: '❤️',
+            count: 3,
+            users: [
+              {
+                id: 'user-uuid-2',
+                username: 'jane_smith',
+                firstName: 'Jane',
+                lastName: 'Smith',
+                profilePicture: null,
+              },
+            ],
+          },
+        ],
+        totalReactions: 8,
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  getPostReactions(@Param('id') id: string) {
+    return this.forumService.getPostReactions(id);
+  }
+
+  @Patch('reactions')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Add reaction',
+    summary: 'Add/Remove reaction',
     description: 'Add or remove a reaction to a post',
   })
   @ApiResponse({
@@ -434,8 +574,11 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  addReaction(@CurrentUser('id') userId: string, @Body() dto: AddReactionDto) {
-    return this.forumService.addReaction(userId, dto);
+  addRemoveReaction(
+    @CurrentUser('id') userId: string,
+    @Body() dto: AddReactionDto,
+  ) {
+    return this.forumService.addRemoveReaction(userId, dto);
   }
 
   @Get('tags')
@@ -498,5 +641,154 @@ export class ForumController {
   @ApiResponse({ status: 404, description: 'Tag not found' })
   getThreadsByTag(@Param('slug') slug: string) {
     return this.forumService.getThreadsByTag(slug);
+  }
+
+  @Post('comments')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Create comment',
+    description: 'Create a comment on a post or reply to another comment',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Comment created successfully',
+    schema: {
+      example: {
+        id: 'comment-uuid',
+        content: 'This is a great post!',
+        postId: 'post-uuid',
+        authorId: 'user-uuid',
+        parentId: null,
+        author: {
+          id: 'user-uuid',
+          username: 'john_doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          profilePicture: 'https://example.com/pic.jpg',
+        },
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-01T00:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Post or parent comment not found' })
+  createComment(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateCommentDto,
+  ) {
+    return this.forumService.createComment(userId, dto);
+  }
+
+  @Get('posts/:id/comments')
+  @ApiOperation({
+    summary: 'Get post comments',
+    description: 'Retrieve all comments for a post with nested replies',
+  })
+  @ApiParam({ name: 'id', description: 'Post ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of comments with nested replies',
+    schema: {
+      example: [
+        {
+          id: 'comment-uuid-1',
+          content: 'Great post!',
+          postId: 'post-uuid',
+          authorId: 'user-uuid-1',
+          parentId: null,
+          isEdited: false,
+          author: {
+            id: 'user-uuid-1',
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/pic.jpg',
+          },
+          replies: [
+            {
+              id: 'comment-uuid-2',
+              content: 'Thanks!',
+              postId: 'post-uuid',
+              authorId: 'user-uuid-2',
+              parentId: 'comment-uuid-1',
+              isEdited: false,
+              author: {
+                id: 'user-uuid-2',
+                username: 'jane_smith',
+                firstName: 'Jane',
+                lastName: 'Smith',
+                profilePicture: null,
+              },
+              replies: [],
+              createdAt: '2024-01-01T00:05:00.000Z',
+            },
+          ],
+          createdAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Post not found' })
+  getPostComments(@Param('id') id: string) {
+    return this.forumService.getPostComments(id);
+  }
+
+  @Patch('comments/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Update comment',
+    description: 'Update a comment (only by comment author)',
+  })
+  @ApiParam({ name: 'id', description: 'Comment ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Comment updated successfully',
+    schema: {
+      example: {
+        id: 'comment-uuid',
+        content: 'Updated comment content...',
+        isEdited: true,
+        updatedAt: '2024-01-01T12:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - not the comment author',
+  })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
+  updateComment(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateCommentDto,
+  ) {
+    return this.forumService.updateComment(id, userId, dto);
+  }
+
+  @Delete('comments/:id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Delete comment',
+    description: 'Delete a comment (only by comment author)',
+  })
+  @ApiParam({ name: 'id', description: 'Comment ID' })
+  @ApiResponse({
+    status: 204,
+    description: 'Comment deleted successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Bad request' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - not the comment author',
+  })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
+  deleteComment(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.forumService.deleteComment(id, userId);
   }
 }

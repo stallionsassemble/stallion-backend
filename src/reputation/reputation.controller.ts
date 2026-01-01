@@ -16,7 +16,7 @@ import { ReputationService } from './reputation.service';
 export class ReputationController {
   constructor(private readonly reputationService: ReputationService) {}
 
-  @Get('me')
+  @Get()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -110,9 +110,14 @@ export class ReputationController {
     description: 'Retrieve reputation leaderboard with optional filters',
   })
   @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
     name: 'limit',
     required: false,
-    description: 'Number of users to retrieve (default: 50)',
+    description: 'Number of users per page (default: 50)',
   })
   @ApiQuery({
     name: 'category',
@@ -121,75 +126,93 @@ export class ReputationController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Leaderboard rankings',
+    description: 'Leaderboard rankings with pagination',
     schema: {
-      example: [
-        {
-          rank: 1,
-          userId: 'user-uuid-1',
-          username: 'top_contributor',
-          firstName: 'Alice',
-          lastName: 'Johnson',
-          profilePicture: 'https://example.com/alice.jpg',
-          score: 5420,
-          level: 12,
-          bountyScore: 3200,
-          hackathonScore: 1800,
-          communityScore: 420,
-          badges: [
-            {
-              id: 'badge-uuid',
-              name: 'Legend',
-              icon: '👑',
-            },
-          ],
+      example: {
+        data: [
+          {
+            rank: 1,
+            userId: 'user-uuid-1',
+            username: 'top_contributor',
+            firstName: 'Alice',
+            lastName: 'Johnson',
+            profilePicture: 'https://example.com/alice.jpg',
+            score: 5420,
+            level: 12,
+            bountyScore: 3200,
+            hackathonScore: 1800,
+            communityScore: 420,
+            badges: [
+              {
+                id: 'badge-uuid',
+                name: 'Legend',
+                icon: '👑',
+              },
+            ],
+          },
+          {
+            rank: 2,
+            userId: 'user-uuid-2',
+            username: 'code_master',
+            firstName: 'Bob',
+            lastName: 'Smith',
+            profilePicture: 'https://example.com/bob.jpg',
+            score: 4850,
+            level: 11,
+            bountyScore: 2900,
+            hackathonScore: 1650,
+            communityScore: 300,
+            badges: [
+              {
+                id: 'badge-uuid-2',
+                name: 'Expert',
+                icon: '🏆',
+              },
+            ],
+          },
+        ],
+        pagination: {
+          total: 150,
+          page: 1,
+          limit: 50,
+          totalPages: 3,
         },
-        {
-          rank: 2,
-          userId: 'user-uuid-2',
-          username: 'code_master',
-          firstName: 'Bob',
-          lastName: 'Smith',
-          profilePicture: 'https://example.com/bob.jpg',
-          score: 4850,
-          level: 11,
-          bountyScore: 2900,
-          hackathonScore: 1650,
-          communityScore: 300,
-          badges: [
-            {
-              id: 'badge-uuid-2',
-              name: 'Expert',
-              icon: '🏆',
-            },
-          ],
-        },
-      ],
+      },
     },
   })
   async getLeaderboard(
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('category') category?: string,
   ) {
-    const leaderboard = await this.reputationService.getLeaderboard(
-      limit ? parseInt(limit) : 50,
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 50;
+
+    const result = await this.reputationService.getLeaderboard(
+      pageNum,
+      limitNum,
       category,
     );
 
-    return leaderboard.map((entry, index) => ({
-      rank: index + 1,
-      userId: entry.user.id,
-      username: entry.user.username,
-      firstName: entry.user.firstName,
-      lastName: entry.user.lastName,
-      profilePicture: entry.user.profilePicture,
-      score: entry.score,
-      level: entry.level,
-      bountyScore: entry.bountyScore,
-      hackathonScore: entry.hackathonScore,
-      communityScore: entry.communityScore,
-      badges: entry.badges,
-    }));
+    const startRank = (pageNum - 1) * limitNum;
+
+    return {
+      data: result.data.map((entry, index) => ({
+        rank: startRank + index + 1,
+        userId: entry.user.id,
+        username: entry.user.username,
+        firstName: entry.user.firstName,
+        lastName: entry.user.lastName,
+        profilePicture: entry.user.profilePicture,
+        score: entry.score,
+        level: entry.level,
+        bountyScore: entry.bountyScore,
+        hackathonScore: entry.hackathonScore,
+        communityScore: entry.communityScore,
+        badges: entry.badges,
+      })),
+      pagination: result.pagination,
+    };
   }
 
   @Get('history')
@@ -201,53 +224,71 @@ export class ReputationController {
       'Retrieve reputation change history for the authenticated user',
   })
   @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
     name: 'limit',
     required: false,
-    description: 'Number of history entries (default: 50)',
+    description: 'Number of history entries per page (default: 50)',
   })
   @ApiResponse({
     status: 200,
-    description: 'Reputation history',
+    description: 'Reputation history with pagination',
     schema: {
-      example: [
-        {
-          id: 'history-uuid-1',
-          userId: 'user-uuid',
-          change: 100,
-          reason: 'Bounty completed',
-          category: 'bounty',
-          referenceId: 'bounty-uuid',
-          createdAt: '2024-03-01T12:00:00.000Z',
+      example: {
+        data: [
+          {
+            id: 'history-uuid-1',
+            userId: 'user-uuid',
+            change: 100,
+            reason: 'Bounty completed',
+            category: 'bounty',
+            referenceId: 'bounty-uuid',
+            createdAt: '2024-03-01T12:00:00.000Z',
+          },
+          {
+            id: 'history-uuid-2',
+            userId: 'user-uuid',
+            change: 50,
+            reason: 'Hackathon participation',
+            category: 'hackathon',
+            referenceId: 'hackathon-uuid',
+            createdAt: '2024-02-28T10:00:00.000Z',
+          },
+          {
+            id: 'history-uuid-3',
+            userId: 'user-uuid',
+            change: 10,
+            reason: 'Forum post upvoted',
+            category: 'community',
+            referenceId: 'post-uuid',
+            createdAt: '2024-02-27T15:30:00.000Z',
+          },
+        ],
+        pagination: {
+          total: 125,
+          page: 1,
+          limit: 50,
+          totalPages: 3,
         },
-        {
-          id: 'history-uuid-2',
-          userId: 'user-uuid',
-          change: 50,
-          reason: 'Hackathon participation',
-          category: 'hackathon',
-          referenceId: 'hackathon-uuid',
-          createdAt: '2024-02-28T10:00:00.000Z',
-        },
-        {
-          id: 'history-uuid-3',
-          userId: 'user-uuid',
-          change: 10,
-          reason: 'Forum post upvoted',
-          category: 'community',
-          referenceId: 'post-uuid',
-          createdAt: '2024-02-27T15:30:00.000Z',
-        },
-      ],
+      },
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMyHistory(
     @CurrentUser('id') userId: string,
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 50;
+
     return this.reputationService.getReputationHistory(
       userId,
-      limit ? parseInt(limit) : 50,
+      pageNum,
+      limitNum,
     );
   }
 
@@ -258,35 +299,53 @@ export class ReputationController {
   })
   @ApiParam({ name: 'userId', description: 'User ID' })
   @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
     name: 'limit',
     required: false,
-    description: 'Number of history entries (default: 50)',
+    description: 'Number of history entries per page (default: 50)',
   })
   @ApiResponse({
     status: 200,
-    description: 'Reputation history',
+    description: 'Reputation history with pagination',
     schema: {
-      example: [
-        {
-          id: 'history-uuid-1',
-          userId: 'user-uuid',
-          change: 100,
-          reason: 'Bounty completed',
-          category: 'bounty',
-          referenceId: 'bounty-uuid',
-          createdAt: '2024-03-01T12:00:00.000Z',
+      example: {
+        data: [
+          {
+            id: 'history-uuid-1',
+            userId: 'user-uuid',
+            change: 100,
+            reason: 'Bounty completed',
+            category: 'bounty',
+            referenceId: 'bounty-uuid',
+            createdAt: '2024-03-01T12:00:00.000Z',
+          },
+        ],
+        pagination: {
+          total: 75,
+          page: 1,
+          limit: 50,
+          totalPages: 2,
         },
-      ],
+      },
     },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserHistory(
     @Param('userId') userId: string,
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    const pageNum = page ? parseInt(page) : 1;
+    const limitNum = limit ? parseInt(limit) : 50;
+
     return this.reputationService.getReputationHistory(
       userId,
-      limit ? parseInt(limit) : 50,
+      pageNum,
+      limitNum,
     );
   }
 

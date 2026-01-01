@@ -19,14 +19,6 @@ export class UpdateThreadDto {
   content?: string;
 
   @ApiPropertyOptional({
-    description: 'Whether the thread should be pinned',
-    example: true,
-  })
-  @IsOptional()
-  @IsBoolean()
-  isPinned?: boolean;
-
-  @ApiPropertyOptional({
     description: 'Whether the thread should be locked',
     example: false,
   })

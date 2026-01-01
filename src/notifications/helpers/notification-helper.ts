@@ -135,28 +135,96 @@ export const BountyNotifications = {
 
 // Forum notification helpers
 export const ForumNotifications = {
-  threadReply: (userId: string, replierName: string, threadTitle: string) => ({
+  threadReply: (
+    userId: string,
+    replierName: string,
+    threadTitle: string,
+    data?: any,
+  ) => ({
     userId,
     type: 'THREAD_REPLY' as NotificationType,
     title: 'New reply to your thread',
     message: `${replierName} replied to "${threadTitle}"`,
+    data,
+    sendInApp: true,
+    sendPush: true,
   }),
 
-  postReaction: (userId: string, reactorName: string, emoji: string) => ({
+  postReaction: (
+    userId: string,
+    reactorName: string,
+    emoji: string,
+    data?: any,
+  ) => ({
     userId,
     type: 'POST_REACTION' as NotificationType,
     title: 'Someone reacted to your post',
     message: `${reactorName} reacted with ${emoji}`,
+    data,
+    sendInApp: true,
+    sendPush: true,
   }),
 
   threadMention: (
     userId: string,
     mentionerName: string,
     threadTitle: string,
+    data?: any,
   ) => ({
     userId,
     type: 'THREAD_MENTION' as NotificationType,
     title: `${mentionerName} mentioned you`,
     message: `In thread: ${threadTitle}`,
+    data,
+    sendInApp: true,
+    sendPush: true,
+  }),
+
+  postComment: (userId: string, commenterName: string, data?: any) => ({
+    userId,
+    type: 'POST_COMMENT' as NotificationType,
+    title: 'New comment on your post',
+    message: `${commenterName} commented on your post`,
+    data,
+    sendInApp: true,
+    sendPush: true,
+  }),
+
+  commentReply: (userId: string, replierName: string, data?: any) => ({
+    userId,
+    type: 'COMMENT_REPLY' as NotificationType,
+    title: 'New reply to your comment',
+    message: `${replierName} replied to your comment`,
+    data,
+    sendInApp: true,
+    sendPush: true,
+  }),
+};
+
+// Reputation notification helpers
+export const ReputationNotifications = {
+  badgeEarned: (
+    userId: string,
+    badgeName: string,
+    badgeIcon: string,
+    data?: any,
+  ) => ({
+    userId,
+    type: 'BADGE_EARNED' as NotificationType,
+    title: 'New badge earned!',
+    message: `You earned the "${badgeName}" badge ${badgeIcon}`,
+    data,
+    sendInApp: true,
+    sendPush: true,
+  }),
+
+  levelUp: (userId: string, newLevel: string, data?: any) => ({
+    userId,
+    type: 'LEVEL_UP' as NotificationType,
+    title: 'Level up!',
+    message: `Congratulations! You reached ${newLevel} level`,
+    data,
+    sendInApp: true,
+    sendPush: true,
   }),
 };
