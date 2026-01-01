@@ -174,7 +174,7 @@ export class HackathonsController {
     return this.hackathonsService.getSubmissions(hackathonId, trackId);
   }
 
-  @Get('submissions/my')
+  @Get('submissions')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({

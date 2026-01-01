@@ -58,7 +58,6 @@ export class ProjectContractService {
       this.networkPassphrase,
     );
     const totalReward = BigInt(params.reward);
-    const platformFee = BigInt(params.platformFee);
     const deadlineTimestamp = BigInt(
       Math.floor(params.deadline.getTime() / 1000),
     );
@@ -76,7 +75,6 @@ export class ProjectContractService {
       total_reward: totalReward,
       milestones,
       deadline: deadlineTimestamp,
-      platform_fee: platformFee,
     });
 
     const result = await tx.signAndSend({
@@ -206,7 +204,6 @@ export class ProjectContractService {
       this.networkPassphrase,
     );
     const rewardAmount = BigInt(params.rewardAmount);
-    const platformFee = BigInt(params.platformFee);
     const deadlineTimestamp = BigInt(
       Math.floor(params.deadline.getTime() / 1000),
     );
@@ -217,7 +214,6 @@ export class ProjectContractService {
       owner: params.ownerPublicKey,
       token: tokenAddress,
       reward_amount: rewardAmount,
-      platform_fee: platformFee,
       deadline: deadlineTimestamp,
     });
 
@@ -263,6 +259,146 @@ export class ProjectContractService {
       contractProjectId: projectId,
       txHash,
     };
+  }
+
+  async updateGigProject(params: {
+    projectId: number;
+    ownerId: string;
+    ownerPublicKey: string;
+    walletId: string;
+    deadline?: Date;
+    milestones?: Array<{ amount: string; order: number }>;
+  }): Promise<{ txHash: string }> {
+    this.logger.log(
+      `Updating GIG project ${params.projectId} on smart contract`,
+    );
+
+    this.sorobanClient.options.publicKey = params.ownerPublicKey;
+
+    const updateParams: any = {
+      owner: params.ownerPublicKey,
+      project_id: params.projectId,
+    };
+
+    if (params.deadline) {
+      updateParams.deadline = BigInt(
+        Math.floor(params.deadline.getTime() / 1000),
+      );
+    }
+
+    if (params.milestones) {
+      updateParams.milestones = params.milestones.map((m) => ({
+        amount: BigInt(m.amount),
+        order: m.order,
+      }));
+    }
+
+    const tx = await this.sorobanClient.update_project_gig(updateParams);
+
+    const result = await tx.signAndSend({
+      signTransaction: async (transactionXdr) => {
+        const transaction = StellarSDK.TransactionBuilder.fromXDR(
+          transactionXdr,
+          this.networkPassphrase,
+        ) as StellarSDK.Transaction;
+
+        const signedTx = await this.walletSigning.signTransaction(
+          params.walletId,
+          transaction,
+        );
+
+        return {
+          signedTxXdr: signedTx.toXDR(),
+          signerAddress: params.ownerPublicKey,
+        };
+      },
+    });
+
+    if (!result.result.isOk()) {
+      const error = result.result.unwrapErr();
+      this.logger.error('Contract invocation failed', error);
+      throw new BadRequestException(
+        `Failed to update GIG project on contract: ${JSON.stringify(error)}`,
+      );
+    }
+
+    if (!result.getTransactionResponse) {
+      throw new BadRequestException('Transaction response not available');
+    }
+
+    const txHash = result.getTransactionResponse.txHash;
+
+    this.logger.log(
+      `GIG project ${params.projectId} updated on contract, tx: ${txHash}`,
+    );
+
+    return { txHash };
+  }
+
+  async updateJobProject(params: {
+    projectId: number;
+    ownerId: string;
+    ownerPublicKey: string;
+    walletId: string;
+    deadline?: Date;
+  }): Promise<{ txHash: string }> {
+    this.logger.log(
+      `Updating JOB project ${params.projectId} on smart contract`,
+    );
+
+    this.sorobanClient.options.publicKey = params.ownerPublicKey;
+
+    const updateParams: any = {
+      owner: params.ownerPublicKey,
+      project_id: params.projectId,
+    };
+
+    if (params.deadline) {
+      updateParams.deadline = BigInt(
+        Math.floor(params.deadline.getTime() / 1000),
+      );
+    }
+
+    const tx = await this.sorobanClient.update_project_job(updateParams);
+
+    const result = await tx.signAndSend({
+      signTransaction: async (transactionXdr) => {
+        const transaction = StellarSDK.TransactionBuilder.fromXDR(
+          transactionXdr,
+          this.networkPassphrase,
+        ) as StellarSDK.Transaction;
+
+        const signedTx = await this.walletSigning.signTransaction(
+          params.walletId,
+          transaction,
+        );
+
+        return {
+          signedTxXdr: signedTx.toXDR(),
+          signerAddress: params.ownerPublicKey,
+        };
+      },
+    });
+
+    if (!result.result.isOk()) {
+      const error = result.result.unwrapErr();
+      this.logger.error('Contract invocation failed', error);
+      throw new BadRequestException(
+        `Failed to update JOB project on contract: ${JSON.stringify(error)}`,
+      );
+    }
+
+    if (!result.getTransactionResponse) {
+      throw new BadRequestException('Transaction response not available');
+    }
+
+    const txHash = result.getTransactionResponse.txHash;
+
+    this.logger.log(
+      `JOB project ${params.projectId} updated on contract, tx: ${txHash}`,
+    );
+
+    return { txHash };
   }
 
   async cancelGigProject(params: {

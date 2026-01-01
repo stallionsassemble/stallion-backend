@@ -31,6 +31,7 @@ import {
 import { ReviewApplicationDto } from './dto/review-application.dto';
 import { ReviewMilestoneDto } from './dto/review-milestone.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectActivityService } from './project-activity.service';
 import { ProjectApplicationsService } from './project-applications.service';
 import { ProjectMilestonesService } from './project-milestones.service';
@@ -106,6 +107,36 @@ export class ProjectsController {
     return this.projectsService.getProject(id);
   }
 
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Update a project',
+    description:
+      'Update project details. Only accessible by the project owner. Only OPEN projects can be updated.',
+  })
+  @ApiParam({ name: 'id', description: 'Project ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Project updated successfully',
+    type: ProjectResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Bad request - validation failed or project not in OPEN status',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - not the project owner',
+  })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async updateProject(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: UpdateProjectDto,
+  ) {
+    return this.projectsService.updateProject(id, userId, dto);
+  }
+
   @Patch(':id/cancel')
   @ApiOperation({
     summary: 'Cancel a project',
@@ -170,7 +201,7 @@ export class ProjectsController {
     return this.applicationsService.getApplicationsByProject(projectId);
   }
 
-  @Get('applications/my')
+  @Get('applications')
   @ApiOperation({
     summary: 'Get my applications',
     description: 'Get all applications submitted by the current user',

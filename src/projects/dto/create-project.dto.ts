@@ -7,21 +7,75 @@ import {
   IsEnum,
   IsInt,
   IsNotEmpty,
+  IsNumber,
   IsOptional,
+  IsPositive,
   IsString,
+  IsUrl,
+  Length,
+  MaxLength,
   Min,
+  Validate,
   ValidateNested,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
+
+@ValidatorConstraint({ name: 'projectDeadlineValid', async: false })
+export class ProjectDeadlineConstraint implements ValidatorConstraintInterface {
+  validate(deadline: string | undefined) {
+    if (!deadline) {
+      return false;
+    }
+    const deadlineDate = new Date(deadline);
+    const now = new Date();
+    return deadlineDate > now;
+  }
+
+  defaultMessage() {
+    return 'Project deadline must be in the future';
+  }
+}
+
+export class AttachmentItem {
+  @ApiProperty({
+    description: 'Original filename',
+    example: 'requirements.pdf',
+  })
+  @IsString()
+  @MaxLength(255)
+  filename: string;
+
+  @ApiProperty({
+    description: 'File URL',
+    example: 'http://localhost:3000/uploads/documents/1234567890-abc123.pdf',
+  })
+  @IsUrl()
+  url: string;
+
+  @ApiProperty({ description: 'File size in bytes', example: 102400 })
+  @IsNumber()
+  @IsPositive()
+  size: number;
+
+  @ApiProperty({
+    description: 'File MIME type',
+    example: 'application/pdf',
+  })
+  @IsString()
+  @MaxLength(100)
+  mimetype: string;
+}
 
 export class MilestoneDto {
   @ApiProperty({ description: 'Milestone title' })
   @IsString()
-  @IsNotEmpty()
+  @Length(3, 100)
   title: string;
 
   @ApiProperty({ description: 'Milestone description' })
   @IsString()
-  @IsNotEmpty()
+  @Length(10, 1000)
   description: string;
 
   @ApiProperty({ description: 'Milestone amount (in smallest unit)' })
@@ -37,17 +91,17 @@ export class MilestoneDto {
 export class CreateProjectDto {
   @ApiProperty({ description: 'Project title' })
   @IsString()
-  @IsNotEmpty()
+  @Length(5, 100)
   title: string;
 
   @ApiProperty({ description: 'Short description of the project' })
   @IsString()
-  @IsNotEmpty()
+  @Length(10, 200)
   shortDescription: string;
 
   @ApiProperty({ description: 'Detailed project description' })
   @IsString()
-  @IsNotEmpty()
+  @Length(10, 10000)
   description: string;
 
   @ApiPropertyOptional({
@@ -56,6 +110,7 @@ export class CreateProjectDto {
   })
   @IsArray()
   @IsString({ each: true })
+  @Length(1, 500, { each: true })
   @IsOptional()
   requirements?: string[];
 
@@ -65,6 +120,7 @@ export class CreateProjectDto {
   })
   @IsArray()
   @IsString({ each: true })
+  @Length(1, 500, { each: true })
   @IsOptional()
   deliverables?: string[];
 
@@ -74,14 +130,26 @@ export class CreateProjectDto {
   })
   @IsArray()
   @IsString({ each: true })
+  @Length(1, 50, { each: true })
   skills: string[];
 
   @ApiPropertyOptional({
     description: 'Project attachments',
-    example: [{ filename: 'spec.pdf', url: 'https://...', size: 1024 }],
+    type: [AttachmentItem],
+    example: [
+      {
+        filename: 'requirements.pdf',
+        url: 'http://localhost:3000/uploads/documents/1234567890-abc123.pdf',
+        size: 102400,
+        mimetype: 'application/pdf',
+      },
+    ],
   })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AttachmentItem)
   @IsOptional()
-  attachments?: any;
+  attachments?: AttachmentItem[];
 
   @ApiProperty({ description: 'Total reward amount (in smallest unit)' })
   @IsString()
@@ -90,11 +158,12 @@ export class CreateProjectDto {
 
   @ApiProperty({ description: 'Currency code', example: 'XLM' })
   @IsString()
-  @IsNotEmpty()
+  @Length(2, 10)
   currency: string;
 
   @ApiProperty({ description: 'Project deadline' })
   @IsDateString()
+  @Validate(ProjectDeadlineConstraint)
   deadline: string;
 
   @ApiProperty({

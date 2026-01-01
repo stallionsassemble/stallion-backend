@@ -17,35 +17,42 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
+export const networks = {
+  testnet: {
+    networkPassphrase: 'Test SDF Network ; September 2015',
+    contractId: 'CAKPQ3VYEHMRLIH4TTWL5MN4YZ4W5GZTKXZQGJ3GPQD2ZRUFQ474JKOS',
+  },
+} as const;
+
 export const Errors = {
-  1: { message: 'OnlyOwner' },
-  2: { message: 'InactiveBounty' },
-  3: { message: 'BountyDeadlinePassed' },
-  4: { message: 'BountyNotFound' },
-  5: { message: 'SubmissionNotFound' },
-  6: { message: 'JudgingDeadlinePassed' },
-  7: { message: 'DistributionMustSumTo100' },
-  8: { message: 'CannotSelectWinnersBeforeSubmissionDeadline' },
-  9: { message: 'JudgingDeadlineMustBeAfterSubmissionDeadline' },
-  10: { message: 'NotEnoughWinners' },
-  11: { message: 'InternalError' },
-  12: { message: 'NotAdmin' },
-  13: { message: 'AdminCannotBeZero' },
-  14: { message: 'FeeAccountCannotBeZero' },
-  15: { message: 'SameFeeAccount' },
-  16: { message: 'BountyHasSubmissions' },
-  17: { message: 'InvalidDeadlineUpdate' },
-  18: { message: 'InvalidReward' },
-  19: { message: 'Unauthorized' },
-  20: { message: 'ProjectNotFound' },
-  21: { message: 'InvalidProjectType' },
+  1: { message: 'NotAdmin' },
+  2: { message: 'AdminCannotBeZero' },
+  3: { message: 'FeeAccountCannotBeZero' },
+  4: { message: 'SameFeeAccount' },
+  5: { message: 'OnlyOwner' },
+  6: { message: 'Unauthorized' },
+  7: { message: 'BountyNotFound' },
+  8: { message: 'InactiveBounty' },
+  9: { message: 'BountyDeadlinePassed' },
+  10: { message: 'JudgingDeadlinePassed' },
+  11: { message: 'BountyHasSubmissions' },
+  12: { message: 'CannotSelectWinnersBeforeSubmissionDeadline' },
+  13: { message: 'JudgingDeadlineMustBeAfterSubmissionDeadline' },
+  14: { message: 'NotEnoughWinners' },
+  15: { message: 'DistributionMustSumTo100' },
+  16: { message: 'InvalidDeadlineUpdate' },
+  17: { message: 'SubmissionNotFound' },
+  18: { message: 'ProjectNotFound' },
+  19: { message: 'InvalidProjectType' },
+  20: { message: 'ProjectNotActive' },
+  21: { message: 'InvalidMilestones' },
   22: { message: 'MilestoneNotFound' },
   23: { message: 'MilestoneAlreadyPaid' },
   24: { message: 'InsufficientEscrow' },
-  25: { message: 'InvalidAmount' },
-  26: { message: 'ProjectNotActive' },
-  27: { message: 'InvalidMilestones' },
-  28: { message: 'DeadlinePassed' },
+  25: { message: 'InvalidReward' },
+  26: { message: 'InvalidAmount' },
+  27: { message: 'DeadlinePassed' },
+  28: { message: 'InternalError' },
 };
 
 export interface Bounty {
@@ -143,7 +150,7 @@ export interface Client {
   update_admin: (
     { new_admin }: { new_admin: string },
     options?: MethodOptions,
-  ) => Promise<AssembledTransaction<Result<string>>>;
+  ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a check_judging transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -283,14 +290,12 @@ export interface Client {
       total_reward,
       milestones,
       deadline,
-      platform_fee,
     }: {
       owner: string;
       token: string;
       total_reward: i128;
       milestones: Array<MilestoneData>;
       deadline: u64;
-      platform_fee: i128;
     },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<u32>>>;
@@ -303,15 +308,8 @@ export interface Client {
       owner,
       token,
       reward_amount,
-      platform_fee,
       deadline,
-    }: {
-      owner: string;
-      token: string;
-      reward_amount: i128;
-      platform_fee: i128;
-      deadline: u64;
-    },
+    }: { owner: string; token: string; reward_amount: i128; deadline: u64 },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<u32>>>;
 
@@ -352,7 +350,37 @@ export interface Client {
   update_fee_account: (
     { new_fee_account }: { new_fee_account: string },
     options?: MethodOptions,
-  ) => Promise<AssembledTransaction<Result<string>>>;
+  ) => Promise<AssembledTransaction<Result<void>>>;
+
+  /**
+   * Construct and simulate a update_project_gig transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  update_project_gig: (
+    {
+      owner,
+      project_id,
+      new_milestones,
+      new_deadline,
+    }: {
+      owner: string;
+      project_id: u32;
+      new_milestones: Option<Array<MilestoneData>>;
+      new_deadline: Option<u64>;
+    },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
+
+  /**
+   * Construct and simulate a update_project_job transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  update_project_job: (
+    {
+      owner,
+      project_id,
+      new_deadline,
+    }: { owner: string; project_id: u32; new_deadline: Option<u64> },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
    * Construct and simulate a get_active_bounties transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -478,7 +506,7 @@ export class Client extends ContractClient {
         'AAAAAAAAAAAAAAAMY2xvc2VfYm91bnR5AAAAAgAAAAAAAAAFb3duZXIAAAAAAAATAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAQAAA+kAAAPtAAAAAAAAAAM=',
         'AAAAAAAAAAAAAAAMZ2V0X2JvdW50aWVzAAAAAAAAAAEAAAPqAAAABA==',
         'AAAAAAAAAAAAAAAMZ2V0X3Byb2plY3RzAAAAAAAAAAEAAAPqAAAABA==',
-        'AAAAAAAAAAAAAAAMdXBkYXRlX2FkbWluAAAAAQAAAAAAAAAJbmV3X2FkbWluAAAAAAAAEwAAAAEAAAPpAAAAEwAAAAM=',
+        'AAAAAAAAAAAAAAAMdXBkYXRlX2FkbWluAAAAAQAAAAAAAAAJbmV3X2FkbWluAAAAAAAAEwAAAAEAAAPpAAAD7QAAAAAAAAAD',
         'AAAAAAAAAAAAAAANY2hlY2tfanVkZ2luZwAAAAAAAAEAAAAAAAAACWJvdW50eV9pZAAAAAAAAAQAAAABAAAD6QAAA+0AAAAAAAAAAw==',
         'AAAAAAAAAAAAAAANY3JlYXRlX2JvdW50eQAAAAAAAAcAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAAAAAAZyZXdhcmQAAAAAAAsAAAAAAAAADGRpc3RyaWJ1dGlvbgAAA+oAAAPtAAAAAgAAAAQAAAAEAAAAAAAAABNzdWJtaXNzaW9uX2RlYWRsaW5lAAAAAAYAAAAAAAAAEGp1ZGdpbmdfZGVhZGxpbmUAAAAGAAAAAAAAAAV0aXRsZQAAAAAAABAAAAABAAAD6QAAAAQAAAAD',
         'AAAAAAAAAAAAAAANZGVsZXRlX2JvdW50eQAAAAAAAAIAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD7QAAAAAAAAAD',
@@ -491,13 +519,15 @@ export class Client extends ContractClient {
         'AAAAAAAAAAAAAAARZ2V0X3VzZXJfYm91bnRpZXMAAAAAAAABAAAAAAAAAAR1c2VyAAAAEwAAAAEAAAPqAAAABA==',
         'AAAAAAAAAAAAAAARdXBkYXRlX3N1Ym1pc3Npb24AAAAAAAADAAAAAAAAAAlhcHBsaWNhbnQAAAAAAAATAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAAAAABNuZXdfc3VibWlzc2lvbl9saW5rAAAAABAAAAABAAAD6QAAA+0AAAAAAAAAAw==',
         'AAAAAAAAAAAAAAASY2FuY2VsX3Byb2plY3RfZ2lnAAAAAAACAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACnByb2plY3RfaWQAAAAAAAQAAAABAAAD6QAAAAsAAAAD',
-        'AAAAAAAAAAAAAAASY3JlYXRlX3Byb2plY3RfZ2lnAAAAAAAGAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfcmV3YXJkAAAACwAAAAAAAAAKbWlsZXN0b25lcwAAAAAD6gAAB9AAAAANTWlsZXN0b25lRGF0YQAAAAAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAAAAAAxwbGF0Zm9ybV9mZWUAAAALAAAAAQAAA+kAAAAEAAAAAw==',
-        'AAAAAAAAAAAAAAASY3JlYXRlX3Byb2plY3Rfam9iAAAAAAAFAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAANcmV3YXJkX2Ftb3VudAAAAAAAAAsAAAAAAAAADHBsYXRmb3JtX2ZlZQAAAAsAAAAAAAAACGRlYWRsaW5lAAAABgAAAAEAAAPpAAAABAAAAAM=',
+        'AAAAAAAAAAAAAAASY3JlYXRlX3Byb2plY3RfZ2lnAAAAAAAFAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfcmV3YXJkAAAACwAAAAAAAAAKbWlsZXN0b25lcwAAAAAD6gAAB9AAAAANTWlsZXN0b25lRGF0YQAAAAAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAQAAA+kAAAAEAAAAAw==',
+        'AAAAAAAAAAAAAAASY3JlYXRlX3Byb2plY3Rfam9iAAAAAAAEAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAANcmV3YXJkX2Ftb3VudAAAAAAAAAsAAAAAAAAACGRlYWRsaW5lAAAABgAAAAEAAAPpAAAABAAAAAM=',
         'AAAAAAAAAAAAAAASZ2V0X2JvdW50aWVzX2NvdW50AAAAAAAAAAAAAQAAAAQ=',
         'AAAAAAAAAAAAAAASZ2V0X2JvdW50eV93aW5uZXJzAAAAAAABAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAQAAA+kAAAPqAAAAEwAAAAM=',
         'AAAAAAAAAAAAAAASZ2V0X293bmVyX2JvdW50aWVzAAAAAAABAAAAAAAAAAVvd25lcgAAAAAAABMAAAABAAAD6gAAAAQ=',
         'AAAAAAAAAAAAAAASZ2V0X293bmVyX3Byb2plY3RzAAAAAAABAAAAAAAAAAVvd25lcgAAAAAAABMAAAABAAAD6gAAAAQ=',
-        'AAAAAAAAAAAAAAASdXBkYXRlX2ZlZV9hY2NvdW50AAAAAAABAAAAAAAAAA9uZXdfZmVlX2FjY291bnQAAAAAEwAAAAEAAAPpAAAAEwAAAAM=',
+        'AAAAAAAAAAAAAAASdXBkYXRlX2ZlZV9hY2NvdW50AAAAAAABAAAAAAAAAA9uZXdfZmVlX2FjY291bnQAAAAAEwAAAAEAAAPpAAAD7QAAAAAAAAAD',
+        'AAAAAAAAAAAAAAASdXBkYXRlX3Byb2plY3RfZ2lnAAAAAAAEAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACnByb2plY3RfaWQAAAAAAAQAAAAAAAAADm5ld19taWxlc3RvbmVzAAAAAAPoAAAD6gAAB9AAAAANTWlsZXN0b25lRGF0YQAAAAAAAAAAAAAMbmV3X2RlYWRsaW5lAAAD6AAAAAYAAAABAAAD6QAAA+0AAAAAAAAAAw==',
+        'AAAAAAAAAAAAAAASdXBkYXRlX3Byb2plY3Rfam9iAAAAAAADAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACnByb2plY3RfaWQAAAAAAAQAAAAAAAAADG5ld19kZWFkbGluZQAAA+gAAAAGAAAAAQAAA+kAAAPtAAAAAAAAAAM=',
         'AAAAAAAAAAAAAAATZ2V0X2FjdGl2ZV9ib3VudGllcwAAAAAAAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAVZ2V0X2JvdW50aWVzX2J5X3Rva2VuAAAAAAAAAQAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAVZ2V0X2JvdW50eV9hcHBsaWNhbnRzAAAAAAAAAQAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD6gAAABMAAAAD',
@@ -509,7 +539,7 @@ export class Client extends ContractClient {
         'AAAAAAAAAAAAAAAZcmVsZWFzZV9taWxlc3RvbmVfcGF5bWVudAAAAAAAAAUAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAKcHJvamVjdF9pZAAAAAAABAAAAAAAAAAPbWlsZXN0b25lX29yZGVyAAAAAAQAAAAAAAAAC2NvbnRyaWJ1dG9yAAAAABMAAAAAAAAABmFtb3VudAAAAAAACwAAAAEAAAPpAAAD7QAAAAAAAAAD',
         'AAAAAAAAAAAAAAAbZ2V0X2JvdW50aWVzX2J5X3Rva2VuX2NvdW50AAAAAAEAAAAAAAAABXRva2VuAAAAAAAAEwAAAAEAAAAE',
         'AAAAAAAAAAAAAAAcZ2V0X2JvdW50aWVzX2J5X3N0YXR1c19jb3VudAAAAAEAAAAAAAAABnN0YXR1cwAAAAAH0AAAAAZTdGF0dXMAAAAAAAEAAAAE',
-        'AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAHAAAAAAAAAAJT25seU93bmVyAAAAAAAAAQAAAAAAAAAOSW5hY3RpdmVCb3VudHkAAAAAAAIAAAAAAAAAFEJvdW50eURlYWRsaW5lUGFzc2VkAAAAAwAAAAAAAAAOQm91bnR5Tm90Rm91bmQAAAAAAAQAAAAAAAAAElN1Ym1pc3Npb25Ob3RGb3VuZAAAAAAABQAAAAAAAAAVSnVkZ2luZ0RlYWRsaW5lUGFzc2VkAAAAAAAABgAAAAAAAAAYRGlzdHJpYnV0aW9uTXVzdFN1bVRvMTAwAAAABwAAAAAAAAArQ2Fubm90U2VsZWN0V2lubmVyc0JlZm9yZVN1Ym1pc3Npb25EZWFkbGluZQAAAAAIAAAAAAAAACxKdWRnaW5nRGVhZGxpbmVNdXN0QmVBZnRlclN1Ym1pc3Npb25EZWFkbGluZQAAAAkAAAAAAAAAEE5vdEVub3VnaFdpbm5lcnMAAAAKAAAAAAAAAA1JbnRlcm5hbEVycm9yAAAAAAAACwAAAAAAAAAITm90QWRtaW4AAAAMAAAAAAAAABFBZG1pbkNhbm5vdEJlWmVybwAAAAAAAA0AAAAAAAAAFkZlZUFjY291bnRDYW5ub3RCZVplcm8AAAAAAA4AAAAAAAAADlNhbWVGZWVBY2NvdW50AAAAAAAPAAAAAAAAABRCb3VudHlIYXNTdWJtaXNzaW9ucwAAABAAAAAAAAAAFUludmFsaWREZWFkbGluZVVwZGF0ZQAAAAAAABEAAAAAAAAADUludmFsaWRSZXdhcmQAAAAAAAASAAAAAAAAAAxVbmF1dGhvcml6ZWQAAAATAAAAAAAAAA9Qcm9qZWN0Tm90Rm91bmQAAAAAFAAAAAAAAAASSW52YWxpZFByb2plY3RUeXBlAAAAAAAVAAAAAAAAABFNaWxlc3RvbmVOb3RGb3VuZAAAAAAAABYAAAAAAAAAFE1pbGVzdG9uZUFscmVhZHlQYWlkAAAAFwAAAAAAAAASSW5zdWZmaWNpZW50RXNjcm93AAAAAAAYAAAAAAAAAA1JbnZhbGlkQW1vdW50AAAAAAAAGQAAAAAAAAAQUHJvamVjdE5vdEFjdGl2ZQAAABoAAAAAAAAAEUludmFsaWRNaWxlc3RvbmVzAAAAAAAAGwAAAAAAAAAORGVhZGxpbmVQYXNzZWQAAAAAABw=',
+        'AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAHAAAAAAAAAAITm90QWRtaW4AAAABAAAAAAAAABFBZG1pbkNhbm5vdEJlWmVybwAAAAAAAAIAAAAAAAAAFkZlZUFjY291bnRDYW5ub3RCZVplcm8AAAAAAAMAAAAAAAAADlNhbWVGZWVBY2NvdW50AAAAAAAEAAAAAAAAAAlPbmx5T3duZXIAAAAAAAAFAAAAAAAAAAxVbmF1dGhvcml6ZWQAAAAGAAAAAAAAAA5Cb3VudHlOb3RGb3VuZAAAAAAABwAAAAAAAAAOSW5hY3RpdmVCb3VudHkAAAAAAAgAAAAAAAAAFEJvdW50eURlYWRsaW5lUGFzc2VkAAAACQAAAAAAAAAVSnVkZ2luZ0RlYWRsaW5lUGFzc2VkAAAAAAAACgAAAAAAAAAUQm91bnR5SGFzU3VibWlzc2lvbnMAAAALAAAAAAAAACtDYW5ub3RTZWxlY3RXaW5uZXJzQmVmb3JlU3VibWlzc2lvbkRlYWRsaW5lAAAAAAwAAAAAAAAALEp1ZGdpbmdEZWFkbGluZU11c3RCZUFmdGVyU3VibWlzc2lvbkRlYWRsaW5lAAAADQAAAAAAAAAQTm90RW5vdWdoV2lubmVycwAAAA4AAAAAAAAAGERpc3RyaWJ1dGlvbk11c3RTdW1UbzEwMAAAAA8AAAAAAAAAFUludmFsaWREZWFkbGluZVVwZGF0ZQAAAAAAABAAAAAAAAAAElN1Ym1pc3Npb25Ob3RGb3VuZAAAAAAAEQAAAAAAAAAPUHJvamVjdE5vdEZvdW5kAAAAABIAAAAAAAAAEkludmFsaWRQcm9qZWN0VHlwZQAAAAAAEwAAAAAAAAAQUHJvamVjdE5vdEFjdGl2ZQAAABQAAAAAAAAAEUludmFsaWRNaWxlc3RvbmVzAAAAAAAAFQAAAAAAAAARTWlsZXN0b25lTm90Rm91bmQAAAAAAAAWAAAAAAAAABRNaWxlc3RvbmVBbHJlYWR5UGFpZAAAABcAAAAAAAAAEkluc3VmZmljaWVudEVzY3JvdwAAAAAAGAAAAAAAAAANSW52YWxpZFJld2FyZAAAAAAAABkAAAAAAAAADUludmFsaWRBbW91bnQAAAAAAAAaAAAAAAAAAA5EZWFkbGluZVBhc3NlZAAAAAAAGwAAAAAAAAANSW50ZXJuYWxFcnJvcgAAAAAAABw=',
         'AAAAAQAAAAAAAAAAAAAABkJvdW50eQAAAAAACwAAAAAAAAAKYXBwbGljYW50cwAAAAAD6gAAABMAAAAAAAAADGRpc3RyaWJ1dGlvbgAAA+wAAAAEAAAABAAAAAAAAAAQanVkZ2luZ19kZWFkbGluZQAAAAYAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAGcmV3YXJkAAAAAAALAAAAAAAAAAZzdGF0dXMAAAAAB9AAAAAGU3RhdHVzAAAAAAAAAAAAE3N1Ym1pc3Npb25fZGVhZGxpbmUAAAAABgAAAAAAAAALc3VibWlzc2lvbnMAAAAD7AAAABMAAAAQAAAAAAAAAAV0aXRsZQAAAAAAABAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAHd2lubmVycwAAAAPqAAAAEw==',
         'AAAAAgAAAAAAAAAAAAAABlN0YXR1cwAAAAAAAwAAAAAAAAAAAAAABkFjdGl2ZQAAAAAAAAAAAAAAAAAJQ29tcGxldGVkAAAAAAAAAAAAAAAAAAAGQ2xvc2VkAAA=',
         'AAAAAQAAAAAAAAAAAAAAB1Byb2plY3QAAAAACAAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAAAAAAptaWxlc3RvbmVzAAAAAAPqAAAH0AAAAA1NaWxlc3RvbmVJbmZvAAAAAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAADHByb2plY3RfdHlwZQAAB9AAAAALUHJvamVjdFR5cGUAAAAAAAAAABByZW1haW5pbmdfZXNjcm93AAAACwAAAAAAAAAGc3RhdHVzAAAAAAfQAAAADVByb2plY3RTdGF0dXMAAAAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfcmV3YXJkAAAACw==',
@@ -527,7 +557,7 @@ export class Client extends ContractClient {
     close_bounty: this.txFromJSON<Result<void>>,
     get_bounties: this.txFromJSON<Array<u32>>,
     get_projects: this.txFromJSON<Array<u32>>,
-    update_admin: this.txFromJSON<Result<string>>,
+    update_admin: this.txFromJSON<Result<void>>,
     check_judging: this.txFromJSON<Result<void>>,
     create_bounty: this.txFromJSON<Result<u32>>,
     delete_bounty: this.txFromJSON<Result<void>>,
@@ -545,7 +575,9 @@ export class Client extends ContractClient {
     get_bounty_winners: this.txFromJSON<Result<Array<string>>>,
     get_owner_bounties: this.txFromJSON<Array<u32>>,
     get_owner_projects: this.txFromJSON<Array<u32>>,
-    update_fee_account: this.txFromJSON<Result<string>>,
+    update_fee_account: this.txFromJSON<Result<void>>,
+    update_project_gig: this.txFromJSON<Result<void>>,
+    update_project_job: this.txFromJSON<Result<void>>,
     get_active_bounties: this.txFromJSON<Array<u32>>,
     get_bounties_by_token: this.txFromJSON<Array<u32>>,
     get_bounty_applicants: this.txFromJSON<Result<Array<string>>>,

@@ -13,8 +13,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectActivityService } from './project-activity.service';
 import { ProjectContractService } from './project-contract.service';
+import { InputJsonValue } from '@prisma/client/runtime/client';
 
 @Injectable()
 export class ProjectsService {
@@ -112,7 +114,7 @@ export class ProjectsService {
         requirements: dto.requirements || [],
         deliverables: dto.deliverables || [],
         skills: dto.skills,
-        attachments: dto.attachments,
+        attachments: dto.attachments as unknown as InputJsonValue,
         reward: dto.reward,
         currency: dto.currency,
         deadline,
@@ -213,6 +215,158 @@ export class ProjectsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  async updateProject(
+    projectId: string,
+    ownerId: string,
+    dto: UpdateProjectDto,
+  ) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: { milestones: true, owner: { include: { wallet: true } } },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== ownerId) {
+      throw new ForbiddenException('Only the project owner can update');
+    }
+
+    if (project.status !== ProjectStatus.OPEN) {
+      throw new BadRequestException(
+        'Only OPEN projects can be updated. Cannot update projects that are in progress, completed, or cancelled.',
+      );
+    }
+
+    if (!project.owner.wallet) {
+      throw new NotFoundException('Owner wallet not found');
+    }
+
+    // Validate deadline if provided
+    if (dto.deadline) {
+      const newDeadline = new Date(dto.deadline);
+      const currentDeadline = new Date(project.deadline);
+      const now = new Date();
+
+      if (newDeadline <= now) {
+        throw new BadRequestException('Deadline must be in the future');
+      }
+
+      if (newDeadline < currentDeadline) {
+        throw new BadRequestException(
+          'New deadline cannot be before the current deadline',
+        );
+      }
+    }
+
+    // Validate milestones for GIG projects
+    if (dto.milestones && project.type === ProjectType.GIG) {
+      const rewardAmount = BigInt(project.reward);
+      const totalMilestoneAmount = dto.milestones.reduce(
+        (sum, m) => sum + BigInt(m.amount || '0'),
+        BigInt(0),
+      );
+
+      if (
+        totalMilestoneAmount > BigInt(0) &&
+        totalMilestoneAmount !== rewardAmount
+      ) {
+        throw new BadRequestException(
+          'Sum of milestone amounts must equal total reward',
+        );
+      }
+    }
+
+    // Check if contract-related fields are being updated
+    const needsContractUpdate =
+      dto.deadline !== undefined || dto.milestones !== undefined;
+
+    // Update smart contract if needed
+    if (needsContractUpdate && project.contractProjectId) {
+      if (project.type === ProjectType.GIG) {
+        const contractParams: any = {
+          projectId: project.contractProjectId,
+          ownerId,
+          ownerPublicKey: project.owner.wallet.publicKey,
+          walletId: project.owner.wallet.id,
+        };
+
+        if (dto.deadline) {
+          contractParams.deadline = new Date(dto.deadline);
+        }
+
+        if (dto.milestones) {
+          contractParams.milestones = dto.milestones.map((m, index) => ({
+            amount: m.amount || '0',
+            order: index + 1,
+          }));
+        }
+
+        await this.contractService.updateGigProject(contractParams);
+      } else if (project.type === ProjectType.JOB) {
+        const contractParams: any = {
+          projectId: project.contractProjectId,
+          ownerId,
+          ownerPublicKey: project.owner.wallet.publicKey,
+          walletId: project.owner.wallet.id,
+        };
+
+        if (dto.deadline) {
+          contractParams.deadline = new Date(dto.deadline);
+        }
+
+        await this.contractService.updateJobProject(contractParams);
+      }
+    }
+
+    // Prepare update data
+    const updateData: any = {};
+    if (dto.title !== undefined) updateData.title = dto.title;
+    if (dto.shortDescription !== undefined)
+      updateData.shortDescription = dto.shortDescription;
+    if (dto.description !== undefined) updateData.description = dto.description;
+    if (dto.requirements !== undefined)
+      updateData.requirements = dto.requirements;
+    if (dto.deliverables !== undefined)
+      updateData.deliverables = dto.deliverables;
+    if (dto.skills !== undefined) updateData.skills = dto.skills;
+    if (dto.attachments !== undefined) updateData.attachments = dto.attachments;
+    if (dto.deadline !== undefined)
+      updateData.deadline = new Date(dto.deadline);
+    if (dto.peopleNeeded !== undefined)
+      updateData.peopleNeeded = dto.peopleNeeded;
+
+    const updatedProject = await this.prisma.project.update({
+      where: { id: projectId },
+      data: updateData,
+      include: {
+        owner: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            companyName: true,
+            profilePicture: true,
+          },
+        },
+        milestones: {
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    await this.activityService.createActivity({
+      projectId,
+      userId: ownerId,
+      type: ProjectActivityType.PROJECT_UPDATED,
+      message: 'Project details updated',
+    });
+
+    return updatedProject;
   }
 
   async cancelProject(projectId: string, ownerId: string) {
