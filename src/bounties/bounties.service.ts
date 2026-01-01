@@ -18,12 +18,12 @@ import * as StellarSDK from '@stellar/stellar-sdk';
 import { Queue } from 'bullmq';
 import { createHash } from 'crypto';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
+import { EnvConfig } from 'src/config/env.config';
 import { ReputationService } from 'src/reputation/reputation.service';
 import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { EnvConfig } from '../config/env.config';
-import type { Status } from '../soroban/contract-bindings';
-import { Client as SorobanClient } from '../soroban/contract-bindings';
+import { Client as SorobanClient, Status } from '../soroban/contract-bindings';
+import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from '../wallet/stellar-wallet.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
@@ -705,10 +705,7 @@ export class BountiesService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to create bounty on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'create bounty');
       }
 
       if (!result.getTransactionResponse) {
@@ -847,10 +844,7 @@ export class BountiesService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to update bounty on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'update bounty');
       }
 
       if (!result.getTransactionResponse) {
@@ -962,10 +956,7 @@ export class BountiesService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to delete bounty on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'delete bounty');
       }
 
       if (!result.getTransactionResponse) {
@@ -1070,10 +1061,7 @@ export class BountiesService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to apply to bounty on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'apply to bounty');
       }
 
       if (!result.getTransactionResponse) {
@@ -1227,9 +1215,9 @@ export class BountiesService {
           // Handle transaction result
           if (!result.result.isOk()) {
             const error = result.result.unwrapErr();
-            this.logger.error('Contract invocation failed', error);
-            throw new BadRequestException(
-              `Failed to update submission on contract: ${JSON.stringify(error)}`,
+            ContractErrorHandler.handleContractError(
+              error,
+              'update submission',
             );
           }
 
@@ -1420,10 +1408,7 @@ export class BountiesService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to select winners on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'select winners');
       }
 
       if (!result.getTransactionResponse) {
@@ -1612,10 +1597,7 @@ export class BountiesService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to close bounty on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'close bounty');
       }
 
       if (!result.getTransactionResponse) {

@@ -10,6 +10,7 @@ import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
 import { Client as SorobanClient } from '../soroban/contract-bindings';
+import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 /**
@@ -129,10 +130,7 @@ export class AdminService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to update admin on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'update admin');
       }
 
       if (!result.getTransactionResponse) {
@@ -202,10 +200,7 @@ export class AdminService {
       // Handle transaction result
       if (!result.result.isOk()) {
         const error = result.result.unwrapErr();
-        this.logger.error('Contract invocation failed', error);
-        throw new BadRequestException(
-          `Failed to update fee account on contract: ${JSON.stringify(error)}`,
-        );
+        ContractErrorHandler.handleContractError(error, 'update fee account');
       }
 
       if (!result.getTransactionResponse) {

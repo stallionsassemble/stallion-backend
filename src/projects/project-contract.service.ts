@@ -5,6 +5,7 @@ import { getTokenAddress } from '../bounties/utils/supported-currencies';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
 import { Client } from '../soroban/contract-bindings';
+import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 @Injectable()
@@ -98,10 +99,7 @@ export class ProjectContractService {
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
-      this.logger.error('Contract invocation failed', error);
-      throw new BadRequestException(
-        `Failed to create GIG project on contract: ${JSON.stringify(error)}`,
-      );
+      ContractErrorHandler.handleContractError(error, 'create GIG project');
     }
 
     if (!result.getTransactionResponse) {
@@ -167,9 +165,9 @@ export class ProjectContractService {
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
-      this.logger.error('Contract invocation failed', error);
-      throw new BadRequestException(
-        `Failed to release milestone payment: ${JSON.stringify(error)}`,
+      ContractErrorHandler.handleContractError(
+        error,
+        'release milestone payment',
       );
     }
 
@@ -238,10 +236,7 @@ export class ProjectContractService {
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
-      this.logger.error('Contract invocation failed', error);
-      throw new BadRequestException(
-        `Failed to create JOB project on contract: ${JSON.stringify(error)}`,
-      );
+      ContractErrorHandler.handleContractError(error, 'create JOB project');
     }
 
     if (!result.getTransactionResponse) {
@@ -316,10 +311,7 @@ export class ProjectContractService {
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
-      this.logger.error('Contract invocation failed', error);
-      throw new BadRequestException(
-        `Failed to update GIG project on contract: ${JSON.stringify(error)}`,
-      );
+      ContractErrorHandler.handleContractError(error, 'update GIG project');
     }
 
     if (!result.getTransactionResponse) {
@@ -382,10 +374,7 @@ export class ProjectContractService {
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
-      this.logger.error('Contract invocation failed', error);
-      throw new BadRequestException(
-        `Failed to update JOB project on contract: ${JSON.stringify(error)}`,
-      );
+      ContractErrorHandler.handleContractError(error, 'update JOB project');
     }
 
     if (!result.getTransactionResponse) {
@@ -437,10 +426,7 @@ export class ProjectContractService {
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
-      this.logger.error('Contract invocation failed', error);
-      throw new BadRequestException(
-        `Failed to cancel GIG project: ${JSON.stringify(error)}`,
-      );
+      ContractErrorHandler.handleContractError(error, 'cancel GIG project');
     }
 
     if (!result.getTransactionResponse) {
