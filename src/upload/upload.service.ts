@@ -172,9 +172,10 @@ export class UploadService {
       await writeFile(filepath, file.buffer);
 
       // Generate URL
+      const port = this.configService.get<number>(EnvConfig.PORT) || 5000;
       const baseUrl =
         this.configService.get<string>(EnvConfig.APP_URL) ||
-        'http://localhost:3000';
+        `http://localhost:${port}`;
       const url = `${baseUrl}/uploads/${subfolder}/${filename}`;
 
       this.logger.log(`File uploaded: ${filename}`);

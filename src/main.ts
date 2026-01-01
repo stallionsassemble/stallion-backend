@@ -1,12 +1,14 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { EnvConfig } from './config/env.config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   const configService = app.get(ConfigService);
 
@@ -20,6 +22,13 @@ async function bootstrap() {
 
   app.enableCors();
   app.setGlobalPrefix('api');
+
+  // Serve static files from uploads directory
+  const uploadDir =
+    configService.get<string>(EnvConfig.UPLOAD_DIR) || './uploads';
+  app.useStaticAssets(join(process.cwd(), uploadDir), {
+    prefix: '/uploads/',
+  });
 
   // Swagger Configuration
   const config = new DocumentBuilder()
