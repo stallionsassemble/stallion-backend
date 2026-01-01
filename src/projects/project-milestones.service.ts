@@ -102,6 +102,34 @@ export class ProjectMilestonesService {
       throw new BadRequestException('Project is not in progress');
     }
 
+    // Validate chronological submission: ensure all previous milestones are completed
+    if (milestone.order > 1) {
+      const previousMilestones = await this.prisma.projectMilestone.findMany({
+        where: {
+          projectId: milestone.projectId,
+          applicationId: milestone.applicationId,
+          order: {
+            lt: milestone.order,
+          },
+        },
+        orderBy: {
+          order: 'asc',
+        },
+      });
+
+      const incompletePrevious = previousMilestones.find(
+        (m) =>
+          m.status !== MilestoneStatus.APPROVED &&
+          m.status !== MilestoneStatus.PAID,
+      );
+
+      if (incompletePrevious) {
+        throw new BadRequestException(
+          `Cannot submit milestone ${milestone.order}. Milestone ${incompletePrevious.order} ("${incompletePrevious.title}") must be completed first. Milestones must be submitted chronologically.`,
+        );
+      }
+    }
+
     const updatedMilestone = await this.prisma.projectMilestone.update({
       where: { id: milestoneId },
       data: {
