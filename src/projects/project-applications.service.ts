@@ -7,14 +7,14 @@ import {
 } from '@nestjs/common';
 import {
   ApplicationStatus,
-  ProjectActivityType,
   ProjectStatus,
   ProjectType,
   Role,
 } from '@prisma/client';
+import { ActivitiesService } from '../activities/activities.service';
+import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
-import { ProjectActivityService } from './project-activity.service';
 
 @Injectable()
 export class ProjectApplicationsService {
@@ -22,7 +22,7 @@ export class ProjectApplicationsService {
 
   constructor(
     private prisma: PrismaService,
-    private activityService: ProjectActivityService,
+    private activitiesService: ActivitiesService,
   ) {}
 
   async applyToProject(
@@ -109,13 +109,9 @@ export class ProjectApplicationsService {
       },
     });
 
-    await this.activityService.createActivity({
-      projectId,
-      userId,
-      type: ProjectActivityType.APPLICATION_SUBMITTED,
-      message: `${user.username || user.firstName || 'User'} applied to the project`,
-      metadata: { applicationId: application.id },
-    });
+    await this.activitiesService.recordActivity(
+      ProjectActivities.applicationSubmitted(userId, projectId, project.title),
+    );
 
     return application;
   }
@@ -221,19 +217,23 @@ export class ProjectApplicationsService {
       return app;
     });
 
-    await this.activityService.createActivity({
-      projectId: application.projectId,
-      userId: ownerId,
-      type:
-        status === 'ACCEPTED'
-          ? ProjectActivityType.APPLICATION_ACCEPTED
-          : ProjectActivityType.APPLICATION_REJECTED,
-      message:
-        status === 'ACCEPTED'
-          ? `Accepted ${application.user.username || application.user.firstName || 'contributor'}'s application`
-          : `Rejected ${application.user.username || application.user.firstName || 'contributor'}'s application`,
-      metadata: { applicationId, rejectionReason },
-    });
+    if (status === 'ACCEPTED') {
+      await this.activitiesService.recordActivity(
+        ProjectActivities.applicationAccepted(
+          application.userId,
+          application.projectId,
+          application.project.title,
+        ),
+      );
+    } else {
+      await this.activitiesService.recordActivity(
+        ProjectActivities.applicationRejected(
+          application.userId,
+          application.projectId,
+          application.project.title,
+        ),
+      );
+    }
 
     return updatedApplication;
   }
@@ -263,13 +263,13 @@ export class ProjectApplicationsService {
       data: { status: ApplicationStatus.WITHDRAWN },
     });
 
-    await this.activityService.createActivity({
-      projectId: application.projectId,
-      userId,
-      type: ProjectActivityType.APPLICATION_WITHDRAWN,
-      message: 'Application withdrawn',
-      metadata: { applicationId },
-    });
+    await this.activitiesService.recordActivity(
+      ProjectActivities.applicationRejected(
+        userId,
+        application.projectId,
+        application.project.title,
+      ),
+    );
 
     return updatedApplication;
   }

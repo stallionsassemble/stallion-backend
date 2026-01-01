@@ -50,6 +50,8 @@ async function bootstrap() {
     .addTag('Notifications', 'User notifications and preferences')
     .addTag('Settings', 'User settings and passkey management')
     .addTag('Upload', 'File upload operations')
+    .addTag('Payout Methods', 'Payout method management')
+    .addTag('Activities', 'Activity feed and notifications')
     .addBearerAuth(
       {
         type: 'http',

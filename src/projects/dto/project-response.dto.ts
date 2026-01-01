@@ -1,8 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ActivityType,
   ApplicationStatus,
   MilestoneStatus,
-  ProjectActivityType,
   ProjectStatus,
   ProjectType,
 } from '@prisma/client';
@@ -193,8 +193,8 @@ export class ActivityResponseDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty({ enum: ProjectActivityType })
-  type: ProjectActivityType;
+  @ApiProperty({ enum: ActivityType })
+  type: ActivityType;
 
   @ApiProperty()
   message: string;
@@ -205,8 +205,14 @@ export class ActivityResponseDto {
   @ApiProperty()
   createdAt: Date;
 
-  @ApiProperty()
-  projectId: string;
+  @ApiPropertyOptional()
+  projectId?: string;
+
+  @ApiPropertyOptional()
+  bountyId?: string;
+
+  @ApiPropertyOptional()
+  hackathonId?: string;
 
   @ApiProperty()
   userId: string;

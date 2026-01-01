@@ -18,6 +18,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ProjectStatus, ProjectType } from '@prisma/client';
+import { ActivitiesService } from '../activities/activities.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
@@ -32,7 +33,6 @@ import { ReviewApplicationDto } from './dto/review-application.dto';
 import { ReviewMilestoneDto } from './dto/review-milestone.dto';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { ProjectActivityService } from './project-activity.service';
 import { ProjectApplicationsService } from './project-applications.service';
 import { ProjectMilestonesService } from './project-milestones.service';
 import { ProjectsService } from './projects.service';
@@ -46,7 +46,7 @@ export class ProjectsController {
     private readonly projectsService: ProjectsService,
     private readonly applicationsService: ProjectApplicationsService,
     private readonly milestonesService: ProjectMilestonesService,
-    private readonly activityService: ProjectActivityService,
+    private readonly activitiesService: ActivitiesService,
   ) {}
 
   @Post()
@@ -366,6 +366,6 @@ export class ProjectsController {
     type: [ActivityResponseDto],
   })
   async getProjectActivities(@Param('id') projectId: string) {
-    return this.activityService.getProjectActivities(projectId);
+    return this.activitiesService.getProjectActivities(projectId);
   }
 }

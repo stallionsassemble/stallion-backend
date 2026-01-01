@@ -89,7 +89,7 @@ model User {
   ownedProjects       Project[]            @relation("ProjectOwner")
   projectApplications ProjectApplication[]
   projectMilestones   ProjectMilestone[]
-  projectActivities   ProjectActivity[]
+  projectActivities Activity[]
 
   @@index([role])
   @@index([createdAt])
@@ -231,6 +231,7 @@ model Bounty {
   owner       User               @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   submissions BountySubmission[]
   winners     BountyWinner[]
+  activities  Activity[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([ownerId])
@@ -803,6 +804,7 @@ model Hackathon {
   tracks      HackathonTrack[]
   submissions HackathonSubmission[]
   winners     HackathonWinner[]
+  activities  Activity[]
 
   @@index([ownerId])
   @@index([status, startDate])
@@ -990,7 +992,7 @@ model Project {
   owner        User                 @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   applications ProjectApplication[]
   milestones   ProjectMilestone[]
-  activities   ProjectActivity[]
+  activities Activity[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([type, status])
@@ -1073,25 +1075,33 @@ model ProjectMilestone {
   @@map("project_milestones")
 }
 
-model ProjectActivity {
-  id       String              @id @default(cuid())
-  type     ProjectActivityType
+model Activity {
+  id       String       @id @default(cuid())
+  type     ActivityType
   message  String
-  metadata Json? // Additional context about the activity
+  metadata Json? // Additional context about the activity (amounts, names, etc.)
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  projectId String  @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Optional references to specific entities
+  bountyId    String?  @map("bounty_id")
+  bounty      Bounty?  @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  projectId   String?  @map("project_id")
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  hackathonId String?  @map("hackathon_id")
+  hackathon   Hackathon? @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([bountyId, createdAt(sort: Desc)])
   @@index([projectId, createdAt(sort: Desc)])
-  @@index([userId])
-  @@index([type])
-  @@map("project_activities")
+  @@index([hackathonId, createdAt(sort: Desc)])
+  @@index([type, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+  @@map("activities")
 }
 
 // ============================================
@@ -1127,18 +1137,38 @@ enum MilestoneStatus {
   PAID // Payment released
 }
 
-enum ProjectActivityType {
+enum ActivityType {
+  // Bounty activities
+  BOUNTY_CREATED
+  BOUNTY_SUBMISSION
+  BOUNTY_WON
+  BOUNTY_COMPLETED
+  
+  // Project activities
   PROJECT_CREATED
   PROJECT_UPDATED
-  APPLICATION_SUBMITTED
-  APPLICATION_ACCEPTED
-  APPLICATION_REJECTED
-  APPLICATION_WITHDRAWN
-  MILESTONE_CREATED
-  MILESTONE_SUBMITTED
-  MILESTONE_APPROVED
-  MILESTONE_REVISION_REQUESTED
-  MILESTONE_PAID
+  PROJECT_WON
+  PROJECT_APPLICATION_SUBMITTED
+  PROJECT_APPLICATION_ACCEPTED
+  PROJECT_APPLICATION_REJECTED
+  PROJECT_MILESTONE_SUBMITTED
+  PROJECT_MILESTONE_APPROVED
+  PROJECT_MILESTONE_PAID
   PROJECT_COMPLETED
   PROJECT_CANCELLED
+  
+  // Hackathon activities
+  HACKATHON_CREATED
+  HACKATHON_SUBMISSION
+  HACKATHON_WON
+  HACKATHON_COMPLETED
+  
+  // Forum activities
+  FORUM_THREAD_CREATED
+  FORUM_POST_CREATED
+  FORUM_COMMENT_CREATED
+  
+  // Reputation activities
+  BADGE_EARNED
+  LEVEL_UP
 }

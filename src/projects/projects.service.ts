@@ -5,18 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ProjectActivityType,
-  ProjectStatus,
-  ProjectType,
-  Role,
-} from '@prisma/client';
+import { ProjectStatus, ProjectType, Role } from '@prisma/client';
+import { InputJsonValue } from '@prisma/client/runtime/client';
+import { ActivitiesService } from '../activities/activities.service';
+import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
-import { ProjectActivityService } from './project-activity.service';
 import { ProjectContractService } from './project-contract.service';
-import { InputJsonValue } from '@prisma/client/runtime/client';
 
 @Injectable()
 export class ProjectsService {
@@ -25,7 +21,7 @@ export class ProjectsService {
   constructor(
     private prisma: PrismaService,
     private contractService: ProjectContractService,
-    private activityService: ProjectActivityService,
+    private activitiesService: ActivitiesService,
   ) {}
 
   async createProject(ownerId: string, dto: CreateProjectDto) {
@@ -139,12 +135,15 @@ export class ProjectsService {
       },
     });
 
-    await this.activityService.createActivity({
-      projectId: project.id,
-      userId: ownerId,
-      type: ProjectActivityType.PROJECT_CREATED,
-      message: `Project "${project.title}" created`,
-    });
+    await this.activitiesService.recordActivity(
+      ProjectActivities.created(
+        ownerId,
+        project.id,
+        project.title,
+        project.reward,
+        project.currency,
+      ),
+    );
 
     return project;
   }
@@ -359,12 +358,9 @@ export class ProjectsService {
       },
     });
 
-    await this.activityService.createActivity({
-      projectId,
-      userId: ownerId,
-      type: ProjectActivityType.PROJECT_UPDATED,
-      message: 'Project details updated',
-    });
+    await this.activitiesService.recordActivity(
+      ProjectActivities.updated(ownerId, projectId, updatedProject.title),
+    );
 
     return updatedProject;
   }
@@ -391,12 +387,9 @@ export class ProjectsService {
       data: { status: ProjectStatus.CANCELLED },
     });
 
-    await this.activityService.createActivity({
-      projectId,
-      userId: ownerId,
-      type: ProjectActivityType.PROJECT_CANCELLED,
-      message: 'Project cancelled',
-    });
+    await this.activitiesService.recordActivity(
+      ProjectActivities.cancelled(ownerId, projectId, project.title),
+    );
 
     return updatedProject;
   }

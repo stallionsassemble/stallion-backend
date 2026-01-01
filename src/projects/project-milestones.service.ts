@@ -5,15 +5,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  MilestoneStatus,
-  ProjectActivityType,
-  ProjectStatus,
-  ProjectType,
-} from '@prisma/client';
+import { MilestoneStatus, ProjectStatus, ProjectType } from '@prisma/client';
+import { ActivitiesService } from '../activities/activities.service';
+import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
-import { ProjectActivityService } from './project-activity.service';
 import { ProjectContractService } from './project-contract.service';
 
 @Injectable()
@@ -23,7 +19,7 @@ export class ProjectMilestonesService {
   constructor(
     private prisma: PrismaService,
     private contractService: ProjectContractService,
-    private activityService: ProjectActivityService,
+    private activitiesService: ActivitiesService,
   ) {}
 
   async createMilestonesForApplication(
@@ -66,13 +62,8 @@ export class ProjectMilestonesService {
       ),
     );
 
-    await this.activityService.createActivity({
-      projectId: application.projectId,
-      userId: application.project.ownerId,
-      type: ProjectActivityType.MILESTONE_CREATED,
-      message: `Created ${milestones.length} milestones`,
-      metadata: { applicationId, milestoneCount: milestones.length },
-    });
+    // Activity is recorded when milestones are created
+    // This happens as part of accepting an application
 
     return createdMilestones;
   }
@@ -121,13 +112,14 @@ export class ProjectMilestonesService {
       },
     });
 
-    await this.activityService.createActivity({
-      projectId: milestone.projectId,
-      userId: contributorId,
-      type: ProjectActivityType.MILESTONE_SUBMITTED,
-      message: `Submitted milestone: ${milestone.title}`,
-      metadata: { milestoneId },
-    });
+    await this.activitiesService.recordActivity(
+      ProjectActivities.milestoneSubmitted(
+        contributorId,
+        milestone.projectId,
+        milestone.project.title,
+        milestone.title,
+      ),
+    );
 
     return updatedMilestone;
   }
@@ -221,17 +213,16 @@ export class ProjectMilestonesService {
       },
     });
 
-    await this.activityService.createActivity({
-      projectId: milestone.projectId,
-      userId: ownerId,
-      type: approve
-        ? ProjectActivityType.MILESTONE_APPROVED
-        : ProjectActivityType.MILESTONE_REVISION_REQUESTED,
-      message: approve
-        ? `Approved milestone: ${milestone.title}`
-        : `Requested revision for milestone: ${milestone.title}`,
-      metadata: { milestoneId, txHash },
-    });
+    if (approve) {
+      await this.activitiesService.recordActivity(
+        ProjectActivities.milestoneApproved(
+          milestone.contributorId,
+          milestone.projectId,
+          milestone.project.title,
+          milestone.title,
+        ),
+      );
+    }
 
     const allMilestones = await this.prisma.projectMilestone.findMany({
       where: { projectId: milestone.projectId },
@@ -249,12 +240,13 @@ export class ProjectMilestonesService {
         data: { status: ProjectStatus.COMPLETED },
       });
 
-      await this.activityService.createActivity({
-        projectId: milestone.projectId,
-        userId: ownerId,
-        type: ProjectActivityType.PROJECT_COMPLETED,
-        message: 'All milestones completed, project finished',
-      });
+      await this.activitiesService.recordActivity(
+        ProjectActivities.completed(
+          ownerId,
+          milestone.projectId,
+          milestone.project.title,
+        ),
+      );
     }
 
     return updatedMilestone;
