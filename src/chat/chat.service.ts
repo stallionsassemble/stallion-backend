@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConversationType, MessageType, ParticipantRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
-import { SendMessageWsDto } from './dto/websocket-events.dto';
+import { SendMessageWsDto } from './dto/chat.dto';
 import {
   ConversationResponse,
   MessageResponse,
@@ -401,7 +401,10 @@ export class ChatService {
       },
     });
 
-    return message as MessageResponse;
+    return {
+      ...message,
+      identifier: dto.identifier,
+    } as MessageResponse;
   }
 
   async updateMessage(messageId: string, userId: string, content: string) {
@@ -465,6 +468,77 @@ export class ChatService {
     return { message: 'Message deleted successfully' };
   }
 
+  async markMessagesAsRead(
+    conversationId: string,
+    userId: string,
+    messageIds: string[],
+  ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
+    // Verify user is a participant
+    const participant = await this.prisma.conversationParticipant.findUnique({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+    });
+
+    if (!participant) {
+      throw new ForbiddenException(
+        'You are not a participant in this conversation',
+      );
+    }
+
+    // Create read receipts for all messages that don't already have one
+    const existingReceipts = await this.prisma.messageReadReceipt.findMany({
+      where: {
+        messageId: { in: messageIds },
+        userId,
+      },
+      select: { messageId: true },
+    });
+
+    const existingMessageIds = new Set(
+      existingReceipts.map((r) => r.messageId),
+    );
+    const newMessageIds = messageIds.filter(
+      (id) => !existingMessageIds.has(id),
+    );
+
+    if (newMessageIds.length > 0) {
+      await this.prisma.messageReadReceipt.createMany({
+        data: newMessageIds.map((messageId) => ({
+          messageId,
+          userId,
+        })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Update lastReadAt
+    await this.prisma.conversationParticipant.update({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId,
+        },
+      },
+      data: {
+        lastReadAt: new Date(),
+      },
+    });
+
+    return { message: 'Messages marked as read', count: newMessageIds.length };
+  }
+
   async markAsRead(conversationId: string, userId: string, messageId?: string) {
     const participant = await this.prisma.conversationParticipant.findUnique({
       where: {
@@ -523,6 +597,13 @@ export class ChatService {
     conversationId: string,
     userId: string,
   ): Promise<string> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
     const participants = await this.prisma.conversationParticipant.findMany({
       where: {
         conversationId,
@@ -546,6 +627,13 @@ export class ChatService {
    * In 1-on-1 chats, this is like archiving/hiding the conversation
    */
   async deleteConversation(conversationId: string, userId: string) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
     const participant = await this.prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {
@@ -578,6 +666,14 @@ export class ChatService {
     conversationId: string,
     userId: string,
   ): Promise<number> {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (!conversation) {
+      throw new NotFoundException('Conversation not found');
+    }
+
     const participant = await this.prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: {

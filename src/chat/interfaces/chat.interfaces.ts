@@ -43,6 +43,7 @@ export interface JoinConversationPayload {
 
 export interface MessageResponse {
   id: string;
+  identifier?: string;
   content: string;
   type: string;
   attachments?: any;

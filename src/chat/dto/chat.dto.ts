@@ -35,6 +35,10 @@ class MessageAttachment {
 
 export class SendMessageWsDto {
   @IsString()
+  @IsOptional()
+  identifier?: string;
+
+  @IsString()
   @IsNotEmpty()
   recipientId: string;
 
@@ -84,6 +88,17 @@ export class MarkAsReadWsDto {
   @IsString()
   @IsOptional()
   messageId?: string;
+}
+
+export class MarkMessagesAsReadWsDto {
+  @IsString()
+  @IsNotEmpty()
+  conversationId: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  messageIds: string[];
 }
 
 export class TypingWsDto {

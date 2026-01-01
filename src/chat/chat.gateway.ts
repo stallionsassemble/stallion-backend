@@ -37,10 +37,11 @@ import {
   DeleteMessageWsDto,
   GetOnlineStatusWsDto,
   MarkAsReadWsDto,
+  MarkMessagesAsReadWsDto,
   SendMessageWsDto,
   TypingWsDto,
   UpdateMessageWsDto,
-} from './dto/websocket-events.dto';
+} from './dto/chat.dto';
 import { WsAuthGuard } from './guards/ws-auth.guard';
 import { WsThrottleGuard } from './guards/ws-throttle.guard';
 import type { AuthenticatedSocket } from './interfaces/chat.interfaces';
@@ -383,7 +384,7 @@ export class ChatGateway
         }
       }
 
-      return { success: true };
+      return { success: true, messageId: data.messageId };
     } catch (error) {
       this.logger.error(`Error deleting message: ${error.message}`);
       throw new WsException(this.getErrorMessage(error));
@@ -440,6 +441,59 @@ export class ChatGateway
       return { success: true };
     } catch (error) {
       this.logger.error(`Error marking as read: ${error.message}`);
+      throw new WsException(this.getErrorMessage(error));
+    }
+  }
+
+  @UseGuards(WsAuthGuard, WsThrottleGuard)
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      exceptionFactory: (errors) => {
+        const messages = errors.map((error) => {
+          return Object.values(error.constraints || {}).join(', ');
+        });
+        return new WsException(messages.join('; '));
+      },
+    }),
+  )
+  @SubscribeMessage(ClientEvents.MARK_MESSAGES_AS_READ)
+  async handleMarkMessagesAsRead(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: MarkMessagesAsReadWsDto,
+  ) {
+    const userId = client.userId;
+
+    try {
+      const result = await this.chatService.markMessagesAsRead(
+        data.conversationId,
+        userId,
+        data.messageIds,
+      );
+
+      // Emit read event to other participants
+      const readEvent: ReadEventPayload = {
+        conversationId: data.conversationId,
+        userId,
+      };
+
+      const otherUserId = await this.chatNotification.getConversationRecipient(
+        data.conversationId,
+        userId,
+      );
+
+      if (otherUserId) {
+        await this.emitToUser(
+          otherUserId,
+          ServerEvents.MESSAGE_READ,
+          readEvent,
+        );
+      }
+
+      return { success: true, ...result };
+    } catch (error) {
+      this.logger.error(`Error marking messages as read: ${error.message}`);
       throw new WsException(this.getErrorMessage(error));
     }
   }

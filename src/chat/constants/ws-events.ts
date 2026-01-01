@@ -14,6 +14,7 @@ export const ClientEvents = {
   UPDATE_MESSAGE: 'updateMessage',
   DELETE_MESSAGE: 'deleteMessage',
   MARK_AS_READ: 'markAsRead',
+  MARK_MESSAGES_AS_READ: 'markMessagesAsRead',
   TYPING: 'typing',
   GET_ONLINE_STATUS: 'getOnlineStatus',
 } as const;
