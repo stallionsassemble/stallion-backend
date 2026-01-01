@@ -438,7 +438,7 @@ export class ChatGateway
         );
       }
 
-      return { success: true };
+      return { success: true, messageId: data.messageId };
     } catch (error) {
       this.logger.error(`Error marking as read: ${error.message}`);
       throw new WsException(this.getErrorMessage(error));
@@ -491,7 +491,7 @@ export class ChatGateway
         );
       }
 
-      return { success: true, ...result };
+      return { success: true, messageIds: data.messageIds, ...result };
     } catch (error) {
       this.logger.error(`Error marking messages as read: ${error.message}`);
       throw new WsException(this.getErrorMessage(error));
@@ -539,7 +539,11 @@ export class ChatGateway
         );
       }
 
-      return { success: true };
+      return {
+        success: true,
+        conversationId: data.conversationId,
+        isTyping: data.isTyping,
+      };
     } catch (error) {
       this.logger.error(`Error marking as read: ${error.message}`);
       throw new WsException(this.getErrorMessage(error));
