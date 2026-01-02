@@ -90,6 +90,21 @@ export class ContractErrorHandler {
   private static readonly logger = new Logger(ContractErrorHandler.name);
 
   /**
+   * Wrap contract operations with error handling
+   * This catches errors from both simulation and execution phases
+   */
+  static async wrapContractCall<T>(
+    operation: () => Promise<T>,
+    context: string,
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      this.handleContractError(error, context);
+    }
+  }
+
+  /**
    * Parse and handle contract errors with user-friendly messages
    */
   static handleContractError(error: any, context: string): never {

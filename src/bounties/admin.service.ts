@@ -103,29 +103,31 @@ export class AdminService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = walletPublicKey;
 
-      const tx = await this.sorobanClient.update_admin({
-        new_admin: newAdminAddress,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.update_admin({
+          new_admin: newAdminAddress,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            walletId,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              walletId,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: walletPublicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: walletPublicKey,
+            };
+          },
+        });
+      }, 'update admin');
 
       // Handle transaction result
       if (!result.result.isOk()) {
@@ -173,29 +175,31 @@ export class AdminService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = walletPublicKey;
 
-      const tx = await this.sorobanClient.update_fee_account({
-        new_fee_account: newFeeAccount,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.update_fee_account({
+          new_fee_account: newFeeAccount,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            walletId,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              walletId,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: walletPublicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: walletPublicKey,
+            };
+          },
+        });
+      }, 'update fee account');
 
       // Handle transaction result
       if (!result.result.isOk()) {

@@ -70,32 +70,34 @@ export class ProjectContractService {
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const tx = await this.sorobanClient.create_project_gig({
-      owner: params.ownerPublicKey,
-      token: tokenAddress,
-      total_reward: totalReward,
-      milestones,
-      deadline: deadlineTimestamp,
-    });
+    const result = await ContractErrorHandler.wrapContractCall(async () => {
+      const tx = await this.sorobanClient.create_project_gig({
+        owner: params.ownerPublicKey,
+        token: tokenAddress,
+        total_reward: totalReward,
+        milestones,
+        deadline: deadlineTimestamp,
+      });
 
-    const result = await tx.signAndSend({
-      signTransaction: async (transactionXdr) => {
-        const transaction = StellarSDK.TransactionBuilder.fromXDR(
-          transactionXdr,
-          this.networkPassphrase,
-        ) as StellarSDK.Transaction;
+      return await tx.signAndSend({
+        signTransaction: async (transactionXdr) => {
+          const transaction = StellarSDK.TransactionBuilder.fromXDR(
+            transactionXdr,
+            this.networkPassphrase,
+          ) as StellarSDK.Transaction;
 
-        const signedTx = await this.walletSigning.signTransaction(
-          params.walletId,
-          transaction,
-        );
+          const signedTx = await this.walletSigning.signTransaction(
+            params.walletId,
+            transaction,
+          );
 
-        return {
-          signedTxXdr: signedTx.toXDR(),
-          signerAddress: params.ownerPublicKey,
-        };
-      },
-    });
+          return {
+            signedTxXdr: signedTx.toXDR(),
+            signerAddress: params.ownerPublicKey,
+          };
+        },
+      });
+    }, 'create GIG project');
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
@@ -136,32 +138,34 @@ export class ProjectContractService {
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const tx = await this.sorobanClient.release_milestone_payment({
-      owner: params.ownerPublicKey,
-      project_id: params.projectId,
-      milestone_order: params.milestoneOrder,
-      contributor: params.contributorPublicKey,
-      amount,
-    });
+    const result = await ContractErrorHandler.wrapContractCall(async () => {
+      const tx = await this.sorobanClient.release_milestone_payment({
+        owner: params.ownerPublicKey,
+        project_id: params.projectId,
+        milestone_order: params.milestoneOrder,
+        contributor: params.contributorPublicKey,
+        amount,
+      });
 
-    const result = await tx.signAndSend({
-      signTransaction: async (transactionXdr) => {
-        const transaction = StellarSDK.TransactionBuilder.fromXDR(
-          transactionXdr,
-          this.networkPassphrase,
-        ) as StellarSDK.Transaction;
+      return await tx.signAndSend({
+        signTransaction: async (transactionXdr) => {
+          const transaction = StellarSDK.TransactionBuilder.fromXDR(
+            transactionXdr,
+            this.networkPassphrase,
+          ) as StellarSDK.Transaction;
 
-        const signedTx = await this.walletSigning.signTransaction(
-          params.walletId,
-          transaction,
-        );
+          const signedTx = await this.walletSigning.signTransaction(
+            params.walletId,
+            transaction,
+          );
 
-        return {
-          signedTxXdr: signedTx.toXDR(),
-          signerAddress: params.ownerPublicKey,
-        };
-      },
-    });
+          return {
+            signedTxXdr: signedTx.toXDR(),
+            signerAddress: params.ownerPublicKey,
+          };
+        },
+      });
+    }, 'release milestone payment');
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
@@ -208,31 +212,33 @@ export class ProjectContractService {
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const tx = await this.sorobanClient.create_project_job({
-      owner: params.ownerPublicKey,
-      token: tokenAddress,
-      reward_amount: rewardAmount,
-      deadline: deadlineTimestamp,
-    });
+    const result = await ContractErrorHandler.wrapContractCall(async () => {
+      const tx = await this.sorobanClient.create_project_job({
+        owner: params.ownerPublicKey,
+        token: tokenAddress,
+        reward_amount: rewardAmount,
+        deadline: deadlineTimestamp,
+      });
 
-    const result = await tx.signAndSend({
-      signTransaction: async (transactionXdr) => {
-        const transaction = StellarSDK.TransactionBuilder.fromXDR(
-          transactionXdr,
-          this.networkPassphrase,
-        ) as StellarSDK.Transaction;
+      return await tx.signAndSend({
+        signTransaction: async (transactionXdr) => {
+          const transaction = StellarSDK.TransactionBuilder.fromXDR(
+            transactionXdr,
+            this.networkPassphrase,
+          ) as StellarSDK.Transaction;
 
-        const signedTx = await this.walletSigning.signTransaction(
-          params.walletId,
-          transaction,
-        );
+          const signedTx = await this.walletSigning.signTransaction(
+            params.walletId,
+            transaction,
+          );
 
-        return {
-          signedTxXdr: signedTx.toXDR(),
-          signerAddress: params.ownerPublicKey,
-        };
-      },
-    });
+          return {
+            signedTxXdr: signedTx.toXDR(),
+            signerAddress: params.ownerPublicKey,
+          };
+        },
+      });
+    }, 'create JOB project');
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();
@@ -400,29 +406,31 @@ export class ProjectContractService {
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const tx = await this.sorobanClient.cancel_project_gig({
-      owner: params.ownerPublicKey,
-      project_id: params.projectId,
-    });
+    const result = await ContractErrorHandler.wrapContractCall(async () => {
+      const tx = await this.sorobanClient.cancel_project_gig({
+        owner: params.ownerPublicKey,
+        project_id: params.projectId,
+      });
 
-    const result = await tx.signAndSend({
-      signTransaction: async (transactionXdr) => {
-        const transaction = StellarSDK.TransactionBuilder.fromXDR(
-          transactionXdr,
-          this.networkPassphrase,
-        ) as StellarSDK.Transaction;
+      return await tx.signAndSend({
+        signTransaction: async (transactionXdr) => {
+          const transaction = StellarSDK.TransactionBuilder.fromXDR(
+            transactionXdr,
+            this.networkPassphrase,
+          ) as StellarSDK.Transaction;
 
-        const signedTx = await this.walletSigning.signTransaction(
-          params.walletId,
-          transaction,
-        );
+          const signedTx = await this.walletSigning.signTransaction(
+            params.walletId,
+            transaction,
+          );
 
-        return {
-          signedTxXdr: signedTx.toXDR(),
-          signerAddress: params.ownerPublicKey,
-        };
-      },
-    });
+          return {
+            signedTxXdr: signedTx.toXDR(),
+            signerAddress: params.ownerPublicKey,
+          };
+        },
+      });
+    }, 'cancel GIG project');
 
     if (!result.result.isOk()) {
       const error = result.result.unwrapErr();

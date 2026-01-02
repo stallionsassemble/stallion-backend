@@ -669,38 +669,42 @@ export class BountiesService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = walletPublicKey;
 
-      // Create bounty transaction
-      const tx = await this.sorobanClient.create_bounty({
-        owner: walletPublicKey,
-        token: tokenAddress,
-        reward: rewardAmount,
-        distribution,
-        submission_deadline: BigInt(
-          Math.floor(submissionDeadline.getTime() / 1000),
-        ),
-        judging_deadline: BigInt(Math.floor(judgingDeadline.getTime() / 1000)),
-        title: dto.title,
-      });
+      // Create bounty transaction and execute with error handling
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.create_bounty({
+          owner: walletPublicKey,
+          token: tokenAddress,
+          reward: rewardAmount,
+          distribution,
+          submission_deadline: BigInt(
+            Math.floor(submissionDeadline.getTime() / 1000),
+          ),
+          judging_deadline: BigInt(
+            Math.floor(judgingDeadline.getTime() / 1000),
+          ),
+          title: dto.title,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            walletId,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              walletId,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: walletPublicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: walletPublicKey,
+            };
+          },
+        });
+      }, 'create bounty');
 
       // Handle transaction result
       if (!result.result.isOk()) {
@@ -811,35 +815,37 @@ export class BountiesService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-      const tx = await this.sorobanClient.update_bounty({
-        owner: user.wallet.publicKey,
-        bounty_id: contractBountyId,
-        new_title: dto.title || undefined,
-        new_distribution: distribution,
-        new_submission_deadline: submissionDeadline
-          ? BigInt(Math.floor(submissionDeadline.getTime() / 1000))
-          : undefined,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.update_bounty({
+          owner: user.wallet!.publicKey,
+          bounty_id: contractBountyId,
+          new_title: dto.title || undefined,
+          new_distribution: distribution,
+          new_submission_deadline: submissionDeadline
+            ? BigInt(Math.floor(submissionDeadline.getTime() / 1000))
+            : undefined,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            user.wallet!.id,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              user.wallet!.id,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: user.wallet!.publicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: user.wallet!.publicKey,
+            };
+          },
+        });
+      }, 'update bounty');
 
       // Handle transaction result
       if (!result.result.isOk()) {
@@ -928,30 +934,32 @@ export class BountiesService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-      const tx = await this.sorobanClient.delete_bounty({
-        owner: user.wallet.publicKey,
-        bounty_id: contractBountyId,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.delete_bounty({
+          owner: user.wallet!.publicKey,
+          bounty_id: contractBountyId,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            user.wallet!.id,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              user.wallet!.id,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: user.wallet!.publicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: user.wallet!.publicKey,
+            };
+          },
+        });
+      }, 'delete bounty');
 
       // Handle transaction result
       if (!result.result.isOk()) {
@@ -1032,31 +1040,33 @@ export class BountiesService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-      const tx = await this.sorobanClient.apply_to_bounty({
-        applicant: user.wallet.publicKey,
-        bounty_id: contractBountyId,
-        submission_link: hashedLink,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.apply_to_bounty({
+          applicant: user.wallet!.publicKey,
+          bounty_id: contractBountyId,
+          submission_link: hashedLink,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            user.wallet!.id,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              user.wallet!.id,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: user.wallet!.publicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: user.wallet!.publicKey,
+            };
+          },
+        });
+      }, 'apply to bounty');
 
       // Handle transaction result
       if (!result.result.isOk()) {
@@ -1186,31 +1196,36 @@ export class BountiesService {
           // Set the public key for the Soroban client
           this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-          const tx = await this.sorobanClient.update_submission({
-            applicant: user.wallet.publicKey,
-            bounty_id: contractBountyId,
-            new_submission_link: hashedLink,
-          });
+          const result = await ContractErrorHandler.wrapContractCall(
+            async () => {
+              const tx = await this.sorobanClient.update_submission({
+                applicant: user.wallet!.publicKey,
+                bounty_id: contractBountyId,
+                new_submission_link: hashedLink,
+              });
 
-          // Sign and send transaction
-          const result = await tx.signAndSend({
-            signTransaction: async (transactionXdr) => {
-              const transaction = StellarSDK.TransactionBuilder.fromXDR(
-                transactionXdr,
-                this.networkPassphrase,
-              ) as StellarSDK.Transaction;
+              // Sign and send transaction
+              return await tx.signAndSend({
+                signTransaction: async (transactionXdr) => {
+                  const transaction = StellarSDK.TransactionBuilder.fromXDR(
+                    transactionXdr,
+                    this.networkPassphrase,
+                  ) as StellarSDK.Transaction;
 
-              const signedTx = await this.walletSigning.signTransaction(
-                user.wallet!.id,
-                transaction,
-              );
+                  const signedTx = await this.walletSigning.signTransaction(
+                    user.wallet!.id,
+                    transaction,
+                  );
 
-              return {
-                signedTxXdr: signedTx.toXDR(),
-                signerAddress: user.wallet!.publicKey,
-              };
+                  return {
+                    signedTxXdr: signedTx.toXDR(),
+                    signerAddress: user.wallet!.publicKey,
+                  };
+                },
+              });
             },
-          });
+            'update submission',
+          );
 
           // Handle transaction result
           if (!result.result.isOk()) {
@@ -1244,9 +1259,6 @@ export class BountiesService {
         data: {
           submissionLink:
             dto.submissionLink || existingSubmission.submissionLink,
-          submission:
-            dto.submissionData ||
-            (existingSubmission.submission as Prisma.InputJsonValue),
         },
       });
 
@@ -1379,31 +1391,33 @@ export class BountiesService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-      const tx = await this.sorobanClient.select_winners({
-        owner: user.wallet.publicKey,
-        bounty_id: contractBountyId,
-        winners: winnerPublicKeys,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.select_winners({
+          owner: user.wallet!.publicKey,
+          bounty_id: contractBountyId,
+          winners: winnerPublicKeys,
+        });
 
-      // Sign and send transaction (Payouts are handled by the Soroban contract)
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            user.wallet!.id,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              user.wallet!.id,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: user.wallet!.publicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: user.wallet!.publicKey,
+            };
+          },
+        });
+      }, 'select winners');
 
       // Handle transaction result
       if (!result.result.isOk()) {
@@ -1569,30 +1583,32 @@ export class BountiesService {
       // Set the public key for the Soroban client
       this.sorobanClient.options.publicKey = user.wallet.publicKey;
 
-      const tx = await this.sorobanClient.close_bounty({
-        owner: user.wallet.publicKey,
-        bounty_id: contractBountyId,
-      });
+      const result = await ContractErrorHandler.wrapContractCall(async () => {
+        const tx = await this.sorobanClient.close_bounty({
+          owner: user.wallet!.publicKey,
+          bounty_id: contractBountyId,
+        });
 
-      // Sign and send transaction
-      const result = await tx.signAndSend({
-        signTransaction: async (transactionXdr) => {
-          const transaction = StellarSDK.TransactionBuilder.fromXDR(
-            transactionXdr,
-            this.networkPassphrase,
-          ) as StellarSDK.Transaction;
+        // Sign and send transaction
+        return await tx.signAndSend({
+          signTransaction: async (transactionXdr) => {
+            const transaction = StellarSDK.TransactionBuilder.fromXDR(
+              transactionXdr,
+              this.networkPassphrase,
+            ) as StellarSDK.Transaction;
 
-          const signedTx = await this.walletSigning.signTransaction(
-            user.wallet!.id,
-            transaction,
-          );
+            const signedTx = await this.walletSigning.signTransaction(
+              user.wallet!.id,
+              transaction,
+            );
 
-          return {
-            signedTxXdr: signedTx.toXDR(),
-            signerAddress: user.wallet!.publicKey,
-          };
-        },
-      });
+            return {
+              signedTxXdr: signedTx.toXDR(),
+              signerAddress: user.wallet!.publicKey,
+            };
+          },
+        });
+      }, 'close bounty');
 
       // Handle transaction result
       if (!result.result.isOk()) {
