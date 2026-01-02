@@ -14,6 +14,7 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateThreadDto } from './dto/create-thread.dto';
+import { AddThreadReactionDto } from './dto/thread-reaction.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
@@ -1025,5 +1026,116 @@ export class ForumService {
     });
 
     return { message: 'Comment deleted successfully' };
+  }
+
+  async addRemoveThreadReaction(
+    userId: string,
+    threadId: string,
+    dto: AddThreadReactionDto,
+  ) {
+    const thread = await this.prisma.forumThread.findUnique({
+      where: { id: threadId },
+    });
+
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+
+    const existing = await this.prisma.threadReaction.findUnique({
+      where: {
+        threadId_userId_emoji: {
+          threadId,
+          userId,
+          emoji: dto.emoji,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.threadReaction.delete({
+        where: { id: existing.id },
+      });
+      return { message: 'Reaction removed', action: 'removed' };
+    }
+
+    await this.prisma.threadReaction.create({
+      data: {
+        threadId,
+        userId,
+        emoji: dto.emoji,
+      },
+    });
+
+    return { message: 'Reaction added', action: 'added' };
+  }
+
+  async getThreadReactions(threadId: string, currentUserId?: string) {
+    const thread = await this.prisma.forumThread.findUnique({
+      where: { id: threadId },
+    });
+
+    if (!thread) {
+      throw new NotFoundException('Thread not found');
+    }
+
+    const reactions = await this.prisma.threadReaction.findMany({
+      where: { threadId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+          },
+        },
+      },
+    });
+
+    // Consolidate reactions by emoji
+    const consolidatedReactions = reactions.reduce(
+      (acc, reaction) => {
+        const emoji = reaction.emoji;
+        if (!acc[emoji]) {
+          acc[emoji] = {
+            emoji,
+            count: 0,
+            userIds: [],
+            users: [],
+            hasReacted: false,
+          };
+        }
+        acc[emoji].count++;
+        acc[emoji].userIds.push(reaction.userId);
+        acc[emoji].users.push({
+          id: reaction.user.id,
+          username: reaction.user.username,
+          firstName: reaction.user.firstName,
+          lastName: reaction.user.lastName,
+          profilePicture: reaction.user.profilePicture,
+        });
+        if (currentUserId && reaction.userId === currentUserId) {
+          acc[emoji].hasReacted = true;
+        }
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          emoji: string;
+          count: number;
+          userIds: string[];
+          users: any[];
+          hasReacted: boolean;
+        }
+      >,
+    );
+
+    return {
+      threadId,
+      reactions: Object.values(consolidatedReactions),
+      totalReactions: reactions.length,
+    };
   }
 }

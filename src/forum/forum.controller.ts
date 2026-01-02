@@ -24,6 +24,7 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateThreadDto } from './dto/create-thread.dto';
+import { AddThreadReactionDto } from './dto/thread-reaction.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
@@ -790,5 +791,87 @@ export class ForumController {
   @ApiResponse({ status: 404, description: 'Comment not found' })
   deleteComment(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.forumService.deleteComment(id, userId);
+  }
+
+  @Post('threads/:id/reactions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Add/Remove thread reaction',
+    description:
+      'Add or remove a reaction to a thread. If the reaction already exists, it will be removed.',
+  })
+  @ApiParam({ name: 'id', description: 'Thread ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Reaction added or removed successfully',
+    schema: {
+      example: {
+        message: 'Reaction added',
+        action: 'added',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Thread not found' })
+  addRemoveThreadReaction(
+    @Param('id') threadId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: AddThreadReactionDto,
+  ) {
+    return this.forumService.addRemoveThreadReaction(userId, threadId, dto);
+  }
+
+  @Get('threads/:id/reactions')
+  @ApiOperation({
+    summary: 'Get thread reactions',
+    description: 'Get all reactions for a specific thread, grouped by emoji',
+  })
+  @ApiParam({ name: 'id', description: 'Thread ID' })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'User ID to check if they have reacted',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Thread reactions retrieved successfully',
+    schema: {
+      example: {
+        threadId: 'thread-uuid',
+        reactions: [
+          {
+            emoji: '👍',
+            count: 5,
+            userIds: ['user-1', 'user-2', 'user-3', 'user-4', 'user-5'],
+            users: [
+              {
+                id: 'user-1',
+                username: 'john_doe',
+                firstName: 'John',
+                lastName: 'Doe',
+                profilePicture: 'https://example.com/avatar.jpg',
+              },
+            ],
+            hasReacted: true,
+          },
+          {
+            emoji: '❤️',
+            count: 3,
+            userIds: ['user-6', 'user-7', 'user-8'],
+            users: [],
+            hasReacted: false,
+          },
+        ],
+        totalReactions: 8,
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Thread not found' })
+  getThreadReactions(
+    @Param('id') threadId: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.forumService.getThreadReactions(threadId, userId);
   }
 }

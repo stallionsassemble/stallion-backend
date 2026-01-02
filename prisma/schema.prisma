@@ -63,12 +63,13 @@ model User {
   payoutMethods PayoutMethod[]
 
   // Forum relations
-  forumCategories ForumCategory[]  @relation("ForumCategoryCreator")
-  forumThreads    ForumThread[]
-  forumPosts      ForumPost[]
-  forumComments   ForumComment[]
-  forumReactions  ForumReaction[]
-  pinnedThreads   UserThreadPin[]
+  forumCategories   ForumCategory[]     @relation("ForumCategoryCreator")
+  forumThreads      ForumThread[]
+  forumPosts        ForumPost[]
+  forumComments     ForumComment[]
+  forumReactions    ForumReaction[]
+  threadReactions   ThreadReaction[]
+  pinnedThreads     UserThreadPin[]
 
   // Chat relations
   conversationParticipants ConversationParticipant[]
@@ -440,6 +441,7 @@ model ForumThread {
   posts      ForumPost[]
   tags       ForumThreadTag[]
   pinnedBy   UserThreadPin[]
+  reactions  ThreadReaction[]
 
   @@index([categoryId, updatedAt(sort: Desc)])
   @@index([authorId])
@@ -508,6 +510,23 @@ model ForumReaction {
   @@index([postId])
   @@index([userId])
   @@map("forum_reactions")
+}
+
+model ThreadReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  threadId String      @map("thread_id")
+  thread   ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, userId, emoji])
+  @@index([threadId])
+  @@index([userId])
+  @@map("thread_reactions")
 }
 
 model ForumTag {
