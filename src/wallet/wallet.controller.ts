@@ -8,7 +8,6 @@ import {
 import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { EnvConfig } from '../config/env.config';
 import { SetupTrustlineDto } from './dto/setup-trustline.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
@@ -146,15 +145,10 @@ export class WalletController {
     @Body() dto: SetupTrustlineDto,
   ) {
     const wallet = await this.walletService.getWalletByUserId(userId);
-    const configService = this.walletService['configService'];
-    const networkPassphrase = configService.getOrThrow<string>(
-      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
-    );
 
     return this.walletService.setupTrustlineForCurrency(
       wallet.id,
       dto.currencyCode,
-      networkPassphrase,
     );
   }
 }

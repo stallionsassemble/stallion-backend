@@ -5,10 +5,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma, TxState, TxType } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
+import { EnvConfig } from '../config/env.config';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from './stellar-wallet.service';
 import { hasTrustline, setupTrustline } from './utils/trustline.util';
@@ -23,6 +25,7 @@ export class WalletService {
     private stellarAccount: StellarAccountService,
     private stellarWallet: StellarWalletService,
     private walletSigning: WalletSigningService,
+    private configService: ConfigService,
     @InjectQueue('withdrawal') private withdrawalQueue: Queue,
   ) {}
 
@@ -662,7 +665,6 @@ export class WalletService {
   async setupTrustlineForCurrency(
     walletId: string,
     currencyCode: string,
-    networkPassphrase: string,
   ): Promise<{
     success: boolean;
     txHash?: string;
@@ -675,6 +677,10 @@ export class WalletService {
     if (!wallet) {
       throw new NotFoundException('Wallet not found');
     }
+
+    const networkPassphrase = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
+    );
 
     try {
       const result = await setupTrustline(
@@ -713,7 +719,6 @@ export class WalletService {
   async checkTrustline(
     walletId: string,
     currencyCode: string,
-    networkPassphrase: string,
   ): Promise<boolean> {
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
@@ -722,6 +727,10 @@ export class WalletService {
     if (!wallet) {
       throw new NotFoundException('Wallet not found');
     }
+
+    const networkPassphrase = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
+    );
 
     return hasTrustline(
       wallet.publicKey,
