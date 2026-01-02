@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, TxState, TxType } from '@prisma/client';
+import { Horizon } from '@stellar/stellar-sdk';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
@@ -601,17 +602,17 @@ export class WalletService {
 
         // Process each operation
         for (const op of operations.records) {
-          const opType = op.type as string;
-          if (opType === 'payment' || opType === 'create_account') {
-            const isIncoming = (op as any).to === publicKey;
-            const amount = parseFloat(
-              (op as any).amount || (op as any).starting_balance || '0',
-            );
+          const opType = op.type;
+          if (opType === Horizon.HorizonApi.OperationResponseType.payment) {
+            // Handle payment operations
+            const paymentOp = op as Horizon.HorizonApi.PaymentOperationResponse;
+            const isIncoming = paymentOp.to === publicKey;
+            const amount = parseFloat(paymentOp.amount);
 
             // Determine currency from operation
             let currency = 'XLM';
-            if (opType === 'payment' && (op as any).asset_type !== 'native') {
-              currency = (op as any).asset_code || 'UNKNOWN';
+            if (paymentOp.asset_type !== 'native') {
+              currency = paymentOp.asset_code || 'UNKNOWN';
             }
 
             if (amount > 0) {
@@ -630,9 +631,45 @@ export class WalletService {
                     syncedAt: new Date().toISOString(),
                     operationType: op.type,
                     txHash: txRecord.hash,
-                    asset_type: (op as any).asset_type,
-                    asset_code: (op as any).asset_code,
-                    asset_issuer: (op as any).asset_issuer,
+                    asset_type: paymentOp.asset_type,
+                    asset_code: paymentOp.asset_code,
+                    asset_issuer: paymentOp.asset_issuer,
+                  } as Prisma.InputJsonValue,
+                },
+              });
+
+              syncedCount++;
+              this.logger.log(
+                `Synced ${op.type} transaction: ${amount} ${currency} (${isIncoming ? 'incoming' : 'outgoing'})`,
+              );
+            }
+          } else if (
+            opType === Horizon.HorizonApi.OperationResponseType.createAccount
+          ) {
+            // Handle create_account operations
+            const createAccountOp =
+              op as Horizon.HorizonApi.CreateAccountOperationResponse;
+            // If the account being created is our wallet, it's incoming (we received the funding)
+            const isIncoming = createAccountOp.account === publicKey;
+            const amount = parseFloat(createAccountOp.starting_balance);
+            const currency = 'XLM';
+
+            if (amount > 0) {
+              // Create transaction record
+              await this.prisma.transaction.create({
+                data: {
+                  walletId,
+                  type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
+                  amount: amount,
+                  currency,
+                  state: TxState.COMPLETED,
+                  externalTxId: txRecord.id,
+                  idempotencyKey: generateIdempotencyKey(),
+                  note: `Synced from blockchain - ${op.type}`,
+                  metadata: {
+                    syncedAt: new Date().toISOString(),
+                    operationType: op.type,
+                    txHash: txRecord.hash,
                   } as Prisma.InputJsonValue,
                 },
               });
