@@ -35,6 +35,27 @@ import { ForumService } from './forum.service';
 export class ForumController {
   constructor(private readonly forumService: ForumService) {}
 
+  @Get('stats')
+  @ApiOperation({
+    summary: 'Get forum statistics',
+    description: 'Retrieve real-time forum metrics for the community dashboard',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Forum statistics retrieved successfully',
+    schema: {
+      example: {
+        totalDiscussions: 1250,
+        activeMembers: 340,
+        postsToday: 45,
+        onlineUsers: 82,
+      },
+    },
+  })
+  getForumStats() {
+    return this.forumService.getForumStats();
+  }
+
   @Post('categories')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')

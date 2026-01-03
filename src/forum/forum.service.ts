@@ -30,6 +30,120 @@ export class ForumService {
     private notificationsService: NotificationsService,
   ) {}
 
+  async getForumStats() {
+    // Total discussions (threads) ever created
+    const totalDiscussions = await this.prisma.forumThread.count();
+
+    // Active members: unique users who have posted/replied/reacted in the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [
+      activeThreadAuthors,
+      activePostAuthors,
+      activeCommentAuthors,
+      activeReactors,
+    ] = await Promise.all([
+      this.prisma.forumThread.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { authorId: true },
+        distinct: ['authorId'],
+      }),
+      this.prisma.forumPost.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { authorId: true },
+        distinct: ['authorId'],
+      }),
+      this.prisma.forumComment.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { authorId: true },
+        distinct: ['authorId'],
+      }),
+      this.prisma.forumReaction.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+    ]);
+
+    // Combine all unique user IDs
+    const activeUserIds = new Set([
+      ...activeThreadAuthors.map((t) => t.authorId),
+      ...activePostAuthors.map((p) => p.authorId),
+      ...activeCommentAuthors.map((c) => c.authorId),
+      ...activeReactors.map((r) => r.userId),
+    ]);
+
+    const activeMembers = activeUserIds.size;
+
+    // Posts today: threads + posts + comments created since 00:00 UTC today
+    const todayStart = new Date();
+    todayStart.setUTCHours(0, 0, 0, 0);
+
+    const [threadsToday, postsToday, commentsToday] = await Promise.all([
+      this.prisma.forumThread.count({
+        where: { createdAt: { gte: todayStart } },
+      }),
+      this.prisma.forumPost.count({
+        where: { createdAt: { gte: todayStart } },
+      }),
+      this.prisma.forumComment.count({
+        where: { createdAt: { gte: todayStart } },
+      }),
+    ]);
+
+    const postsTodayTotal = threadsToday + postsToday + commentsToday;
+
+    // Online users: count of users with recent activity (last 5 minutes)
+    // This is a simple approximation based on recent forum activity
+    const fiveMinutesAgo = new Date();
+    fiveMinutesAgo.setMinutes(fiveMinutesAgo.getMinutes() - 5);
+
+    const [
+      recentThreadAuthors,
+      recentPostAuthors,
+      recentCommentAuthors,
+      recentReactors,
+    ] = await Promise.all([
+      this.prisma.forumThread.findMany({
+        where: { createdAt: { gte: fiveMinutesAgo } },
+        select: { authorId: true },
+        distinct: ['authorId'],
+      }),
+      this.prisma.forumPost.findMany({
+        where: { createdAt: { gte: fiveMinutesAgo } },
+        select: { authorId: true },
+        distinct: ['authorId'],
+      }),
+      this.prisma.forumComment.findMany({
+        where: { createdAt: { gte: fiveMinutesAgo } },
+        select: { authorId: true },
+        distinct: ['authorId'],
+      }),
+      this.prisma.forumReaction.findMany({
+        where: { createdAt: { gte: fiveMinutesAgo } },
+        select: { userId: true },
+        distinct: ['userId'],
+      }),
+    ]);
+
+    const onlineUserIds = new Set([
+      ...recentThreadAuthors.map((t) => t.authorId),
+      ...recentPostAuthors.map((p) => p.authorId),
+      ...recentCommentAuthors.map((c) => c.authorId),
+      ...recentReactors.map((r) => r.userId),
+    ]);
+
+    const onlineUsers = onlineUserIds.size;
+
+    return {
+      totalDiscussions,
+      activeMembers,
+      postsToday: postsTodayTotal,
+      onlineUsers,
+    };
+  }
+
   async createCategory(userId: string, dto: CreateCategoryDto) {
     const existing = await this.prisma.forumCategory.findUnique({
       where: { slug: dto.slug },
