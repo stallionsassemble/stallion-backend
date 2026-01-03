@@ -21,6 +21,7 @@ import { ProjectStatus, ProjectType } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import {
@@ -39,8 +40,6 @@ import { ProjectsService } from './projects.service';
 
 @ApiTags('Projects')
 @Controller('projects')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth('JWT-auth')
 export class ProjectsController {
   constructor(
     private readonly projectsService: ProjectsService,
@@ -50,6 +49,8 @@ export class ProjectsController {
   ) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Create a new project',
     description:
@@ -71,9 +72,11 @@ export class ProjectsController {
   }
 
   @Get()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'List all projects',
-    description: 'Get a list of projects with optional filters',
+    description:
+      'Get a list of projects with optional filters. Authentication is optional - if provided, includes applied field.',
   })
   @ApiQuery({ name: 'type', enum: ProjectType, required: false })
   @ApiQuery({ name: 'status', enum: ProjectStatus, required: false })
@@ -82,32 +85,155 @@ export class ProjectsController {
     status: 200,
     description: 'Projects retrieved successfully',
     type: [ProjectResponseDto],
+    schema: {
+      example: [
+        {
+          id: 'project-uuid',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a comprehensive DeFi analytics dashboard',
+          status: 'OPEN',
+          type: 'GIG',
+          reward: '5000',
+          currency: 'USDC',
+          peopleNeeded: 1,
+          acceptedCount: 0,
+          deadline: '2024-03-01T00:00:00.000Z',
+          createdAt: '2024-01-01T00:00:00.000Z',
+          applied: true,
+          owner: {
+            id: 'owner-uuid',
+            username: 'project_owner',
+            firstName: 'John',
+            lastName: 'Doe',
+            companyName: 'Tech Corp',
+            profilePicture: 'https://example.com/profile.jpg',
+            totalPaid: '25000',
+            totalBounties: 15,
+            totalProjects: 8,
+          },
+        },
+      ],
+    },
   })
   async listProjects(
     @Query('type') type?: ProjectType,
     @Query('status') status?: ProjectStatus,
     @Query('ownerId') ownerId?: string,
+    @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.projectsService.listProjects({ type, status, ownerId });
+    return this.projectsService.listProjects(
+      { type, status, ownerId },
+      currentUserId,
+    );
   }
 
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Get project details',
-    description: 'Get detailed information about a specific project',
+    description:
+      'Get detailed information about a specific project including milestones and winner. Authentication is optional - if provided, includes applied field.',
   })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({
     status: 200,
     description: 'Project retrieved successfully',
     type: ProjectResponseDto,
+    schema: {
+      example: {
+        id: 'project-uuid',
+        title: 'Build a DeFi Dashboard',
+        shortDescription: 'Create a comprehensive DeFi analytics dashboard',
+        description: 'We need a full-featured DeFi dashboard that tracks...',
+        requirements: ['React expertise', 'Web3 experience'],
+        deliverables: ['Responsive web app', 'Documentation'],
+        skills: ['React', 'TypeScript', 'Web3'],
+        reward: '5000',
+        currency: 'USDC',
+        deadline: '2024-03-01T00:00:00.000Z',
+        status: 'IN_PROGRESS',
+        type: 'GIG',
+        peopleNeeded: 1,
+        acceptedCount: 1,
+        contractProjectId: 123,
+        txHash: '0xabc123...',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-15T10:00:00.000Z',
+        ownerId: 'owner-uuid',
+        applied: true,
+        winner: {
+          userId: 'winner-uuid',
+          username: 'dev_jane',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          profilePicture: 'https://example.com/jane.jpg',
+          acceptedAt: '2024-01-10T14:30:00.000Z',
+        },
+        owner: {
+          id: 'owner-uuid',
+          username: 'project_owner',
+          firstName: 'John',
+          lastName: 'Doe',
+          companyName: 'Tech Corp',
+          profilePicture: 'https://example.com/profile.jpg',
+          totalPaid: '25000',
+          totalBounties: 15,
+          totalProjects: 8,
+        },
+        milestones: [
+          {
+            id: 'milestone-1',
+            title: 'UI Design & Setup',
+            description: 'Create the initial UI mockups and project setup',
+            amount: '2000',
+            dueDate: '2024-02-01T00:00:00.000Z',
+            status: 'COMPLETED',
+            order: 1,
+            submittedAt: '2024-01-28T10:00:00.000Z',
+            reviewedAt: '2024-01-29T15:00:00.000Z',
+            paidAt: '2024-01-30T09:00:00.000Z',
+            txHash: '0xdef456...',
+            contributorId: 'winner-uuid',
+            contributor: {
+              id: 'winner-uuid',
+              username: 'dev_jane',
+              firstName: 'Jane',
+              lastName: 'Smith',
+              profilePicture: 'https://example.com/jane.jpg',
+            },
+          },
+          {
+            id: 'milestone-2',
+            title: 'Backend Integration',
+            description: 'Integrate with DeFi protocols',
+            amount: '3000',
+            dueDate: '2024-02-15T00:00:00.000Z',
+            status: 'IN_PROGRESS',
+            order: 2,
+            contributorId: 'winner-uuid',
+            contributor: {
+              id: 'winner-uuid',
+              username: 'dev_jane',
+              firstName: 'Jane',
+              lastName: 'Smith',
+              profilePicture: 'https://example.com/jane.jpg',
+            },
+          },
+        ],
+      },
+    },
   })
   @ApiResponse({ status: 404, description: 'Project not found' })
-  async getProject(@Param('id') id: string) {
-    return this.projectsService.getProject(id);
+  async getProject(
+    @Param('id') id: string,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.projectsService.getProject(id, currentUserId);
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Update a project',
     description:
@@ -138,6 +264,8 @@ export class ProjectsController {
   }
 
   @Patch(':id/cancel')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Cancel a project',
     description: 'Cancel a project. Only accessible by the project owner.',
@@ -161,6 +289,8 @@ export class ProjectsController {
   }
 
   @Post(':id/apply')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Apply to a project',
     description:
@@ -187,6 +317,8 @@ export class ProjectsController {
   }
 
   @Get(':id/applications')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get project applications',
     description: 'Get all applications for a specific project',
@@ -202,6 +334,8 @@ export class ProjectsController {
   }
 
   @Get('applications')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get my applications',
     description: 'Get all applications submitted by the current user',

@@ -148,7 +148,7 @@ export class ProjectsService {
     return project;
   }
 
-  async getProject(projectId: string) {
+  async getProject(projectId: string, currentUserId?: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
       include: {
@@ -178,6 +178,17 @@ export class ProjectsService {
         },
         milestones: {
           orderBy: { order: 'asc' },
+          include: {
+            contributor: {
+              select: {
+                id: true,
+                username: true,
+                firstName: true,
+                lastName: true,
+                profilePicture: true,
+              },
+            },
+          },
         },
       },
     });
@@ -186,15 +197,76 @@ export class ProjectsService {
       throw new NotFoundException('Project not found');
     }
 
-    return project;
+    // Check if current user has applied
+    let applied = false;
+    if (currentUserId) {
+      const application = await this.prisma.projectApplication.findFirst({
+        where: {
+          projectId,
+          userId: currentUserId,
+        },
+      });
+      applied = !!application;
+    }
+
+    // Get winner information (accepted application)
+    const acceptedApplication = project.applications.find(
+      (app) => app.status === 'ACCEPTED',
+    );
+
+    // Calculate owner stats
+    const [totalPaidResult, totalBounties, totalProjects] = await Promise.all([
+      this.prisma.transaction.aggregate({
+        where: {
+          walletId: project.owner.id,
+          type: 'WITHDRAWAL',
+          state: 'COMPLETED',
+        },
+        _sum: {
+          amount: true,
+        },
+      }),
+      this.prisma.bounty.count({
+        where: { ownerId: project.ownerId },
+      }),
+      this.prisma.project.count({
+        where: { ownerId: project.ownerId },
+      }),
+    ]);
+
+    const totalPaid = totalPaidResult._sum.amount?.toString() || '0';
+
+    return {
+      ...project,
+      applied,
+      winner: acceptedApplication
+        ? {
+            userId: acceptedApplication.user.id,
+            username: acceptedApplication.user.username,
+            firstName: acceptedApplication.user.firstName,
+            lastName: acceptedApplication.user.lastName,
+            profilePicture: acceptedApplication.user.profilePicture,
+            acceptedAt: acceptedApplication.updatedAt,
+          }
+        : null,
+      owner: {
+        ...project.owner,
+        totalPaid,
+        totalBounties,
+        totalProjects,
+      },
+    };
   }
 
-  async listProjects(filters?: {
-    type?: ProjectType;
-    status?: ProjectStatus;
-    ownerId?: string;
-  }) {
-    return this.prisma.project.findMany({
+  async listProjects(
+    filters?: {
+      type?: ProjectType;
+      status?: ProjectStatus;
+      ownerId?: string;
+    },
+    currentUserId?: string,
+  ) {
+    const projects = await this.prisma.project.findMany({
       where: {
         type: filters?.type,
         status: filters?.status,
@@ -211,8 +283,74 @@ export class ProjectsService {
             profilePicture: true,
           },
         },
+        applications: {
+          select: {
+            userId: true,
+            status: true,
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
+    });
+
+    // Get owner stats for all unique owners
+    const ownerIds = [...new Set(projects.map((p) => p.ownerId))];
+    const ownerStatsMap = new Map<
+      string,
+      { totalPaid: string; totalBounties: number; totalProjects: number }
+    >();
+
+    await Promise.all(
+      ownerIds.map(async (ownerId) => {
+        const [totalPaidResult, totalBounties, totalProjects] =
+          await Promise.all([
+            this.prisma.transaction.aggregate({
+              where: {
+                walletId: ownerId,
+                type: 'WITHDRAWAL',
+                state: 'COMPLETED',
+              },
+              _sum: {
+                amount: true,
+              },
+            }),
+            this.prisma.bounty.count({
+              where: { ownerId },
+            }),
+            this.prisma.project.count({
+              where: { ownerId },
+            }),
+          ]);
+
+        ownerStatsMap.set(ownerId, {
+          totalPaid: totalPaidResult._sum.amount?.toString() || '0',
+          totalBounties,
+          totalProjects,
+        });
+      }),
+    );
+
+    // Map projects with applied field and owner stats
+    return projects.map((project) => {
+      const applied = currentUserId
+        ? project.applications.some((app) => app.userId === currentUserId)
+        : false;
+
+      const ownerStats = ownerStatsMap.get(project.ownerId) || {
+        totalPaid: '0',
+        totalBounties: 0,
+        totalProjects: 0,
+      };
+
+      return {
+        ...project,
+        applied,
+        owner: {
+          ...project.owner,
+          ...ownerStats,
+        },
+        applications: undefined, // Remove applications from response
+      };
     });
   }
 

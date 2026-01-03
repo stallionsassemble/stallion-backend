@@ -76,7 +76,33 @@ export class ProjectResponseDto {
     lastName: string | null;
     companyName: string | null;
     profilePicture: string | null;
+    totalPaid: string;
+    totalBounties: number;
+    totalProjects: number;
   };
+
+  @ApiPropertyOptional({
+    description:
+      'Whether the current user has applied to this project (only present if authenticated)',
+  })
+  applied?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Winner information if an application has been accepted',
+  })
+  winner?: {
+    userId: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    profilePicture: string | null;
+    acceptedAt: Date;
+  };
+
+  @ApiPropertyOptional({
+    description: 'Project milestones (only in detailed view)',
+  })
+  milestones?: MilestoneResponseDto[];
 }
 
 export class ApplicationResponseDto {
@@ -187,6 +213,17 @@ export class MilestoneResponseDto {
 
   @ApiProperty()
   contributorId: string;
+
+  @ApiPropertyOptional({
+    description: 'Contributor information',
+  })
+  contributor?: {
+    id: string;
+    username: string | null;
+    firstName: string | null;
+    lastName: string | null;
+    profilePicture: string | null;
+  };
 }
 
 export class ActivityResponseDto {
