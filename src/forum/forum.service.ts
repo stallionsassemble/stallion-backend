@@ -18,6 +18,7 @@ import { AddThreadReactionDto } from './dto/thread-reaction.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
+import { enrichAuthorData } from './utils/author-enrichment.util';
 
 @Injectable()
 export class ForumService {
@@ -204,6 +205,7 @@ export class ForumService {
         data: {
           title: dto.title,
           slug: dto.slug,
+          content: dto.content,
           categoryId: dto.categoryId,
           authorId: userId,
         },
@@ -215,16 +217,9 @@ export class ForumService {
               firstName: true,
               lastName: true,
               profilePicture: true,
+              role: true,
             },
           },
-        },
-      });
-
-      await tx.forumPost.create({
-        data: {
-          content: dto.content,
-          threadId: thread.id,
-          authorId: userId,
         },
       });
 
@@ -252,6 +247,71 @@ export class ForumService {
     });
   }
 
+  async getAllThreads(params?: {
+    categoryId?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const { categoryId, limit = 50, offset = 0 } = params || {};
+
+    const threads = await this.prisma.forumThread.findMany({
+      where: categoryId ? { categoryId } : undefined,
+      take: limit,
+      skip: offset,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        author: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+            role: true,
+          },
+        },
+        category: true,
+        tags: {
+          include: {
+            tag: true,
+          },
+        },
+        _count: {
+          select: {
+            posts: true,
+          },
+        },
+      },
+    });
+
+    // Enrich author data with stats
+    const enrichedThreads = await Promise.all(
+      threads.map(async (thread) => {
+        const enrichedAuthor = await enrichAuthorData(
+          this.prisma,
+          thread.author,
+        );
+
+        return {
+          ...thread,
+          author: enrichedAuthor,
+          postCount: thread._count.posts,
+        };
+      }),
+    );
+
+    const total = await this.prisma.forumThread.count({
+      where: categoryId ? { categoryId } : undefined,
+    });
+
+    return {
+      threads: enrichedThreads,
+      total,
+      limit,
+      offset,
+    };
+  }
+
   async getThread(slug: string) {
     const thread = await this.prisma.forumThread.findUnique({
       where: { slug },
@@ -263,6 +323,7 @@ export class ForumService {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            role: true,
           },
         },
         category: true,
@@ -281,6 +342,7 @@ export class ForumService {
                 firstName: true,
                 lastName: true,
                 profilePicture: true,
+                role: true,
               },
             },
             reactions: {
@@ -307,7 +369,28 @@ export class ForumService {
       data: { viewCount: { increment: 1 } },
     });
 
-    return thread;
+    // Enrich author data
+    const enrichedAuthor = await enrichAuthorData(this.prisma, thread.author);
+
+    // Enrich post authors
+    const enrichedPosts = await Promise.all(
+      thread.posts.map(async (post) => {
+        const enrichedPostAuthor = await enrichAuthorData(
+          this.prisma,
+          post.author,
+        );
+        return {
+          ...post,
+          author: enrichedPostAuthor,
+        };
+      }),
+    );
+
+    return {
+      ...thread,
+      author: enrichedAuthor,
+      posts: enrichedPosts,
+    };
   }
 
   async updateThread(threadId: string, userId: string, dto: UpdateThreadDto) {
@@ -333,19 +416,10 @@ export class ForumService {
         where: { id: threadId },
         data: {
           title: dto.title,
+          content: dto.content,
           isLocked: dto.isLocked,
         },
       });
-
-      if (dto.content && thread.posts.length > 0) {
-        await tx.forumPost.update({
-          where: { id: thread.posts[0].id },
-          data: {
-            content: dto.content,
-            isEdited: true,
-          },
-        });
-      }
 
       if (dto.tags) {
         await tx.forumThreadTag.deleteMany({
@@ -501,6 +575,7 @@ export class ForumService {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            role: true,
           },
         },
       },
@@ -522,7 +597,13 @@ export class ForumService {
       this.logger.error('Failed to add reputation for forum post', error);
     }
 
-    return post;
+    // Enrich author data
+    const enrichedAuthor = await enrichAuthorData(this.prisma, post.author);
+
+    return {
+      ...post,
+      author: enrichedAuthor,
+    };
   }
 
   async updatePost(postId: string, userId: string, dto: UpdatePostDto) {
@@ -543,7 +624,7 @@ export class ForumService {
       throw new ForbiddenException('Thread is locked');
     }
 
-    return this.prisma.forumPost.update({
+    const updatedPost = await this.prisma.forumPost.update({
       where: { id: postId },
       data: {
         content: dto.content,
@@ -557,10 +638,22 @@ export class ForumService {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            role: true,
           },
         },
       },
     });
+
+    // Enrich author data
+    const enrichedAuthor = await enrichAuthorData(
+      this.prisma,
+      updatedPost.author,
+    );
+
+    return {
+      ...updatedPost,
+      author: enrichedAuthor,
+    };
   }
 
   async deletePost(postId: string, userId: string) {
@@ -826,6 +919,7 @@ export class ForumService {
               firstName: true,
               lastName: true,
               profilePicture: true,
+              role: true,
             },
           },
         },
@@ -849,7 +943,16 @@ export class ForumService {
         );
       }
 
-      return comment;
+      // Enrich author data
+      const enrichedAuthor = await enrichAuthorData(
+        this.prisma,
+        comment.author,
+      );
+
+      return {
+        ...comment,
+        author: enrichedAuthor,
+      };
     }
 
     // Create top-level comment
@@ -867,6 +970,7 @@ export class ForumService {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            role: true,
           },
         },
       },
@@ -886,7 +990,13 @@ export class ForumService {
       );
     }
 
-    return comment;
+    // Enrich author data
+    const enrichedAuthor = await enrichAuthorData(this.prisma, comment.author);
+
+    return {
+      ...comment,
+      author: enrichedAuthor,
+    };
   }
 
   async getPostComments(postId: string) {
@@ -911,6 +1021,7 @@ export class ForumService {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            role: true,
           },
         },
         replies: {
@@ -922,6 +1033,7 @@ export class ForumService {
                 firstName: true,
                 lastName: true,
                 profilePicture: true,
+                role: true,
               },
             },
             replies: {
@@ -933,6 +1045,7 @@ export class ForumService {
                     firstName: true,
                     lastName: true,
                     profilePicture: true,
+                    role: true,
                   },
                 },
               },
@@ -948,7 +1061,51 @@ export class ForumService {
       orderBy: { createdAt: 'asc' },
     });
 
-    return comments;
+    // Enrich all comment authors recursively
+    const enrichedComments = await Promise.all(
+      comments.map(async (comment) => {
+        const enrichedAuthor = await enrichAuthorData(
+          this.prisma,
+          comment.author,
+        );
+
+        const enrichedReplies = await Promise.all(
+          comment.replies.map(async (reply) => {
+            const enrichedReplyAuthor = await enrichAuthorData(
+              this.prisma,
+              reply.author,
+            );
+
+            const enrichedNestedReplies = await Promise.all(
+              reply.replies.map(async (nestedReply) => {
+                const enrichedNestedAuthor = await enrichAuthorData(
+                  this.prisma,
+                  nestedReply.author,
+                );
+                return {
+                  ...nestedReply,
+                  author: enrichedNestedAuthor,
+                };
+              }),
+            );
+
+            return {
+              ...reply,
+              author: enrichedReplyAuthor,
+              replies: enrichedNestedReplies,
+            };
+          }),
+        );
+
+        return {
+          ...comment,
+          author: enrichedAuthor,
+          replies: enrichedReplies,
+        };
+      }),
+    );
+
+    return enrichedComments;
   }
 
   async updateComment(
@@ -977,7 +1134,7 @@ export class ForumService {
       throw new ForbiddenException('Thread is locked');
     }
 
-    return this.prisma.forumComment.update({
+    const updatedComment = await this.prisma.forumComment.update({
       where: { id: commentId },
       data: {
         content: dto.content,
@@ -991,10 +1148,22 @@ export class ForumService {
             firstName: true,
             lastName: true,
             profilePicture: true,
+            role: true,
           },
         },
       },
     });
+
+    // Enrich author data
+    const enrichedAuthor = await enrichAuthorData(
+      this.prisma,
+      updatedComment.author,
+    );
+
+    return {
+      ...updatedComment,
+      author: enrichedAuthor,
+    };
   }
 
   async deleteComment(commentId: string, userId: string) {

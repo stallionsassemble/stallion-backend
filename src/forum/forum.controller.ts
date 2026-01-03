@@ -201,6 +201,17 @@ export class ForumController {
         viewCount: 0,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
+        author: {
+          id: 'user-uuid',
+          username: 'john_doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          profilePicture: 'https://example.com/profile.jpg',
+          role: 'USER',
+          postCount: 15,
+          reactionCount: 42,
+          replyCount: 28,
+        },
       },
     },
   })
@@ -210,6 +221,86 @@ export class ForumController {
     @Body() dto: CreateThreadDto,
   ) {
     return this.forumService.createThread(userId, dto);
+  }
+
+  @Get('threads')
+  @ApiOperation({
+    summary: 'Get all threads',
+    description:
+      'Retrieve all forum threads with pagination and optional category filter',
+  })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Filter by category ID',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of threads to return (default: 50)',
+    type: Number,
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    description: 'Number of threads to skip (default: 0)',
+    type: Number,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of threads with pagination',
+    schema: {
+      example: {
+        threads: [
+          {
+            id: 'thread-uuid',
+            title: 'How to get started with bounties?',
+            slug: 'how-to-get-started-with-bounties',
+            categoryId: 'cat-uuid',
+            category: {
+              id: 'cat-uuid',
+              name: 'General Discussion',
+              slug: 'general-discussion',
+            },
+            author: {
+              id: 'user-uuid',
+              username: 'john_doe',
+              firstName: 'John',
+              lastName: 'Doe',
+              profilePicture: 'https://example.com/profile.jpg',
+              role: 'USER',
+              postCount: 15,
+              reactionCount: 42,
+              replyCount: 28,
+            },
+            postCount: 5,
+            viewCount: 42,
+            isPinned: false,
+            isLocked: false,
+            createdAt: '2024-01-01T00:00:00.000Z',
+            tags: [
+              {
+                tag: {
+                  id: 'tag-uuid',
+                  name: 'beginner',
+                  slug: 'beginner',
+                },
+              },
+            ],
+          },
+        ],
+        total: 100,
+        limit: 50,
+        offset: 0,
+      },
+    },
+  })
+  getAllThreads(
+    @Query('categoryId') categoryId?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.forumService.getAllThreads({ categoryId, limit, offset });
   }
 
   @Get('threads/search')
@@ -318,10 +409,15 @@ export class ForumController {
         viewCount: 42,
         createdAt: '2024-01-01T00:00:00.000Z',
         author: {
+          id: 'user-uuid',
           username: 'john_doe',
           firstName: 'John',
           lastName: 'Doe',
           profilePicture: 'https://example.com/profile.jpg',
+          role: 'USER',
+          postCount: 15,
+          reactionCount: 42,
+          replyCount: 28,
         },
         posts: [
           {
@@ -331,9 +427,15 @@ export class ForumController {
             threadId: 'thread-uuid',
             createdAt: '2024-01-01T01:00:00.000Z',
             author: {
+              id: 'user-uuid-2',
               username: 'helper',
               firstName: 'Helper',
               lastName: 'User',
+              profilePicture: 'https://example.com/profile2.jpg',
+              role: 'USER',
+              postCount: 8,
+              reactionCount: 20,
+              replyCount: 15,
             },
             reactions: [
               {
@@ -450,6 +552,17 @@ export class ForumController {
         threadId: 'thread-uuid',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
+        author: {
+          id: 'user-uuid',
+          username: 'john_doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          profilePicture: 'https://example.com/profile.jpg',
+          role: 'USER',
+          postCount: 15,
+          reactionCount: 42,
+          replyCount: 28,
+        },
       },
     },
   })
@@ -474,6 +587,17 @@ export class ForumController {
         id: 'post-uuid',
         content: 'Updated post content...',
         updatedAt: '2024-01-01T12:00:00.000Z',
+        author: {
+          id: 'user-uuid',
+          username: 'john_doe',
+          firstName: 'John',
+          lastName: 'Doe',
+          profilePicture: 'https://example.com/profile.jpg',
+          role: 'USER',
+          postCount: 15,
+          reactionCount: 42,
+          replyCount: 28,
+        },
       },
     },
   })
@@ -667,6 +791,10 @@ export class ForumController {
           firstName: 'John',
           lastName: 'Doe',
           profilePicture: 'https://example.com/pic.jpg',
+          role: 'USER',
+          postCount: 15,
+          reactionCount: 42,
+          replyCount: 28,
         },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
@@ -705,7 +833,11 @@ export class ForumController {
             username: 'john_doe',
             firstName: 'John',
             lastName: 'Doe',
-            profilePicture: 'https://example.com/pic.jpg',
+            profilePicture: 'https://example.com/profile.jpg',
+            role: 'USER',
+            postCount: 15,
+            reactionCount: 42,
+            replyCount: 28,
           },
           replies: [
             {
@@ -721,6 +853,10 @@ export class ForumController {
                 firstName: 'Jane',
                 lastName: 'Smith',
                 profilePicture: null,
+                role: 'USER',
+                postCount: 8,
+                reactionCount: 20,
+                replyCount: 15,
               },
               replies: [],
               createdAt: '2024-01-01T00:05:00.000Z',

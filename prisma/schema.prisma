@@ -427,6 +427,7 @@ model ForumThread {
   id        String   @id @default(cuid())
   title     String
   slug      String   @unique
+  content   String   @default("")
   isLocked  Boolean  @default(false) @map("is_locked")
   viewCount Int      @default(0) @map("view_count")
   createdAt DateTime @default(now()) @map("created_at")
