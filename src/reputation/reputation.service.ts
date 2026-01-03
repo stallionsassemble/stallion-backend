@@ -357,6 +357,7 @@ export class ReputationService {
               firstName: true,
               lastName: true,
               profilePicture: true,
+              skills: true,
             },
           },
         },
@@ -364,8 +365,147 @@ export class ReputationService {
       this.prisma.userReputation.count(),
     ]);
 
+    // Enrich data with additional fields
+    const enrichedData = await Promise.all(
+      data.map(async (entry) => {
+        const userId = entry.user.id;
+
+        // Get bounty applications and wins
+        const [bountySubmissions, bountyWins] = await Promise.all([
+          this.prisma.bountySubmission.count({
+            where: { userId },
+          }),
+          this.prisma.bountyWinner.count({
+            where: { userId },
+          }),
+        ]);
+
+        // Get project applications and wins
+        const [projectApplications, projectWins] = await Promise.all([
+          this.prisma.projectApplication.count({
+            where: { userId },
+          }),
+          this.prisma.projectApplication.count({
+            where: { userId, status: 'ACCEPTED' },
+          }),
+        ]);
+
+        const totalApplications = bountySubmissions + projectApplications;
+        const totalWins = bountyWins + projectWins;
+
+        // Calculate success rate
+        const successRate =
+          totalApplications > 0
+            ? Math.round((totalWins / totalApplications) * 100 * 10) / 10
+            : 0;
+
+        // Check if verified (has won at least one bounty or project)
+        const isVerified = totalWins > 0;
+
+        // Calculate primary skill
+        let primarySkill = entry.user.skills?.[0] || 'N/A';
+
+        if (entry.user.skills && entry.user.skills.length > 0) {
+          // Get all bounty and project skills from applications
+          const [bountySkills, projectSkills] = await Promise.all([
+            this.prisma.bountySubmission.findMany({
+              where: { userId },
+              include: {
+                bounty: {
+                  select: { skills: true },
+                },
+              },
+            }),
+            this.prisma.projectApplication.findMany({
+              where: { userId },
+              include: {
+                project: {
+                  select: { skills: true },
+                },
+              },
+            }),
+          ]);
+
+          // Count skill occurrences
+          const skillCounts: Record<string, number> = {};
+          bountySkills.forEach((sub) => {
+            sub.bounty.skills.forEach((skill) => {
+              if (entry.user.skills.includes(skill)) {
+                skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+              }
+            });
+          });
+          projectSkills.forEach((app) => {
+            app.project.skills.forEach((skill) => {
+              if (entry.user.skills.includes(skill)) {
+                skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+              }
+            });
+          });
+
+          // Find most common skill
+          const mostCommonSkill = Object.entries(skillCounts).sort(
+            ([, a], [, b]) => b - a,
+          )[0];
+          if (mostCommonSkill) {
+            primarySkill = mostCommonSkill[0];
+          }
+        }
+
+        // Calculate total earnings
+        const [bountyEarnings, projectMilestones] = await Promise.all([
+          this.prisma.bountyWinner.findMany({
+            where: { userId },
+            include: {
+              bounty: {
+                select: { reward: true, rewardDistribution: true },
+              },
+            },
+          }),
+          this.prisma.projectMilestone.findMany({
+            where: {
+              contributorId: userId,
+              status: 'PAID',
+            },
+            select: {
+              amount: true,
+            },
+          }),
+        ]);
+
+        let totalEarnings = BigInt(0);
+
+        // Calculate bounty earnings
+        bountyEarnings.forEach((winner) => {
+          const distribution = winner.bounty.rewardDistribution as any[];
+          const positionReward = distribution.find(
+            (d) => d.rank === winner.position,
+          );
+          if (positionReward) {
+            const bountyReward = BigInt(winner.bounty.reward);
+            const percentage = BigInt(positionReward.percentage);
+            totalEarnings += (bountyReward * percentage) / BigInt(100);
+          }
+        });
+
+        // Add project earnings
+        projectMilestones.forEach((milestone) => {
+          totalEarnings += BigInt(milestone.amount);
+        });
+
+        return {
+          ...entry,
+          successRate,
+          isVerified,
+          primarySkill,
+          completedTasksCount: totalWins,
+          earnedAmount: totalEarnings.toString(),
+        };
+      }),
+    );
+
     return {
-      data,
+      data: enrichedData,
       pagination: {
         total,
         page,

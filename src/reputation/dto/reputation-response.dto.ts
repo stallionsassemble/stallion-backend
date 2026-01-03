@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ReputationLevel } from '@prisma/client';
 
 export class ReputationResponseDto {
   @ApiProperty({ description: 'Unique identifier', example: 'rep-uuid' })
@@ -7,8 +8,13 @@ export class ReputationResponseDto {
   @ApiProperty({ description: 'Total reputation score', example: 1250 })
   score: number;
 
-  @ApiProperty({ description: 'Reputation level', example: '5' })
-  level: string;
+  @ApiProperty({
+    description:
+      'Reputation level (NEWCOMER, CONTRIBUTOR, REGULAR, VETERAN, EXPERT, MASTER, LEGEND)',
+    example: 'VETERAN',
+    enum: ReputationLevel,
+  })
+  level: ReputationLevel;
 
   @ApiProperty({ description: 'Score from bounties', example: 800 })
   bountyScore: number;
@@ -108,11 +114,62 @@ export class LeaderboardEntryDto {
   @ApiProperty({ description: 'Total reputation score', example: 1250 })
   score: number;
 
-  @ApiProperty({ description: 'Reputation level', example: '5' })
+  @ApiProperty({
+    description:
+      'Reputation level (NEWCOMER, CONTRIBUTOR, REGULAR, VETERAN, EXPERT, MASTER, LEGEND)',
+    example: 'VETERAN',
+    enum: [
+      'NEWCOMER',
+      'CONTRIBUTOR',
+      'REGULAR',
+      'VETERAN',
+      'EXPERT',
+      'MASTER',
+      'LEGEND',
+    ],
+  })
   level: string;
 
   @ApiProperty({ description: 'Leaderboard rank', example: 42 })
   rank: number;
+
+  @ApiProperty({
+    description:
+      'Success rate (percentage of bounties/projects applied to and won)',
+    example: 75.5,
+  })
+  successRate: number;
+
+  @ApiProperty({
+    description: 'Whether the user has ever won a bounty or project',
+    example: true,
+  })
+  isVerified: boolean;
+
+  @ApiProperty({
+    description: 'Primary skill based on most common skill in applications',
+    example: 'React',
+  })
+  primarySkill: string;
+
+  @ApiProperty({
+    description: 'Total number of won bounties and projects',
+    example: 12,
+  })
+  completedTasksCount: number;
+
+  @ApiProperty({
+    description: 'Total amount earned from bounties and projects',
+    example: '15000',
+  })
+  earnedAmount: string;
+
+  @ApiProperty({
+    description: 'User badges',
+    type: [String],
+    example: ['badge-uuid-1', 'badge-uuid-2'],
+  })
+  badges: string[];
 }
 
 export class BadgeDto {
