@@ -45,7 +45,7 @@ export class StellarAccountService {
   async getAccountBalance(publicKey: string): Promise<string> {
     try {
       this.logger.log(`Fetching balance for public key: ${publicKey}`);
-      const account = await this.server.loadAccount(publicKey);
+      const account = await this.loadWithRetry(this.server, publicKey);
 
       const bal = account.balances.find((b) => b.asset_type === 'native');
 
@@ -81,7 +81,7 @@ export class StellarAccountService {
   > {
     try {
       this.logger.log(`Fetching all balances for public key: ${publicKey}`);
-      const account = await this.server.loadAccount(publicKey);
+      const account = await this.loadWithRetry(this.server, publicKey);
 
       return account.balances.map((bal: any) => ({
         asset_type: bal.asset_type,
@@ -96,5 +96,17 @@ export class StellarAccountService {
       );
       return [];
     }
+  }
+
+  private async loadWithRetry(server: Horizon.Server, pk: string, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await server.loadAccount(pk);
+      } catch (e) {
+        this.logger.error(`Failed to load account ${pk}`, e);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+    throw new Error('Account not found after retries');
   }
 }
