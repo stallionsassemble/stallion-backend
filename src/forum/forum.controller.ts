@@ -19,7 +19,9 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { AddReactionDto } from './dto/add-reaction.dto';
+import { AddCommentReactionDto } from './dto/comment-reaction.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -245,10 +247,11 @@ export class ForumController {
   }
 
   @Get('threads')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Get all threads',
     description:
-      'Retrieve all forum threads with pagination and optional category filter',
+      'Retrieve all forum threads with pagination and optional category filter. Authentication is optional - if provided, includes hasReacted field in reactions.',
   })
   @ApiQuery({
     name: 'categoryId',
@@ -299,6 +302,14 @@ export class ForumController {
             isPinned: false,
             isLocked: false,
             createdAt: '2024-01-01T00:00:00.000Z',
+            reactions: [
+              {
+                emoji: '👍',
+                count: 5,
+                userIds: ['user-1', 'user-2'],
+                hasReacted: false,
+              },
+            ],
             tags: [
               {
                 tag: {
@@ -320,14 +331,20 @@ export class ForumController {
     @Query('categoryId') categoryId?: string,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
+    @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.forumService.getAllThreads({ categoryId, limit, offset });
+    return this.forumService.getAllThreads(
+      { categoryId, limit, offset },
+      currentUserId,
+    );
   }
 
   @Get('threads/search')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Search threads',
-    description: 'Search for threads by query and optional category filter',
+    description:
+      'Search for threads by query and optional category filter. Authentication is optional - if provided, includes hasReacted field in reactions.',
   })
   @ApiQuery({ name: 'q', description: 'Search query' })
   @ApiQuery({
@@ -365,8 +382,9 @@ export class ForumController {
   searchThreads(
     @Query('q') query: string,
     @Query('categoryId') categoryId?: string,
+    @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.forumService.searchThreads(query, categoryId);
+    return this.forumService.searchThreads(query, categoryId, currentUserId);
   }
 
   @Get('threads/pinned')
@@ -408,9 +426,11 @@ export class ForumController {
   }
 
   @Get('threads/:slug')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Get thread by slug',
-    description: 'Retrieve a specific thread with all its posts',
+    description:
+      'Retrieve a specific thread with all its posts. Authentication is optional - if provided, includes hasReacted field in reactions.',
   })
   @ApiParam({ name: 'slug', description: 'Thread slug' })
   @ApiResponse({
@@ -477,8 +497,11 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 404, description: 'Thread not found' })
-  getThread(@Param('slug') slug: string) {
-    return this.forumService.getThread(slug);
+  getThread(
+    @Param('slug') slug: string,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.forumService.getThread(slug, currentUserId);
   }
 
   @Patch('threads/:id')
@@ -832,9 +855,11 @@ export class ForumController {
   }
 
   @Get('posts/:id/comments')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Get post comments',
-    description: 'Retrieve all comments for a post with nested replies',
+    description:
+      'Retrieve all comments for a post with nested replies. Authentication is optional - if provided, includes hasReacted field in reactions.',
   })
   @ApiParam({ name: 'id', description: 'Post ID' })
   @ApiResponse({
@@ -889,8 +914,11 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  getPostComments(@Param('id') id: string) {
-    return this.forumService.getPostComments(id);
+  getPostComments(
+    @Param('id') postId: string,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.forumService.getPostComments(postId, currentUserId);
   }
 
   @Patch('comments/:id')
@@ -948,6 +976,78 @@ export class ForumController {
   @ApiResponse({ status: 404, description: 'Comment not found' })
   deleteComment(@Param('id') id: string, @CurrentUser('id') userId: string) {
     return this.forumService.deleteComment(id, userId);
+  }
+
+  @Post('comments/:id/reactions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Add/Remove comment reaction',
+    description:
+      'Add or remove a reaction to a comment. If the reaction already exists, it will be removed.',
+  })
+  @ApiParam({ name: 'id', description: 'Comment ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Reaction added or removed successfully',
+    schema: {
+      example: {
+        message: 'Reaction added',
+        action: 'added',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
+  addRemoveCommentReaction(
+    @Param('id') commentId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: AddCommentReactionDto,
+  ) {
+    return this.forumService.addRemoveCommentReaction(userId, commentId, dto);
+  }
+
+  @Get('comments/:id/reactions')
+  @ApiOperation({
+    summary: 'Get comment reactions',
+    description: 'Get all reactions for a specific comment, grouped by emoji',
+  })
+  @ApiParam({ name: 'id', description: 'Comment ID' })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'User ID to check if they have reacted',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Comment reactions retrieved successfully',
+    schema: {
+      example: {
+        commentId: 'comment-uuid',
+        reactions: [
+          {
+            emoji: '👍',
+            count: 3,
+            userIds: ['user-1', 'user-2', 'user-3'],
+            hasReacted: false,
+          },
+          {
+            emoji: '❤️',
+            count: 2,
+            userIds: ['user-4', 'user-5'],
+            hasReacted: true,
+          },
+        ],
+        totalReactions: 5,
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: 'Comment not found' })
+  getCommentReactions(
+    @Param('id') commentId: string,
+    @Query('userId') userId?: string,
+  ) {
+    return this.forumService.getCommentReactions(commentId, userId);
   }
 
   @Post('threads/:id/reactions')

@@ -361,11 +361,14 @@ export class ForumService {
     });
   }
 
-  async getAllThreads(params?: {
-    categoryId?: string;
-    limit?: number;
-    offset?: number;
-  }) {
+  async getAllThreads(
+    params?: {
+      categoryId?: string;
+      limit?: number;
+      offset?: number;
+    },
+    currentUserId?: string,
+  ) {
     const { categoryId, limit = 50, offset = 0 } = params || {};
 
     const threads = await this.prisma.forumThread.findMany({
@@ -390,6 +393,12 @@ export class ForumService {
             tag: true,
           },
         },
+        reactions: {
+          select: {
+            emoji: true,
+            userId: true,
+          },
+        },
         _count: {
           select: {
             posts: true,
@@ -398,7 +407,7 @@ export class ForumService {
       },
     });
 
-    // Enrich author data with stats
+    // Enrich author data with stats and add reactions
     const enrichedThreads = await Promise.all(
       threads.map(async (thread) => {
         const enrichedAuthor = await enrichAuthorData(
@@ -406,10 +415,16 @@ export class ForumService {
           thread.author,
         );
 
+        const consolidatedReactions = await this.consolidateReactions(
+          thread.reactions,
+          currentUserId,
+        );
+
         return {
           ...thread,
           author: enrichedAuthor,
           postCount: thread._count.posts,
+          reactions: consolidatedReactions,
         };
       }),
     );
@@ -426,7 +441,7 @@ export class ForumService {
     };
   }
 
-  async getThread(slug: string) {
+  async getThread(slug: string, currentUserId?: string) {
     const thread = await this.prisma.forumThread.findUnique({
       where: { slug },
       include: {
@@ -446,6 +461,12 @@ export class ForumService {
             tag: true,
           },
         },
+        reactions: {
+          select: {
+            emoji: true,
+            userId: true,
+          },
+        },
         posts: {
           orderBy: { createdAt: 'asc' },
           include: {
@@ -460,13 +481,9 @@ export class ForumService {
               },
             },
             reactions: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                  },
-                },
+              select: {
+                emoji: true,
+                userId: true,
               },
             },
           },
@@ -486,16 +503,27 @@ export class ForumService {
     // Enrich author data
     const enrichedAuthor = await enrichAuthorData(this.prisma, thread.author);
 
-    // Enrich post authors
+    // Consolidate thread reactions
+    const threadReactions = await this.consolidateReactions(
+      thread.reactions,
+      currentUserId,
+    );
+
+    // Enrich post authors and consolidate post reactions
     const enrichedPosts = await Promise.all(
       thread.posts.map(async (post) => {
         const enrichedPostAuthor = await enrichAuthorData(
           this.prisma,
           post.author,
         );
+        const postReactions = await this.consolidateReactions(
+          post.reactions,
+          currentUserId,
+        );
         return {
           ...post,
           author: enrichedPostAuthor,
+          reactions: postReactions,
         };
       }),
     );
@@ -503,6 +531,7 @@ export class ForumService {
     return {
       ...thread,
       author: enrichedAuthor,
+      reactions: threadReactions,
       posts: enrichedPosts,
     };
   }
@@ -894,7 +923,11 @@ export class ForumService {
     };
   }
 
-  async searchThreads(query: string, categoryId?: string) {
+  async searchThreads(
+    query: string,
+    categoryId?: string,
+    currentUserId?: string,
+  ) {
     const where: any = {
       OR: [
         { title: { contains: query, mode: 'insensitive' } },
@@ -912,7 +945,7 @@ export class ForumService {
       where.categoryId = categoryId;
     }
 
-    return this.prisma.forumThread.findMany({
+    const threads = await this.prisma.forumThread.findMany({
       where,
       take: 20,
       orderBy: { updatedAt: 'desc' },
@@ -927,11 +960,33 @@ export class ForumService {
           },
         },
         category: true,
+        reactions: {
+          select: {
+            emoji: true,
+            userId: true,
+          },
+        },
         _count: {
           select: { posts: true },
         },
       },
     });
+
+    // Add reactions to each thread
+    const threadsWithReactions = await Promise.all(
+      threads.map(async (thread) => {
+        const consolidatedReactions = await this.consolidateReactions(
+          thread.reactions,
+          currentUserId,
+        );
+        return {
+          ...thread,
+          reactions: consolidatedReactions,
+        };
+      }),
+    );
+
+    return threadsWithReactions;
   }
 
   async getTags() {
@@ -1113,7 +1168,7 @@ export class ForumService {
     };
   }
 
-  async getPostComments(postId: string) {
+  async getPostComments(postId: string, currentUserId?: string) {
     const post = await this.prisma.forumPost.findUnique({
       where: { id: postId },
     });
@@ -1138,6 +1193,12 @@ export class ForumService {
             role: true,
           },
         },
+        reactions: {
+          select: {
+            emoji: true,
+            userId: true,
+          },
+        },
         replies: {
           include: {
             author: {
@@ -1150,6 +1211,12 @@ export class ForumService {
                 role: true,
               },
             },
+            reactions: {
+              select: {
+                emoji: true,
+                userId: true,
+              },
+            },
             replies: {
               include: {
                 author: {
@@ -1160,6 +1227,12 @@ export class ForumService {
                     lastName: true,
                     profilePicture: true,
                     role: true,
+                  },
+                },
+                reactions: {
+                  select: {
+                    emoji: true,
+                    userId: true,
                   },
                 },
               },
@@ -1175,12 +1248,16 @@ export class ForumService {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Enrich all comment authors recursively
+    // Enrich all comment authors and add reactions recursively
     const enrichedComments = await Promise.all(
       comments.map(async (comment) => {
         const enrichedAuthor = await enrichAuthorData(
           this.prisma,
           comment.author,
+        );
+        const commentReactions = await this.consolidateReactions(
+          comment.reactions,
+          currentUserId,
         );
 
         const enrichedReplies = await Promise.all(
@@ -1189,6 +1266,10 @@ export class ForumService {
               this.prisma,
               reply.author,
             );
+            const replyReactions = await this.consolidateReactions(
+              reply.reactions,
+              currentUserId,
+            );
 
             const enrichedNestedReplies = await Promise.all(
               reply.replies.map(async (nestedReply) => {
@@ -1196,9 +1277,14 @@ export class ForumService {
                   this.prisma,
                   nestedReply.author,
                 );
+                const nestedReactions = await this.consolidateReactions(
+                  nestedReply.reactions,
+                  currentUserId,
+                );
                 return {
                   ...nestedReply,
                   author: enrichedNestedAuthor,
+                  reactions: nestedReactions,
                 };
               }),
             );
@@ -1206,6 +1292,7 @@ export class ForumService {
             return {
               ...reply,
               author: enrichedReplyAuthor,
+              reactions: replyReactions,
               replies: enrichedNestedReplies,
             };
           }),
@@ -1214,6 +1301,7 @@ export class ForumService {
         return {
           ...comment,
           author: enrichedAuthor,
+          reactions: commentReactions,
           replies: enrichedReplies,
         };
       }),
@@ -1352,6 +1440,39 @@ export class ForumService {
     return { message: 'Reaction added', action: 'added' };
   }
 
+  private async consolidateReactions(reactions: any[], currentUserId?: string) {
+    const consolidated = reactions.reduce(
+      (acc, reaction) => {
+        const emoji = reaction.emoji;
+        if (!acc[emoji]) {
+          acc[emoji] = {
+            emoji,
+            count: 0,
+            userIds: [],
+            hasReacted: false,
+          };
+        }
+        acc[emoji].count++;
+        acc[emoji].userIds.push(reaction.userId);
+        if (currentUserId && reaction.userId === currentUserId) {
+          acc[emoji].hasReacted = true;
+        }
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          emoji: string;
+          count: number;
+          userIds: string[];
+          hasReacted: boolean;
+        }
+      >,
+    );
+
+    return Object.values(consolidated);
+  }
+
   async getThreadReactions(threadId: string, currentUserId?: string) {
     const thread = await this.prisma.forumThread.findUnique({
       where: { id: threadId },
@@ -1417,6 +1538,117 @@ export class ForumService {
 
     return {
       threadId,
+      reactions: Object.values(consolidatedReactions),
+      totalReactions: reactions.length,
+    };
+  }
+
+  async addRemoveCommentReaction(
+    userId: string,
+    commentId: string,
+    dto: { emoji: string },
+  ) {
+    const comment = await this.prisma.forumComment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const existing = await this.prisma.commentReaction.findUnique({
+      where: {
+        commentId_userId_emoji: {
+          commentId,
+          userId,
+          emoji: dto.emoji,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.prisma.commentReaction.delete({
+        where: { id: existing.id },
+      });
+      return { message: 'Reaction removed', action: 'removed' };
+    }
+
+    await this.prisma.commentReaction.create({
+      data: {
+        commentId,
+        userId,
+        emoji: dto.emoji,
+      },
+    });
+
+    return { message: 'Reaction added', action: 'added' };
+  }
+
+  async getCommentReactions(commentId: string, currentUserId?: string) {
+    const comment = await this.prisma.forumComment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const reactions = await this.prisma.commentReaction.findMany({
+      where: { commentId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+          },
+        },
+      },
+    });
+
+    // Consolidate reactions by emoji
+    const consolidatedReactions = reactions.reduce(
+      (acc, reaction) => {
+        const emoji = reaction.emoji;
+        if (!acc[emoji]) {
+          acc[emoji] = {
+            emoji,
+            count: 0,
+            userIds: [],
+            users: [],
+            hasReacted: false,
+          };
+        }
+        acc[emoji].count++;
+        acc[emoji].userIds.push(reaction.userId);
+        acc[emoji].users.push({
+          id: reaction.user.id,
+          username: reaction.user.username,
+          firstName: reaction.user.firstName,
+          lastName: reaction.user.lastName,
+          profilePicture: reaction.user.profilePicture,
+        });
+        if (currentUserId && reaction.userId === currentUserId) {
+          acc[emoji].hasReacted = true;
+        }
+        return acc;
+      },
+      {} as Record<
+        string,
+        {
+          emoji: string;
+          count: number;
+          userIds: string[];
+          users: any[];
+          hasReacted: boolean;
+        }
+      >,
+    );
+
+    return {
+      commentId,
       reactions: Object.values(consolidatedReactions),
       totalReactions: reactions.length,
     };

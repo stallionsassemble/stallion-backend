@@ -69,6 +69,7 @@ model User {
   forumComments     ForumComment[]
   forumReactions    ForumReaction[]
   threadReactions   ThreadReaction[]
+  commentReactions  CommentReaction[]
   pinnedThreads     UserThreadPin[]
 
   // Chat relations
@@ -489,6 +490,7 @@ model ForumComment {
   parentId      String?        @map("parent_id")
   parent        ForumComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies       ForumComment[] @relation("CommentReplies")
+  reactions     CommentReaction[]
 
   @@index([postId, createdAt])
   @@index([authorId])
@@ -528,6 +530,23 @@ model ThreadReaction {
   @@index([threadId])
   @@index([userId])
   @@map("thread_reactions")
+}
+
+model CommentReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  commentId String       @map("comment_id")
+  comment   ForumComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId, emoji])
+  @@index([commentId])
+  @@index([userId])
+  @@map("comment_reactions")
 }
 
 model ForumTag {

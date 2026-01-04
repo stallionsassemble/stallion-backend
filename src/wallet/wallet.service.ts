@@ -59,9 +59,23 @@ export class WalletService {
     // Sync wallet with blockchain before fetching transactions
     await this.syncWallet(walletId);
 
-    return this.prisma.transaction.findMany({
+    const transactions = await this.prisma.transaction.findMany({
       where: { walletId },
-      orderBy: { createdAt: 'desc' },
+    });
+
+    // Sort by metadata.created_at if it exists, otherwise by transaction.createdAt
+    return transactions.sort((a, b) => {
+      const aMetadata = a.metadata as any;
+      const bMetadata = b.metadata as any;
+
+      const aDate = aMetadata?.created_at
+        ? new Date(aMetadata.created_at)
+        : a.createdAt;
+      const bDate = bMetadata?.created_at
+        ? new Date(bMetadata.created_at)
+        : b.createdAt;
+
+      return bDate.getTime() - aDate.getTime(); // Descending order (newest first)
     });
   }
 
@@ -343,43 +357,6 @@ export class WalletService {
   }
 
   /**
-   * Process payout to winner wallet
-   * Used when bounty winners are selected
-   */
-  async processPayout(
-    walletId: string,
-    amount: number,
-    currency: string,
-    bountyId: string,
-    position: number,
-  ) {
-    return this.prisma.$transaction(async (tx) => {
-      // Create payout transaction (balance tracked on Stellar network)
-      const transaction = await tx.transaction.create({
-        data: {
-          walletId,
-          type: TxType.PAYOUT,
-          amount,
-          currency,
-          state: TxState.COMPLETED,
-          idempotencyKey: generateIdempotencyKey(),
-          note: `Bounty reward - Position ${position}`,
-          metadata: {
-            bountyId,
-            position,
-          } as Prisma.InputJsonValue,
-        },
-      });
-
-      this.logger.log(
-        `Processed payout to wallet ${walletId}: ${amount} ${currency} for bounty ${bountyId}`,
-      );
-
-      return transaction;
-    });
-  }
-
-  /**
    * Get wallet balance with available balance for all assets
    */
   async getWalletBalance(walletId: string) {
@@ -634,6 +611,7 @@ export class WalletService {
                     asset_type: paymentOp.asset_type,
                     asset_code: paymentOp.asset_code,
                     asset_issuer: paymentOp.asset_issuer,
+                    created_at: paymentOp.created_at,
                   } as Prisma.InputJsonValue,
                 },
               });
@@ -670,6 +648,7 @@ export class WalletService {
                     syncedAt: new Date().toISOString(),
                     operationType: op.type,
                     txHash: txRecord.hash,
+                    created_at: createAccountOp.created_at,
                   } as Prisma.InputJsonValue,
                 },
               });
