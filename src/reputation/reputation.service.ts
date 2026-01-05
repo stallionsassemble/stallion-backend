@@ -32,7 +32,18 @@ export class ReputationService {
       reputation = await this.createReputation(userId);
     }
 
-    return reputation;
+    // Get user rating
+    const ratingResult = await this.prisma.userReview.aggregate({
+      where: { reviewedUserId: userId },
+      _avg: { rating: true },
+      _count: true,
+    });
+
+    return {
+      ...reputation,
+      rating: ratingResult._avg.rating || 0,
+      totalReviews: ratingResult._count,
+    };
   }
 
   async createReputation(userId: string) {
@@ -493,6 +504,13 @@ export class ReputationService {
           totalEarnings += BigInt(milestone.amount);
         });
 
+        // Get user rating
+        const ratingResult = await this.prisma.userReview.aggregate({
+          where: { reviewedUserId: userId },
+          _avg: { rating: true },
+          _count: true,
+        });
+
         return {
           ...entry,
           successRate,
@@ -500,6 +518,8 @@ export class ReputationService {
           primarySkill,
           completedTasksCount: totalWins,
           earnedAmount: totalEarnings.toString(),
+          rating: ratingResult._avg.rating || 0,
+          totalReviews: ratingResult._count,
         };
       }),
     );

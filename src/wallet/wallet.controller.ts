@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Post, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -150,5 +150,30 @@ export class WalletController {
       wallet.id,
       dto.currencyCode,
     );
+  }
+
+  @Delete('trustline')
+  @ApiOperation({
+    summary: 'Remove trustline for a currency',
+    description:
+      'Remove a trustline for a currency. Balance must be zero before removal.',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Trustline removed successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Cannot remove trustline - balance not zero or invalid currency',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async removeTrustline(
+    @CurrentUser('id') userId: string,
+    @Body() dto: SetupTrustlineDto,
+  ) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
+
+    return this.walletService.removeTrustline(wallet.id, dto.currencyCode);
   }
 }

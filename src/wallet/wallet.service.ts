@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, TxState, TxType } from '@prisma/client';
+import * as StellarSdk from '@stellar/stellar-sdk';
 import { Horizon } from '@stellar/stellar-sdk';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -726,6 +727,89 @@ export class WalletService {
         error,
       );
       throw error;
+    }
+  }
+
+  /**
+   * Remove trustline for a specific currency
+   */
+  async removeTrustline(
+    walletId: string,
+    currencyCode: string,
+  ): Promise<{
+    success: boolean;
+    txHash?: string;
+    message: string;
+  }> {
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: walletId },
+    });
+
+    if (!wallet) {
+      throw new NotFoundException('Wallet not found');
+    }
+
+    if (!wallet.isActivated) {
+      throw new BadRequestException('Wallet is not activated');
+    }
+
+    // Check balance is zero for the currency
+    const balance = await this.getWalletBalance(walletId);
+    const assetBalance = balance.balances.find(
+      (b) => b.asset_code === currencyCode,
+    );
+    if (assetBalance && parseFloat(assetBalance.balance.toString()) > 0) {
+      throw new BadRequestException(
+        `Cannot remove trustline: ${currencyCode} balance must be zero`,
+      );
+    }
+
+    const networkPassphrase = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
+    );
+
+    try {
+      // Use Stellar SDK to remove trustline
+      const server = this.stellarAccount.getServer();
+      const sourceAccount = await server.loadAccount(wallet.publicKey);
+
+      const asset = new StellarSdk.Asset(
+        currencyCode,
+        this.configService.getOrThrow<string>(`ASSET_${currencyCode}_ISSUER`),
+      );
+
+      const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
+        fee: StellarSdk.BASE_FEE,
+        networkPassphrase,
+      })
+        .addOperation(
+          StellarSdk.Operation.changeTrust({
+            asset,
+            limit: '0', // Setting limit to 0 removes the trustline
+          }),
+        )
+        .setTimeout(30)
+        .build();
+
+      const signedTx = await this.walletSigning.signTransaction(
+        walletId,
+        transaction,
+      );
+      const result = await server.submitTransaction(signedTx);
+
+      return {
+        success: true,
+        txHash: result.hash,
+        message: `Trustline for ${currencyCode} removed successfully`,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to remove trustline for wallet ${walletId} and currency ${currencyCode}`,
+        error,
+      );
+      throw new BadRequestException(
+        `Failed to remove trustline: ${error.message}`,
+      );
     }
   }
 

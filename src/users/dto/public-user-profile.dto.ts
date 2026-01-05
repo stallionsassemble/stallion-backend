@@ -88,4 +88,22 @@ export class PublicUserProfileDto {
     example: '2023-01-01T00:00:00.000Z',
   })
   createdAt?: Date;
+
+  @ApiProperty({
+    description: 'Total amount earned from bounties and projects',
+    example: '50000',
+  })
+  totalEarned: string;
+
+  @ApiProperty({
+    description: 'Total number of submissions (bounties + projects)',
+    example: 15,
+  })
+  totalSubmissions: number;
+
+  @ApiProperty({
+    description: 'Total number of wins (bounties + accepted projects)',
+    example: 8,
+  })
+  totalWon: number;
 }

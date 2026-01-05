@@ -292,19 +292,14 @@ export class ProjectsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'Apply to a project',
-    description:
-      'Submit an application to work on a project. Only accessible by contributors.',
+    summary: 'Apply to project',
+    description: 'Submit an application to a project',
   })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({
     status: 201,
     description: 'Application submitted successfully',
     type: ApplicationResponseDto,
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Bad request - validation failed or already applied',
   })
   @ApiResponse({ status: 403, description: 'Forbidden - not a contributor' })
   @ApiResponse({ status: 404, description: 'Project not found' })
@@ -314,6 +309,38 @@ export class ProjectsController {
     @Body() dto: ApplyToProjectDto,
   ) {
     return this.applicationsService.applyToProject(userId, projectId, dto);
+  }
+
+  @Patch('applications/:applicationId')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Update project application',
+    description:
+      'Update an existing application (only before deadline and if not reviewed)',
+  })
+  @ApiParam({ name: 'applicationId', description: 'Application ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Application updated successfully',
+    type: ApplicationResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - deadline passed or already reviewed',
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden - not your application' })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  async updateApplication(
+    @Param('applicationId') applicationId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ApplyToProjectDto,
+  ) {
+    return this.applicationsService.updateApplication(
+      applicationId,
+      userId,
+      dto,
+    );
   }
 
   @Get(':id/applications')

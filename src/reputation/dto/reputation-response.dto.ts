@@ -170,6 +170,18 @@ export class LeaderboardEntryDto {
     example: ['badge-uuid-1', 'badge-uuid-2'],
   })
   badges: string[];
+
+  @ApiProperty({
+    description: 'Average user rating from reviews (1-5 stars)',
+    example: 4.5,
+  })
+  rating: number;
+
+  @ApiProperty({
+    description: 'Total number of reviews received',
+    example: 15,
+  })
+  totalReviews: number;
 }
 
 export class BadgeDto {

@@ -116,6 +116,68 @@ export class ProjectApplicationsService {
     return application;
   }
 
+  async updateApplication(
+    applicationId: string,
+    userId: string,
+    dto: ApplyToProjectDto,
+  ) {
+    const application = await this.prisma.projectApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        project: true,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    if (application.userId !== userId) {
+      throw new ForbiddenException('You can only update your own application');
+    }
+
+    if (application.status !== ApplicationStatus.PENDING) {
+      throw new BadRequestException(
+        'Cannot update application that has been reviewed',
+      );
+    }
+
+    if (new Date() > application.project.deadline) {
+      throw new BadRequestException(
+        'Cannot update application after project deadline',
+      );
+    }
+
+    return this.prisma.projectApplication.update({
+      where: { id: applicationId },
+      data: {
+        coverLetter: dto.coverLetter,
+        estimatedCompletionTime: dto.estimatedCompletionTime,
+        portfolioLinks: dto.portfolioLinks || [],
+        attachments: dto.attachments,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+            skills: true,
+          },
+        },
+        project: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+          },
+        },
+      },
+    });
+  }
+
   async reviewApplication(
     applicationId: string,
     ownerId: string,

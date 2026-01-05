@@ -8,6 +8,7 @@ import { BountiesModule } from './bounties/bounties.module';
 import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { CronModule } from './cron/cron.module';
+import { DiscussionsModule } from './discussions/discussions.module';
 import { ForumModule } from './forum/forum.module';
 import { HackathonsModule } from './hackathons/hackathons.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -42,6 +43,7 @@ import { WalletModule } from './wallet/wallet.module';
     ReputationModule,
     SorobanModule,
     ForumModule,
+    DiscussionsModule,
     ChatModule,
     NotificationsModule,
     ActivitiesModule,

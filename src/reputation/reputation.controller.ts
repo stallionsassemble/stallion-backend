@@ -213,6 +213,8 @@ export class ReputationController {
         primarySkill: entry.primarySkill,
         completedTasksCount: entry.completedTasksCount,
         earnedAmount: entry.earnedAmount,
+        rating: entry.rating,
+        totalReviews: entry.totalReviews,
       })),
       pagination: result.pagination,
     };

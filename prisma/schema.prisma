@@ -93,6 +93,16 @@ model User {
   projectMilestones   ProjectMilestone[]
   projectActivities Activity[]
 
+  // Discussion relations
+  bountyDiscussions   BountyDiscussion[]
+  projectDiscussions  ProjectDiscussion[]
+  discussionReplies   DiscussionReply[]
+  discussionReactions DiscussionReaction[]
+
+  // Review relations
+  givenReviews    UserReview[] @relation("ReviewGiver")
+  receivedReviews UserReview[] @relation("ReviewReceiver")
+
   @@index([role])
   @@index([createdAt])
   @@index([username])
@@ -234,6 +244,7 @@ model Bounty {
   submissions BountySubmission[]
   winners     BountyWinner[]
   activities  Activity[]
+  discussions BountyDiscussion[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([ownerId])
@@ -1032,6 +1043,7 @@ model Project {
   applications ProjectApplication[]
   milestones   ProjectMilestone[]
   activities Activity[]
+  discussions  ProjectDiscussion[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([type, status])
@@ -1210,4 +1222,122 @@ enum ActivityType {
   // Reputation activities
   BADGE_EARNED
   LEVEL_UP
+}
+
+model BountyDiscussion {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bountyId String @map("bounty_id")
+  bounty   Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  replies   DiscussionReply[]
+  reactions DiscussionReaction[]
+
+  @@index([bountyId, createdAt])
+  @@index([authorId])
+  @@map("bounty_discussions")
+}
+
+model ProjectDiscussion {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  projectId String  @map("project_id")
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  replies   DiscussionReply[]
+  reactions DiscussionReaction[]
+
+  @@index([projectId, createdAt])
+  @@index([authorId])
+  @@map("project_discussions")
+}
+
+// Discussion Reply (works for both bounty and project discussions)
+model DiscussionReply {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Can belong to either a bounty discussion or project discussion
+  bountyDiscussionId  String?           @map("bounty_discussion_id")
+  bountyDiscussion    BountyDiscussion? @relation(fields: [bountyDiscussionId], references: [id], onDelete: Cascade)
+  projectDiscussionId String?           @map("project_discussion_id")
+  projectDiscussion   ProjectDiscussion? @relation(fields: [projectDiscussionId], references: [id], onDelete: Cascade)
+
+  authorId String @map("author_id")
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Self-referential for nested replies
+  parentId String?          @map("parent_id")
+  parent   DiscussionReply? @relation("ReplyToReply", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  DiscussionReply[] @relation("ReplyToReply")
+
+  reactions DiscussionReaction[]
+
+  @@index([bountyDiscussionId, createdAt])
+  @@index([projectDiscussionId, createdAt])
+  @@index([authorId])
+  @@index([parentId])
+  @@map("discussion_replies")
+}
+
+// Discussion Reaction (works for discussions and replies)
+model DiscussionReaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Can react to bounty discussion, project discussion, or reply
+  bountyDiscussionId  String?           @map("bounty_discussion_id")
+  bountyDiscussion    BountyDiscussion? @relation(fields: [bountyDiscussionId], references: [id], onDelete: Cascade)
+  projectDiscussionId String?           @map("project_discussion_id")
+  projectDiscussion   ProjectDiscussion? @relation(fields: [projectDiscussionId], references: [id], onDelete: Cascade)
+  replyId             String?           @map("reply_id")
+  reply               DiscussionReply?  @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bountyDiscussionId, userId, emoji])
+  @@unique([projectDiscussionId, userId, emoji])
+  @@unique([replyId, userId, emoji])
+  @@index([bountyDiscussionId])
+  @@index([projectDiscussionId])
+  @@index([replyId])
+  @@index([userId])
+  @@map("discussion_reactions")
+}
+
+// User Review Model
+model UserReview {
+  id        String   @id @default(cuid())
+  rating    Float // 1-5 stars, can be decimal
+  message   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  reviewerId String @map("reviewer_id")
+  reviewer   User   @relation("ReviewGiver", fields: [reviewerId], references: [id], onDelete: Cascade)
+
+  reviewedUserId String @map("reviewed_user_id")
+  reviewedUser   User   @relation("ReviewReceiver", fields: [reviewedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewerId, reviewedUserId]) // One review per user pair
+  @@index([reviewedUserId])
+  @@index([reviewerId])
+  @@index([rating])
+  @@map("user_reviews")
 }
