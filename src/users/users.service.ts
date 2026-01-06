@@ -3,7 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import {
+  Bounty,
+  BountySubmission,
+  Project,
+  ProjectApplication,
+  Role,
+} from '@prisma/client';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { PublicUserProfileDto } from './dto/public-user-profile.dto';
@@ -337,5 +343,164 @@ export class UsersService {
     });
 
     return result._avg.rating || 0;
+  }
+
+  /**
+   * Get all user submissions (bounty + project) with pagination, filtering, and sorting
+   */
+  async getAllSubmissions(
+    userId: string,
+    query: {
+      page?: number;
+      limit?: number;
+      type?: 'bounty' | 'project' | 'all';
+      status?: string;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+  ) {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+    const sortOrder = query.sortOrder || 'desc';
+
+    const allSubmissions: ((
+      | (BountySubmission & {
+          type: 'bounty';
+          bounty: Pick<
+            Bounty,
+            | 'id'
+            | 'title'
+            | 'shortDescription'
+            | 'reward'
+            | 'rewardCurrency'
+            | 'status'
+            | 'submissionDeadline'
+          >;
+        })
+      | (ProjectApplication & {
+          type: 'project';
+          project: Pick<
+            Project,
+            | 'id'
+            | 'title'
+            | 'shortDescription'
+            | 'reward'
+            | 'currency'
+            | 'status'
+            | 'deadline'
+            | 'type'
+          >;
+        })
+    ) & {
+      type: 'bounty' | 'project';
+    })[] = [];
+
+    // Fetch bounty submissions if needed
+    if (query.type === 'bounty' || query.type === 'all') {
+      const bountyWhere: any = { userId };
+      if (query.status) bountyWhere.status = query.status;
+      if (query.search) {
+        bountyWhere.bounty = {
+          title: { contains: query.search, mode: 'insensitive' },
+        };
+      }
+
+      const bountySubmissions = await this.prisma.bountySubmission.findMany({
+        where: bountyWhere,
+        include: {
+          bounty: {
+            select: {
+              id: true,
+              title: true,
+              shortDescription: true,
+              reward: true,
+              rewardCurrency: true,
+              status: true,
+              submissionDeadline: true,
+            },
+          },
+        },
+      });
+
+      allSubmissions.push(
+        ...bountySubmissions.map((sub) => ({
+          type: 'bounty' as const,
+          ...sub,
+        })),
+      );
+    }
+
+    // Fetch project applications if needed
+    if (query.type === 'project' || query.type === 'all') {
+      const projectWhere: any = { userId };
+      if (query.status) projectWhere.status = query.status;
+      if (query.search) {
+        projectWhere.project = {
+          title: { contains: query.search, mode: 'insensitive' },
+        };
+      }
+
+      const projectApplications = await this.prisma.projectApplication.findMany(
+        {
+          where: projectWhere,
+          include: {
+            project: {
+              select: {
+                id: true,
+                title: true,
+                shortDescription: true,
+                reward: true,
+                currency: true,
+                status: true,
+                deadline: true,
+                type: true,
+              },
+            },
+          },
+        },
+      );
+
+      allSubmissions.push(
+        ...projectApplications.map((app) => ({
+          type: 'project' as const,
+          ...app,
+        })),
+      );
+    }
+
+    // Sort combined results
+    const sortField = query.sortBy || 'createdAt';
+    allSubmissions.sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      if (sortField === 'title') {
+        aValue = a.type === 'bounty' ? a.bounty.title : a.project.title;
+        bValue = b.type === 'bounty' ? b.bounty.title : b.project.title;
+      } else {
+        aValue = a[sortField];
+        bValue = b[sortField];
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    // Apply pagination
+    const total = allSubmissions.length;
+    const paginatedData = allSubmissions.slice(skip, skip + limit);
+
+    return {
+      data: paginatedData,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }

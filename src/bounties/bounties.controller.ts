@@ -35,6 +35,10 @@ import {
   GetBountiesQueryDto,
   PaginatedBountiesResponseDto,
 } from './dto/get-bounties-query.dto';
+import {
+  GetUserSubmissionsQueryDto,
+  PaginatedBountySubmissionsDto,
+} from './dto/get-user-submissions.dto';
 import { SelectWinnersDto } from './dto/select-winners.dto';
 import { UpdateBountyApplicationDto } from './dto/update-bounty-application.dto';
 import { UpdateBountyDto } from './dto/update-bounty.dto';
@@ -46,27 +50,6 @@ export class BountyController {
     private readonly bountyService: BountiesService,
     private readonly adminService: AdminService,
   ) {}
-
-  @Get('supported-currencies')
-  @ApiOperation({ summary: 'Get supported currencies' })
-  @ApiResponse({
-    status: 200,
-    description: 'List of supported currencies with token addresses',
-    schema: {
-      example: [
-        {
-          code: 'USDC',
-          name: 'USD Coin',
-          tokenAddress:
-            'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
-          decimals: 7,
-        },
-      ],
-    },
-  })
-  async getSupportedCurrencies() {
-    return this.bountyService.getSupportedCurrencies();
-  }
 
   @Get('all')
   @ApiOperation({
@@ -149,9 +132,55 @@ export class BountyController {
   @ApiOperation({ summary: 'Get active bounties' })
   @ApiResponse({
     status: 200,
-    description: 'List of active bounty IDs',
+    description: 'List of active bounties',
     schema: {
-      example: [1, 2, 5, 7, 12],
+      example: [
+        {
+          id: 'clx1a2b3c4d5e6f7g8h9i0',
+          title: 'Build a DeFi Dashboard',
+          shortDescription: 'Create a modern DeFi analytics dashboard',
+          description:
+            'Full description of the bounty requirements and deliverables...',
+          reward: '1000000000',
+          token: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+          rewardCurrency: 'USDC',
+          skills: ['React', 'TypeScript', 'TailwindCSS', 'Web3'],
+          rewardDistribution: [
+            { rank: 1, percentage: 70 },
+            { rank: 2, percentage: 20 },
+            { rank: 3, percentage: 10 },
+          ],
+          submissionFields: [
+            {
+              name: 'githubUrl',
+              label: 'GitHub Repository URL',
+              type: 'url',
+              required: true,
+            },
+          ],
+          attachments: [
+            {
+              filename: 'requirements.pdf',
+              url: 'https://example.com/files/requirements.pdf',
+              size: 102400,
+              mimetype: 'application/pdf',
+            },
+          ],
+          status: 'ACTIVE',
+          submissionDeadline: '2024-12-31T23:59:59.000Z',
+          judgingDeadline: '2025-01-07T23:59:59.000Z',
+          contractBountyId: 1,
+          txHash: '0x1234567890abcdef...',
+          ownerId: 'user-uuid-123',
+          owner: {
+            id: 'user-uuid-123',
+            username: 'project_owner',
+            email: 'owner@example.com',
+          },
+          createdAt: '2024-01-01T00:00:00.000Z',
+          updatedAt: '2024-01-01T00:00:00.000Z',
+        },
+      ],
     },
   })
   async getActiveBounties() {
@@ -243,6 +272,27 @@ export class BountyController {
   })
   async getBounty(@Param('id') id: string) {
     return this.bountyService.getBounty(id);
+  }
+
+  @Get('submissions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get user bounty submissions',
+    description:
+      'Retrieve all bounty submissions for the authenticated user with pagination, filtering, and sorting',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of user bounty submissions',
+    type: PaginatedBountySubmissionsDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getMySubmissions(
+    @CurrentUser('id') userId: string,
+    @Query() query: GetUserSubmissionsQueryDto,
+  ): Promise<PaginatedBountySubmissionsDto> {
+    return this.bountyService.getUserSubmissions(userId, query);
   }
 
   @Get(':id/submissions')

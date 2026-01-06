@@ -10,6 +10,10 @@ import { Prisma, TxState, TxType } from '@prisma/client';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Horizon } from '@stellar/stellar-sdk';
 import { Queue } from 'bullmq';
+import {
+  getSupportedCurrencies,
+  type SupportedCurrency,
+} from '../bounties/utils/supported-currencies';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import { EnvConfig } from '../config/env.config';
@@ -838,5 +842,16 @@ export class WalletService {
       networkPassphrase,
       this.stellarAccount.getServer(),
     );
+  }
+
+  /**
+   * Get supported currencies
+   * Returns list of supported currencies with their token addresses for the current network
+   */
+  getSupportedCurrencies(): SupportedCurrency[] {
+    const networkPassphrase = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
+    );
+    return getSupportedCurrencies(networkPassphrase);
   }
 }

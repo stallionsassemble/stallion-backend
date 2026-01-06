@@ -40,11 +40,7 @@ import {
   validateSubmissionData,
   type SubmissionField,
 } from './utils/submission-validator';
-import {
-  getSupportedCurrencies,
-  getTokenAddress,
-  SupportedCurrency,
-} from './utils/supported-currencies';
+import { getTokenAddress } from './utils/supported-currencies';
 import {
   validateWalletForBountyCreation,
   validateWalletForTransaction,
@@ -91,14 +87,6 @@ export class BountiesService {
   }
 
   /**
-   * Get supported currencies
-   * Returns list of supported currencies with their token addresses for the current network
-   */
-  getSupportedCurrencies(): SupportedCurrency[] {
-    return getSupportedCurrencies(this.networkPassphrase);
-  }
-
-  /**
    * Get all bounties with pagination, sorting, and filtering
    */
   async getAllBounties(query: {
@@ -131,10 +119,10 @@ export class BountiesService {
       const sortBy = query.sortBy || 'createdAt';
       const sortOrder = query.sortOrder || 'desc';
 
-      const where: any = {};
+      const where: Prisma.BountyWhereInput = {};
 
       if (query.status) {
-        where.status = query.status;
+        where.status = query.status as any;
       }
 
       if (query.currency) {
@@ -1635,5 +1623,88 @@ export class BountiesService {
       this.logger.error('Failed to close bounty', error);
       throw error;
     }
+  }
+
+  /**
+   * Get user's bounty submissions with pagination, filtering, and sorting
+   */
+  async getUserSubmissions(
+    userId: string,
+    query: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      search?: string;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+    },
+  ) {
+    const page = query.page || 1;
+    const limit = query.limit || 10;
+    const skip = (page - 1) * limit;
+
+    // Build where clause
+    const where: Prisma.BountySubmissionWhereInput = {
+      userId,
+    };
+
+    if (query.status) {
+      where.status = query.status as any;
+    }
+
+    if (query.search) {
+      where.bounty = {
+        title: {
+          contains: query.search,
+          mode: 'insensitive',
+        },
+      };
+    }
+
+    // Build orderBy clause
+    let orderBy: Prisma.BountySubmissionOrderByWithRelationInput = {};
+    if (query.sortBy === 'bountyTitle') {
+      orderBy = {
+        bounty: {
+          title: query.sortOrder || 'desc',
+        },
+      };
+    } else {
+      orderBy = {
+        [query.sortBy || 'createdAt']: query.sortOrder || 'desc',
+      };
+    }
+
+    // Get submissions with pagination
+    const [submissions, total] = await Promise.all([
+      this.prisma.bountySubmission.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy,
+        include: {
+          bounty: {
+            select: {
+              id: true,
+              title: true,
+              shortDescription: true,
+              reward: true,
+              rewardCurrency: true,
+              status: true,
+              submissionDeadline: true,
+            },
+          },
+        },
+      }),
+      this.prisma.bountySubmission.count({ where }),
+    ]);
+
+    return {
+      data: submissions,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 }

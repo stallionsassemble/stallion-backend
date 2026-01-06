@@ -14,12 +14,33 @@ import { WalletService } from './wallet.service';
 
 @ApiTags('Wallet')
 @Controller('wallet')
-@UseGuards(JwtAuthGuard)
-@ApiBearerAuth('JWT-auth')
 export class WalletController {
   constructor(private readonly walletService: WalletService) {}
 
+  @Get('supported-currencies')
+  @ApiOperation({ summary: 'Get supported currencies' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of supported currencies with token addresses',
+    schema: {
+      example: [
+        {
+          code: 'USDC',
+          name: 'USD Coin',
+          tokenAddress:
+            'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+          decimals: 7,
+        },
+      ],
+    },
+  })
+  async getSupportedCurrencies() {
+    return this.walletService.getSupportedCurrencies();
+  }
+
   @Get()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get wallet',
     description: 'Retrieve user wallet details and balance',

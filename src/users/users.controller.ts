@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -9,6 +17,10 @@ import {
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CreateReviewDto, ReviewResponseDto } from './dto/create-review.dto';
+import {
+  GetAllSubmissionsQueryDto,
+  PaginatedAllSubmissionsDto,
+} from './dto/get-all-submissions.dto';
 import { PublicUserProfileDto } from './dto/public-user-profile.dto';
 import { UsersService } from './users.service';
 
@@ -104,5 +116,26 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserReviews(@Param('userId') userId: string) {
     return this.usersService.getUserReviews(userId);
+  }
+
+  @Get('submissions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get all user submissions (bounty + project)',
+    description:
+      'Retrieve all submissions (bounty and project applications) for the authenticated user with pagination, filtering, and sorting',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Paginated list of all user submissions',
+    type: PaginatedAllSubmissionsDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getMySubmissions(
+    @CurrentUser('id') userId: string,
+    @Query() query: GetAllSubmissionsQueryDto,
+  ): Promise<PaginatedAllSubmissionsDto> {
+    return this.usersService.getAllSubmissions(userId, query);
   }
 }
