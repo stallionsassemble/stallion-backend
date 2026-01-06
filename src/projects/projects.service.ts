@@ -24,130 +24,6 @@ export class ProjectsService {
     private activitiesService: ActivitiesService,
   ) {}
 
-  async createProject(ownerId: string, dto: CreateProjectDto) {
-    const owner = await this.prisma.user.findUnique({
-      where: { id: ownerId },
-      include: { wallet: true },
-    });
-
-    if (!owner || !owner.wallet) {
-      throw new NotFoundException('User or wallet not found');
-    }
-
-    if (owner.role !== Role.PROJECT_OWNER) {
-      throw new ForbiddenException('Only project owners can create projects');
-    }
-
-    if (dto.type === ProjectType.GIG) {
-      if (!dto.milestones || dto.milestones.length === 0) {
-        throw new BadRequestException('GIG projects must have milestones');
-      }
-
-      const totalMilestoneAmount = dto.milestones.reduce(
-        (sum, m) => sum + BigInt(m.amount),
-        BigInt(0),
-      );
-      const rewardAmount = BigInt(dto.reward);
-
-      if (totalMilestoneAmount !== rewardAmount) {
-        throw new BadRequestException(
-          'Sum of milestone amounts must equal total reward',
-        );
-      }
-    }
-
-    if (dto.type === ProjectType.JOB && dto.milestones) {
-      throw new BadRequestException('JOB projects cannot have milestones');
-    }
-
-    const deadline = new Date(dto.deadline);
-    if (deadline <= new Date()) {
-      throw new BadRequestException('Deadline must be in the future');
-    }
-
-    const platformFee = '100000000';
-
-    let contractProjectId: number | undefined;
-    let txHash: string | undefined;
-
-    if (dto.type === ProjectType.GIG) {
-      const milestonesWithOrder = dto.milestones!.map((m, index) => ({
-        amount: m.amount,
-        order: index + 1,
-      }));
-
-      const escrowResult = await this.contractService.createGigEscrow({
-        ownerId,
-        ownerPublicKey: owner.wallet.publicKey,
-        walletId: owner.wallet.id,
-        reward: dto.reward,
-        currency: dto.currency,
-        milestones: milestonesWithOrder,
-        deadline,
-        platformFee,
-      });
-      contractProjectId = escrowResult.contractProjectId;
-      txHash = escrowResult.txHash;
-    } else {
-      const jobResult = await this.contractService.createJobProject({
-        ownerId,
-        ownerPublicKey: owner.wallet.publicKey,
-        walletId: owner.wallet.id,
-        rewardAmount: dto.reward,
-        currency: dto.currency,
-        platformFee,
-        deadline,
-      });
-      contractProjectId = jobResult.contractProjectId;
-      txHash = jobResult.txHash;
-    }
-
-    const project = await this.prisma.project.create({
-      data: {
-        title: dto.title,
-        shortDescription: dto.shortDescription,
-        description: dto.description,
-        requirements: dto.requirements || [],
-        deliverables: dto.deliverables || [],
-        skills: dto.skills,
-        attachments: dto.attachments as unknown as InputJsonValue,
-        reward: dto.reward,
-        currency: dto.currency,
-        deadline,
-        type: dto.type,
-        peopleNeeded: dto.peopleNeeded,
-        status: ProjectStatus.OPEN,
-        contractProjectId,
-        txHash,
-        ownerId,
-      },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            profilePicture: true,
-          },
-        },
-      },
-    });
-
-    await this.activitiesService.recordActivity(
-      ProjectActivities.created(
-        ownerId,
-        project.id,
-        project.title,
-        project.reward,
-        project.currency,
-      ),
-    );
-
-    return project;
-  }
-
   async getProject(projectId: string, currentUserId?: string) {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -174,21 +50,20 @@ export class ProjectsService {
                 skills: true,
               },
             },
+            userMilestones: {
+              include: {
+                milestone: true,
+              },
+              orderBy: {
+                milestone: {
+                  order: 'asc',
+                },
+              },
+            },
           },
         },
         milestones: {
           orderBy: { order: 'asc' },
-          include: {
-            contributor: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                profilePicture: true,
-              },
-            },
-          },
         },
       },
     });
@@ -236,9 +111,69 @@ export class ProjectsService {
 
     const totalPaid = totalPaidResult._sum.amount?.toString() || '0';
 
+    // Calculate released and escrowed amounts from user milestones
+    const acceptedApp = project.applications.find(
+      (app) => app.status === 'ACCEPTED',
+    );
+
+    let released = '0';
+    let escrowed = '0';
+
+    if (acceptedApp && acceptedApp.userMilestones.length > 0) {
+      released = acceptedApp.userMilestones
+        .filter((um) => um.status === 'PAID')
+        .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
+        .toString();
+
+      escrowed = acceptedApp.userMilestones
+        .filter((um) => um.status !== 'PAID')
+        .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
+        .toString();
+    }
+
+    // Combine milestone templates with user milestone data for accepted application
+    const milestonesWithStatus =
+      acceptedApp && acceptedApplication
+        ? project.milestones.map((milestone) => {
+            const userMilestone = acceptedApp.userMilestones.find(
+              (um) => um.milestone.id === milestone.id,
+            );
+            return {
+              id: userMilestone?.id || milestone.id,
+              userMilestoneId: userMilestone?.id,
+              title: milestone.title,
+              description: milestone.description,
+              amount: milestone.amount,
+              dueDate: milestone.dueDate,
+              order: milestone.order,
+              status: userMilestone?.status || 'PENDING',
+              submissionNote: userMilestone?.submissionNote,
+              submissionUrl: userMilestone?.submissionUrl,
+              submittedAt: userMilestone?.submittedAt,
+              reviewNote: userMilestone?.reviewNote,
+              reviewedAt: userMilestone?.reviewedAt,
+              revisionNote: userMilestone?.revisionNote,
+              txHash: userMilestone?.txHash,
+              paidAt: userMilestone?.paidAt,
+              contributorId: userMilestone?.contributorId,
+              contributor: acceptedApplication.user,
+            };
+          })
+        : project.milestones.map((milestone) => ({
+            id: milestone.id,
+            title: milestone.title,
+            description: milestone.description,
+            amount: milestone.amount,
+            dueDate: milestone.dueDate,
+            order: milestone.order,
+          }));
+
     return {
       ...project,
       applied,
+      released,
+      escrowed,
+      milestones: milestonesWithStatus,
       winner: acceptedApplication
         ? {
             userId: acceptedApplication.user.id,
@@ -354,6 +289,161 @@ export class ProjectsService {
     });
   }
 
+  async createProject(ownerId: string, dto: CreateProjectDto) {
+    const owner = await this.prisma.user.findUnique({
+      where: { id: ownerId },
+      include: { wallet: true },
+    });
+
+    if (!owner || !owner.wallet) {
+      throw new NotFoundException('User or wallet not found');
+    }
+
+    if (owner.role !== Role.PROJECT_OWNER) {
+      throw new ForbiddenException('Only project owners can create projects');
+    }
+
+    if (dto.type === ProjectType.GIG) {
+      if (!dto.milestones || dto.milestones.length === 0) {
+        throw new BadRequestException('GIG projects must have milestones');
+      }
+
+      // Validate milestone due dates are in chronological order
+      for (let i = 1; i < dto.milestones.length; i++) {
+        const previousDueDate = new Date(dto.milestones[i - 1].dueDate);
+        const currentDueDate = new Date(dto.milestones[i].dueDate);
+
+        if (currentDueDate <= previousDueDate) {
+          throw new BadRequestException(
+            `Milestone ${i + 1} due date must be after milestone ${i} due date. Milestones must be in chronological order.`,
+          );
+        }
+      }
+
+      const totalMilestoneAmount = dto.milestones.reduce(
+        (sum, m) => sum + BigInt(m.amount),
+        BigInt(0),
+      );
+      const rewardAmount = BigInt(dto.reward);
+
+      if (totalMilestoneAmount !== rewardAmount) {
+        throw new BadRequestException(
+          'Sum of milestone amounts must equal total reward',
+        );
+      }
+    }
+
+    if (dto.type === ProjectType.JOB && dto.milestones) {
+      throw new BadRequestException('JOB projects cannot have milestones');
+    }
+
+    const deadline = new Date(dto.deadline);
+    if (deadline <= new Date()) {
+      throw new BadRequestException('Deadline must be in the future');
+    }
+
+    const platformFee = '100000000';
+
+    let contractProjectId: number | undefined;
+    let txHash: string | undefined;
+
+    if (dto.type === ProjectType.GIG) {
+      const milestonesWithOrder = dto.milestones!.map((m, index) => ({
+        amount: m.amount,
+        order: index + 1,
+      }));
+
+      const escrowResult = await this.contractService.createGigEscrow({
+        ownerId,
+        ownerPublicKey: owner.wallet.publicKey,
+        walletId: owner.wallet.id,
+        reward: dto.reward,
+        currency: dto.currency,
+        milestones: milestonesWithOrder,
+        deadline,
+        platformFee,
+      });
+      contractProjectId = escrowResult.contractProjectId;
+      txHash = escrowResult.txHash;
+    } else {
+      const jobResult = await this.contractService.createJobProject({
+        ownerId,
+        ownerPublicKey: owner.wallet.publicKey,
+        walletId: owner.wallet.id,
+        rewardAmount: dto.reward,
+        currency: dto.currency,
+        platformFee,
+        deadline,
+      });
+      contractProjectId = jobResult.contractProjectId;
+      txHash = jobResult.txHash;
+    }
+
+    const project = await this.prisma.project.create({
+      data: {
+        title: dto.title,
+        shortDescription: dto.shortDescription,
+        description: dto.description,
+        requirements: dto.requirements || [],
+        deliverables: dto.deliverables || [],
+        skills: dto.skills,
+        attachments: dto.attachments as unknown as InputJsonValue,
+        reward: dto.reward,
+        currency: dto.currency,
+        deadline,
+        type: dto.type,
+        peopleNeeded: dto.peopleNeeded,
+        status: ProjectStatus.OPEN,
+        contractProjectId,
+        txHash,
+        ownerId,
+        // Create milestone templates for GIG projects
+        ...(dto.type === ProjectType.GIG && dto.milestones
+          ? {
+              milestones: {
+                createMany: {
+                  data: dto.milestones.map((m, index) => ({
+                    title: m.title,
+                    description: m.description,
+                    amount: m.amount,
+                    dueDate: new Date(m.dueDate),
+                    order: index + 1,
+                  })),
+                },
+              },
+            }
+          : {}),
+      },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            companyName: true,
+            profilePicture: true,
+          },
+        },
+        milestones: {
+          orderBy: { order: 'asc' },
+        },
+      },
+    });
+
+    await this.activitiesService.recordActivity(
+      ProjectActivities.created(
+        ownerId,
+        project.id,
+        project.title,
+        project.reward,
+        project.currency,
+      ),
+    );
+
+    return project;
+  }
+
   async updateProject(
     projectId: string,
     ownerId: string,
@@ -401,6 +491,26 @@ export class ProjectsService {
 
     // Validate milestones for GIG projects
     if (dto.milestones && project.type === ProjectType.GIG) {
+      // Validate milestone due dates are in chronological order
+      for (let i = 1; i < dto.milestones.length; i++) {
+        const previousDueDate = dto.milestones[i - 1].dueDate
+          ? new Date(dto.milestones[i - 1].dueDate!)
+          : project.milestones[i - 1]?.dueDate;
+        const currentDueDate = dto.milestones[i].dueDate
+          ? new Date(dto.milestones[i].dueDate!)
+          : project.milestones[i]?.dueDate;
+
+        if (
+          previousDueDate &&
+          currentDueDate &&
+          currentDueDate <= previousDueDate
+        ) {
+          throw new BadRequestException(
+            `Milestone ${i + 1} due date must be after milestone ${i} due date. Milestones must be in chronological order.`,
+          );
+        }
+      }
+
       const rewardAmount = BigInt(project.reward);
       const totalMilestoneAmount = dto.milestones.reduce(
         (sum, m) => sum + BigInt(m.amount || '0'),
@@ -475,6 +585,36 @@ export class ProjectsService {
       updateData.deadline = new Date(dto.deadline);
     if (dto.peopleNeeded !== undefined)
       updateData.peopleNeeded = dto.peopleNeeded;
+
+    // Update milestones if provided
+    if (dto.milestones && project.milestones.length > 0) {
+      // Update existing milestones
+      const milestoneUpdates = dto.milestones.map((milestone, index) => {
+        const existingMilestone = project.milestones[index];
+        if (!existingMilestone) {
+          throw new BadRequestException(
+            `Cannot update milestone at index ${index}: milestone does not exist`,
+          );
+        }
+
+        const milestoneUpdateData: any = {};
+        if (milestone.title !== undefined)
+          milestoneUpdateData.title = milestone.title;
+        if (milestone.description !== undefined)
+          milestoneUpdateData.description = milestone.description;
+        if (milestone.amount !== undefined)
+          milestoneUpdateData.amount = milestone.amount;
+        if (milestone.dueDate !== undefined)
+          milestoneUpdateData.dueDate = new Date(milestone.dueDate);
+
+        return this.prisma.projectMilestone.update({
+          where: { id: existingMilestone.id },
+          data: milestoneUpdateData,
+        });
+      });
+
+      await Promise.all(milestoneUpdates);
+    }
 
     const updatedProject = await this.prisma.project.update({
       where: { id: projectId },

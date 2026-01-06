@@ -60,11 +60,14 @@ export class DashboardService {
       }
     }
 
-    // Calculate total earnings from projects (paid milestones)
-    const projectMilestones = await this.prisma.projectMilestone.findMany({
+    // Calculate total earnings from projects (paid user milestones)
+    const userMilestones = await this.prisma.userMilestone.findMany({
       where: {
         contributorId: userId,
         paidAt: { not: null },
+      },
+      include: {
+        milestone: true,
       },
     });
 
@@ -72,12 +75,12 @@ export class DashboardService {
     let currentMonthProjectEarnings = 0;
     let lastMonthProjectEarnings = 0;
 
-    for (const milestone of projectMilestones) {
-      const amount = parseFloat(milestone.amount);
+    for (const userMilestone of userMilestones) {
+      const amount = parseFloat(userMilestone.milestone.amount);
       totalProjectEarnings += amount;
 
-      if (milestone.paidAt) {
-        const paidDate = new Date(milestone.paidAt);
+      if (userMilestone.paidAt) {
+        const paidDate = new Date(userMilestone.paidAt);
         if (paidDate >= startOfCurrentMonth) {
           currentMonthProjectEarnings += amount;
         } else if (paidDate >= startOfLastMonth && paidDate <= endOfLastMonth) {
@@ -189,13 +192,18 @@ export class DashboardService {
       }
     }
 
-    // Calculate total paid out from projects (paid milestones)
-    const projectMilestones = await this.prisma.projectMilestone.findMany({
+    // Calculate total paid out from projects (paid user milestones)
+    const paidUserMilestones = await this.prisma.userMilestone.findMany({
       where: {
-        project: {
-          ownerId: userId,
+        milestone: {
+          project: {
+            ownerId: userId,
+          },
         },
         paidAt: { not: null },
+      },
+      include: {
+        milestone: true,
       },
     });
 
@@ -203,12 +211,12 @@ export class DashboardService {
     let currentMonthProjectPaidOut = 0;
     let lastMonthProjectPaidOut = 0;
 
-    for (const milestone of projectMilestones) {
-      const amount = parseFloat(milestone.amount);
+    for (const userMilestone of paidUserMilestones) {
+      const amount = parseFloat(userMilestone.milestone.amount);
       totalProjectPaidOut += amount;
 
-      if (milestone.paidAt) {
-        const paidDate = new Date(milestone.paidAt);
+      if (userMilestone.paidAt) {
+        const paidDate = new Date(userMilestone.paidAt);
         if (paidDate >= startOfCurrentMonth) {
           currentMonthProjectPaidOut += amount;
         } else if (paidDate >= startOfLastMonth && paidDate <= endOfLastMonth) {
@@ -232,25 +240,25 @@ export class DashboardService {
     }
 
     // Calculate pending payments
-    // Milestones on projects with accepted applications that are APPROVED but not yet paid
-    const pendingMilestones = await this.prisma.projectMilestone.findMany({
+    // User milestones on projects owned by user that are APPROVED but not yet paid
+    const pendingUserMilestones = await this.prisma.userMilestone.findMany({
       where: {
-        project: {
-          ownerId: userId,
-          applications: {
-            some: {
-              status: 'ACCEPTED',
-            },
+        milestone: {
+          project: {
+            ownerId: userId,
           },
         },
         status: 'APPROVED',
         paidAt: null,
       },
+      include: {
+        milestone: true,
+      },
     });
 
     let pendingPayments = 0;
-    for (const milestone of pendingMilestones) {
-      pendingPayments += parseFloat(milestone.amount);
+    for (const userMilestone of pendingUserMilestones) {
+      pendingPayments += parseFloat(userMilestone.milestone.amount);
     }
 
     return {

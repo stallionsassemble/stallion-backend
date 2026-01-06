@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { MilestoneStatus, ProjectStatus, ProjectType } from '@prisma/client';
+import { MilestoneStatus, ProjectStatus } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -22,151 +22,126 @@ export class ProjectMilestonesService {
     private activitiesService: ActivitiesService,
   ) {}
 
-  async createMilestonesForApplication(
-    applicationId: string,
-    milestones: Array<{
-      title: string;
-      description: string;
-      amount: string;
-      dueDate: Date;
-    }>,
-  ) {
-    const application = await this.prisma.projectApplication.findUnique({
-      where: { id: applicationId },
-      include: { project: true },
-    });
-
-    if (!application) {
-      throw new NotFoundException('Application not found');
-    }
-
-    if (application.project.type !== ProjectType.GIG) {
-      throw new BadRequestException('Only GIG projects have milestones');
-    }
-
-    const createdMilestones = await Promise.all(
-      milestones.map((milestone, index) =>
-        this.prisma.projectMilestone.create({
-          data: {
-            projectId: application.projectId,
-            applicationId,
-            contributorId: application.userId,
-            title: milestone.title,
-            description: milestone.description,
-            amount: milestone.amount,
-            dueDate: milestone.dueDate,
-            order: index + 1,
-            status: MilestoneStatus.PENDING,
-          },
-        }),
-      ),
-    );
-
-    // Activity is recorded when milestones are created
-    // This happens as part of accepting an application
-
-    return createdMilestones;
-  }
+  // This method is no longer needed as UserMilestones are created
+  // automatically when an application is accepted
 
   async submitMilestone(
-    milestoneId: string,
+    userMilestoneId: string,
     contributorId: string,
     dto: SubmitMilestoneDto,
   ) {
-    const milestone = await this.prisma.projectMilestone.findUnique({
-      where: { id: milestoneId },
+    const userMilestone = await this.prisma.userMilestone.findUnique({
+      where: { id: userMilestoneId },
       include: {
-        project: true,
+        milestone: {
+          include: {
+            project: true,
+          },
+        },
         application: true,
       },
     });
 
-    if (!milestone) {
+    if (!userMilestone) {
       throw new NotFoundException('Milestone not found');
     }
 
-    if (milestone.contributorId !== contributorId) {
+    if (userMilestone.contributorId !== contributorId) {
       throw new ForbiddenException('Can only submit your own milestones');
     }
 
     if (
-      milestone.status !== MilestoneStatus.PENDING &&
-      milestone.status !== MilestoneStatus.REVISION_REQUESTED
+      userMilestone.status !== MilestoneStatus.PENDING &&
+      userMilestone.status !== MilestoneStatus.REVISION_REQUESTED
     ) {
       throw new BadRequestException(
         'Milestone can only be submitted when pending or revision requested',
       );
     }
 
-    if (milestone.project.status !== ProjectStatus.IN_PROGRESS) {
+    if (userMilestone.milestone.project.status !== ProjectStatus.IN_PROGRESS) {
       throw new BadRequestException('Project is not in progress');
     }
 
     // Validate chronological submission: ensure all previous milestones are completed
-    if (milestone.order > 1) {
-      const previousMilestones = await this.prisma.projectMilestone.findMany({
+    if (userMilestone.milestone.order > 1) {
+      const previousUserMilestones = await this.prisma.userMilestone.findMany({
         where: {
-          projectId: milestone.projectId,
-          applicationId: milestone.applicationId,
-          order: {
-            lt: milestone.order,
+          applicationId: userMilestone.applicationId,
+          milestone: {
+            projectId: userMilestone.milestone.projectId,
+            order: {
+              lt: userMilestone.milestone.order,
+            },
           },
         },
+        include: {
+          milestone: true,
+        },
         orderBy: {
-          order: 'asc',
+          milestone: {
+            order: 'asc',
+          },
         },
       });
 
-      const incompletePrevious = previousMilestones.find(
-        (m) =>
-          m.status !== MilestoneStatus.APPROVED &&
-          m.status !== MilestoneStatus.PAID,
+      const incompletePrevious = previousUserMilestones.find(
+        (um) =>
+          um.status !== MilestoneStatus.APPROVED &&
+          um.status !== MilestoneStatus.PAID,
       );
 
       if (incompletePrevious) {
         throw new BadRequestException(
-          `Cannot submit milestone ${milestone.order}. Milestone ${incompletePrevious.order} ("${incompletePrevious.title}") must be completed first. Milestones must be submitted chronologically.`,
+          `Cannot submit milestone ${userMilestone.milestone.order}. Milestone ${incompletePrevious.milestone.order} ("${incompletePrevious.milestone.title}") must be completed first. Milestones must be submitted chronologically.`,
         );
       }
     }
 
-    const updatedMilestone = await this.prisma.projectMilestone.update({
-      where: { id: milestoneId },
+    const updatedUserMilestone = await this.prisma.userMilestone.update({
+      where: { id: userMilestoneId },
       data: {
         submissionNote: dto.submissionNote,
         submissionUrl: dto.submissionUrl,
         submittedAt: new Date(),
         status: MilestoneStatus.SUBMITTED,
       },
+      include: {
+        milestone: true,
+      },
     });
 
     await this.activitiesService.recordActivity(
       ProjectActivities.milestoneSubmitted(
         contributorId,
-        milestone.projectId,
-        milestone.project.title,
-        milestone.title,
+        userMilestone.milestone.projectId,
+        userMilestone.milestone.project.title,
+        userMilestone.milestone.title,
       ),
     );
 
-    return updatedMilestone;
+    return updatedUserMilestone;
   }
 
   async reviewMilestone(
-    milestoneId: string,
+    userMilestoneId: string,
     ownerId: string,
     approve: boolean,
     reviewNote?: string,
     revisionNote?: string,
   ) {
-    const milestone = await this.prisma.projectMilestone.findUnique({
-      where: { id: milestoneId },
+    const userMilestone = await this.prisma.userMilestone.findUnique({
+      where: { id: userMilestoneId },
       include: {
-        project: {
+        milestone: {
           include: {
-            owner: {
+            project: {
               include: {
-                wallet: true,
+                owner: {
+                  include: {
+                    wallet: true,
+                  },
+                },
               },
             },
           },
@@ -179,17 +154,17 @@ export class ProjectMilestonesService {
       },
     });
 
-    if (!milestone) {
+    if (!userMilestone) {
       throw new NotFoundException('Milestone not found');
     }
 
-    if (milestone.project.ownerId !== ownerId) {
+    if (userMilestone.milestone.project.ownerId !== ownerId) {
       throw new ForbiddenException(
         'Only the project owner can review milestones',
       );
     }
 
-    if (milestone.status !== MilestoneStatus.SUBMITTED) {
+    if (userMilestone.status !== MilestoneStatus.SUBMITTED) {
       throw new BadRequestException('Milestone must be submitted for review');
     }
 
@@ -206,29 +181,29 @@ export class ProjectMilestonesService {
     let txHash: string | undefined;
 
     if (approve) {
-      if (!milestone.contributor.wallet) {
+      if (!userMilestone.contributor.wallet) {
         throw new BadRequestException('Contributor does not have a wallet');
       }
 
-      if (!milestone.project.owner.wallet) {
+      if (!userMilestone.milestone.project.owner.wallet) {
         throw new BadRequestException('Project owner does not have a wallet');
       }
 
       const paymentResult = await this.contractService.releaseMilestonePayment({
-        projectId: milestone.project.contractProjectId!,
-        milestoneOrder: milestone.order,
-        contributorPublicKey: milestone.contributor.wallet.publicKey,
-        amount: milestone.amount,
+        projectId: userMilestone.milestone.project.contractProjectId!,
+        milestoneOrder: userMilestone.milestone.order,
+        contributorPublicKey: userMilestone.contributor.wallet.publicKey,
+        amount: userMilestone.milestone.amount,
         ownerId,
-        ownerPublicKey: milestone.project.owner.wallet.publicKey,
-        walletId: milestone.project.owner.wallet.id,
+        ownerPublicKey: userMilestone.milestone.project.owner.wallet.publicKey,
+        walletId: userMilestone.milestone.project.owner.wallet.id,
       });
 
       txHash = paymentResult.txHash;
     }
 
-    const updatedMilestone = await this.prisma.projectMilestone.update({
-      where: { id: milestoneId },
+    const updatedUserMilestone = await this.prisma.userMilestone.update({
+      where: { id: userMilestoneId },
       data: {
         status: approve
           ? MilestoneStatus.APPROVED
@@ -239,45 +214,60 @@ export class ProjectMilestonesService {
         txHash: approve ? txHash : undefined,
         paidAt: approve ? new Date() : undefined,
       },
+      include: {
+        milestone: true,
+      },
     });
 
     if (approve) {
       await this.activitiesService.recordActivity(
         ProjectActivities.milestoneApproved(
-          milestone.contributorId,
-          milestone.projectId,
-          milestone.project.title,
-          milestone.title,
+          userMilestone.contributorId,
+          userMilestone.milestone.projectId,
+          userMilestone.milestone.project.title,
+          userMilestone.milestone.title,
+        ),
+      );
+
+      await this.activitiesService.recordActivity(
+        ProjectActivities.milestonePaid(
+          userMilestone.contributorId,
+          userMilestone.milestone.projectId,
+          userMilestone.milestone.project.title,
+          userMilestone.milestone.title,
+          userMilestone.milestone.amount,
+          userMilestone.milestone.project.currency,
         ),
       );
     }
 
-    const allMilestones = await this.prisma.projectMilestone.findMany({
-      where: { projectId: milestone.projectId },
+    // Check if all user milestones for this application are completed
+    const allUserMilestones = await this.prisma.userMilestone.findMany({
+      where: { applicationId: userMilestone.applicationId },
     });
 
-    const allApproved = allMilestones.every(
-      (m) =>
-        m.status === MilestoneStatus.APPROVED ||
-        m.status === MilestoneStatus.PAID,
+    const allApproved = allUserMilestones.every(
+      (um) =>
+        um.status === MilestoneStatus.APPROVED ||
+        um.status === MilestoneStatus.PAID,
     );
 
     if (allApproved) {
       await this.prisma.project.update({
-        where: { id: milestone.projectId },
+        where: { id: userMilestone.milestone.projectId },
         data: { status: ProjectStatus.COMPLETED },
       });
 
       await this.activitiesService.recordActivity(
         ProjectActivities.completed(
           ownerId,
-          milestone.projectId,
-          milestone.project.title,
+          userMilestone.milestone.projectId,
+          userMilestone.milestone.project.title,
         ),
       );
     }
 
-    return updatedMilestone;
+    return updatedUserMilestone;
   }
 
   async getMilestonesByProject(projectId: string) {
@@ -287,25 +277,33 @@ export class ProjectMilestonesService {
     });
   }
 
-  async getMilestonesByContributor(contributorId: string) {
-    return this.prisma.projectMilestone.findMany({
+  async getUserMilestonesByContributor(contributorId: string) {
+    return this.prisma.userMilestone.findMany({
       where: { contributorId },
       include: {
-        project: {
+        milestone: {
           include: {
-            owner: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                companyName: true,
+            project: {
+              include: {
+                owner: {
+                  select: {
+                    id: true,
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                    companyName: true,
+                  },
+                },
               },
             },
           },
         },
       },
-      orderBy: { dueDate: 'asc' },
+      orderBy: {
+        milestone: {
+          dueDate: 'asc',
+        },
+      },
     });
   }
 }

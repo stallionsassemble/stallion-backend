@@ -88,6 +88,18 @@ export class ProjectResponseDto {
   applied?: boolean;
 
   @ApiPropertyOptional({
+    description:
+      'Total amount released from completed milestones (PAID status)',
+  })
+  released?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Total amount escrowed in milestones that have not been paid yet',
+  })
+  escrowed?: string;
+
+  @ApiPropertyOptional({
     description: 'Winner information if an application has been accepted',
   })
   winner?: {
@@ -154,8 +166,17 @@ export class ApplicationResponseDto {
 }
 
 export class MilestoneResponseDto {
-  @ApiProperty()
+  @ApiProperty({
+    description:
+      'ID (userMilestoneId if project has accepted contributor, otherwise milestoneId)',
+  })
   id: string;
+
+  @ApiPropertyOptional({
+    description:
+      'User milestone ID (only present if project has accepted contributor)',
+  })
+  userMilestoneId?: string;
 
   @ApiProperty()
   title: string;
@@ -169,11 +190,14 @@ export class MilestoneResponseDto {
   @ApiProperty()
   dueDate: Date;
 
-  @ApiProperty({ enum: MilestoneStatus })
-  status: MilestoneStatus;
-
   @ApiProperty()
   order: number;
+
+  @ApiPropertyOptional({
+    enum: MilestoneStatus,
+    description: 'Status (only present if project has accepted contributor)',
+  })
+  status?: MilestoneStatus;
 
   @ApiPropertyOptional()
   submissionNote?: string;
@@ -199,23 +223,12 @@ export class MilestoneResponseDto {
   @ApiPropertyOptional()
   paidAt?: Date;
 
-  @ApiProperty()
-  createdAt: Date;
-
-  @ApiProperty()
-  updatedAt: Date;
-
-  @ApiProperty()
-  projectId: string;
-
-  @ApiProperty()
-  applicationId: string;
-
-  @ApiProperty()
-  contributorId: string;
+  @ApiPropertyOptional()
+  contributorId?: string;
 
   @ApiPropertyOptional({
-    description: 'Contributor information',
+    description:
+      'Contributor information (only present if project has accepted contributor)',
   })
   contributor?: {
     id: string;

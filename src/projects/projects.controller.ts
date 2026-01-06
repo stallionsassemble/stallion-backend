@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
 import {
   ActivityResponseDto,
   ApplicationResponseDto,
@@ -47,29 +48,6 @@ export class ProjectsController {
     private readonly milestonesService: ProjectMilestonesService,
     private readonly activitiesService: ActivitiesService,
   ) {}
-
-  @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Create a new project',
-    description:
-      'Create a GIG or JOB project. Only accessible by project owners.',
-  })
-  @ApiResponse({
-    status: 201,
-    description: 'Project created successfully',
-    type: ProjectResponseDto,
-  })
-  @ApiResponse({ status: 400, description: 'Bad request - validation failed' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - not a project owner' })
-  async createProject(
-    @CurrentUser('id') userId: string,
-    @Body() dto: CreateProjectDto,
-  ) {
-    return this.projectsService.createProject(userId, dto);
-  }
 
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
@@ -116,15 +94,10 @@ export class ProjectsController {
     },
   })
   async listProjects(
-    @Query('type') type?: ProjectType,
-    @Query('status') status?: ProjectStatus,
-    @Query('ownerId') ownerId?: string,
+    @Query() query: ListProjectsQueryDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.projectsService.listProjects(
-      { type, status, ownerId },
-      currentUserId,
-    );
+    return this.projectsService.listProjects(query, currentUserId);
   }
 
   @Get(':id')
@@ -161,6 +134,8 @@ export class ProjectsController {
         updatedAt: '2024-01-15T10:00:00.000Z',
         ownerId: 'owner-uuid',
         applied: true,
+        released: '2000',
+        escrowed: '3000',
         winner: {
           userId: 'winner-uuid',
           username: 'dev_jane',
@@ -229,6 +204,29 @@ export class ProjectsController {
     @CurrentUser('id') currentUserId?: string,
   ) {
     return this.projectsService.getProject(id, currentUserId);
+  }
+
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Create a new project',
+    description:
+      'Create a GIG or JOB project. Only accessible by project owners.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Project created successfully',
+    type: ProjectResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - validation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not a project owner' })
+  async createProject(
+    @CurrentUser('id') userId: string,
+    @Body() dto: CreateProjectDto,
+  ) {
+    return this.projectsService.createProject(userId, dto);
   }
 
   @Patch(':id')
@@ -360,7 +358,7 @@ export class ProjectsController {
     return this.applicationsService.getApplicationsByProject(projectId);
   }
 
-  @Get('applications')
+  @Get('applications/me')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -446,7 +444,7 @@ export class ProjectsController {
     return this.milestonesService.getMilestonesByProject(projectId);
   }
 
-  @Get('milestones')
+  @Get('milestones/me')
   @ApiOperation({
     summary: 'Get my milestones',
     description: 'Get all milestones assigned to the current user',
@@ -457,7 +455,7 @@ export class ProjectsController {
     type: [MilestoneResponseDto],
   })
   async getMyMilestones(@CurrentUser('id') userId: string) {
-    return this.milestonesService.getMilestonesByContributor(userId);
+    return this.milestonesService.getUserMilestonesByContributor(userId);
   }
 
   @Post('milestones/:id/submit')

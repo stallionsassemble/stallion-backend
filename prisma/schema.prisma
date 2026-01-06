@@ -90,8 +90,8 @@ model User {
   // Project relations
   ownedProjects       Project[]            @relation("ProjectOwner")
   projectApplications ProjectApplication[]
-  projectMilestones   ProjectMilestone[]
-  projectActivities Activity[]
+  userMilestones      UserMilestone[]      @relation("UserMilestones")
+  projectActivities   Activity[]
 
   // Discussion relations
   bountyDiscussions   BountyDiscussion[]
@@ -1072,7 +1072,7 @@ model ProjectApplication {
   userId String @map("user_id")
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  milestones ProjectMilestone[]
+  userMilestones UserMilestone[]
 
   @@unique([projectId, userId])
   @@index([projectId, status])
@@ -1083,13 +1083,29 @@ model ProjectApplication {
 }
 
 model ProjectMilestone {
-  id          String            @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
-  description String            @db.Text
-  amount      String            @default("0") // Stored as string for large numbers
-  dueDate     DateTime          @map("due_date")
-  status      MilestoneStatus   @default(PENDING)
+  description String   @db.Text
+  amount      String   @default("0") // Stored as string for large numbers
+  dueDate     DateTime @map("due_date")
   order       Int // Order of milestone in the project
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projectId      String            @map("project_id")
+  project        Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userMilestones UserMilestone[]
+
+  @@index([projectId])
+  @@index([dueDate])
+  @@map("project_milestones")
+}
+
+model UserMilestone {
+  id     String          @id @default(cuid())
+  status MilestoneStatus @default(PENDING)
 
   // Submission
   submissionNote String?   @map("submission_note") @db.Text
@@ -1109,21 +1125,21 @@ model ProjectMilestone {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  projectId String  @map("project_id")
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestoneId String           @map("milestone_id")
+  milestone   ProjectMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
 
   applicationId String             @map("application_id")
   application   ProjectApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
 
   contributorId String @map("contributor_id")
-  contributor   User   @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  contributor   User   @relation("UserMilestones", fields: [contributorId], references: [id], onDelete: Cascade)
 
-  @@index([projectId, status])
+  @@unique([milestoneId, applicationId])
+  @@index([milestoneId])
   @@index([applicationId])
   @@index([contributorId])
   @@index([status])
-  @@index([dueDate])
-  @@map("project_milestones")
+  @@map("user_milestones")
 }
 
 model Activity {

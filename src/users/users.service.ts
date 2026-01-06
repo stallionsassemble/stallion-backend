@@ -90,13 +90,17 @@ export class UsersService {
           },
         },
       }),
-      this.prisma.projectMilestone.findMany({
+      this.prisma.userMilestone.findMany({
         where: {
           contributorId: user.id,
           status: 'PAID',
         },
-        select: {
-          amount: true,
+        include: {
+          milestone: {
+            select: {
+              amount: true,
+            },
+          },
         },
       }),
     ]);
@@ -121,8 +125,8 @@ export class UsersService {
     });
 
     // Add project earnings
-    projectEarnings.forEach((milestone) => {
-      totalEarned += BigInt(milestone.amount);
+    projectEarnings.forEach((userMilestone) => {
+      totalEarned += BigInt(userMilestone.milestone.amount);
     });
 
     return {

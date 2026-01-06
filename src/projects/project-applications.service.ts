@@ -192,6 +192,9 @@ export class ProjectApplicationsService {
             applications: {
               where: { status: ApplicationStatus.ACCEPTED },
             },
+            milestones: {
+              orderBy: { order: 'asc' },
+            },
           },
         },
         user: true,
@@ -274,6 +277,20 @@ export class ProjectApplicationsService {
                 : undefined,
           },
         });
+
+        // Create UserMilestones for GIG projects
+        if (
+          application.project.type === ProjectType.GIG &&
+          application.project.milestones.length > 0
+        ) {
+          await tx.userMilestone.createMany({
+            data: application.project.milestones.map((milestone) => ({
+              milestoneId: milestone.id,
+              applicationId: applicationId,
+              contributorId: application.userId,
+            })),
+          });
+        }
       }
 
       return app;

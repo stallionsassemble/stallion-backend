@@ -473,13 +473,17 @@ export class ReputationService {
               },
             },
           }),
-          this.prisma.projectMilestone.findMany({
+          this.prisma.userMilestone.findMany({
             where: {
               contributorId: userId,
               status: 'PAID',
             },
-            select: {
-              amount: true,
+            include: {
+              milestone: {
+                select: {
+                  amount: true,
+                },
+              },
             },
           }),
         ]);
@@ -500,8 +504,8 @@ export class ReputationService {
         });
 
         // Add project earnings
-        projectMilestones.forEach((milestone) => {
-          totalEarnings += BigInt(milestone.amount);
+        projectMilestones.forEach((userMilestone) => {
+          totalEarnings += BigInt(userMilestone.milestone.amount);
         });
 
         // Get user rating
