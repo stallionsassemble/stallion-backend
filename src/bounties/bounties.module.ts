@@ -9,6 +9,7 @@ import { WalletModule } from '../wallet/wallet.module';
 import { AdminService } from './admin.service';
 import { BountyController } from './bounties.controller';
 import { BountiesService } from './bounties.service';
+import { BountyContractService } from './bounty-contract.service';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { BountiesService } from './bounties.service';
     ActivitiesModule,
   ],
   controllers: [BountyController],
-  providers: [BountiesService, AdminService],
+  providers: [BountiesService, AdminService, BountyContractService],
   exports: [BountiesService, AdminService],
 })
 export class BountiesModule {}
