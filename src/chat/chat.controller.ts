@@ -47,12 +47,14 @@ export class ChatController {
               },
             },
           ],
-          lastMessage: {
-            id: 'msg-uuid',
-            content: 'Hello everyone!',
-            createdAt: '2024-01-01T12:00:00.000Z',
-            senderId: 'user-uuid-1',
-          },
+          messages: [
+            {
+              id: 'msg-uuid',
+              content: 'Hello everyone!',
+              createdAt: '2024-01-01T12:00:00.000Z',
+              senderId: 'user-uuid-1',
+            },
+          ],
           unreadCount: 3,
         },
       ],
