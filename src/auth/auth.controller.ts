@@ -13,9 +13,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { PasskeyService } from 'src/passkey/passkey.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { PasskeyService } from '../passkey/passkey.service';
+import { UserIdParamDto } from '../users/dto/user-id-param.dto';
 import { AuthService } from './auth.service';
 import { CompleteContributorProfileDto } from './dto/complete-contributor-profile.dto';
 import { CompleteOwnerProfileDto } from './dto/complete-owner-profile.dto';
@@ -26,6 +27,7 @@ import {
 } from './dto/passkey.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestVerificationDto } from './dto/request-verification.dto';
+import { UsernameParamDto } from './dto/username-param.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { VerifyLoginCodeDto } from './dto/verify-login-code.dto';
 import { VerifyTotpDto } from './dto/verify-totp.dto';
@@ -75,8 +77,8 @@ export class AuthController {
       },
     },
   })
-  async checkUsername(@Param('username') username: string) {
-    return this.authService.checkUsernameAvailability(username);
+  async checkUsername(@Param() params: UsernameParamDto) {
+    return this.authService.checkUsernameAvailability(params.username);
   }
 
   @Post('signup/request-verification')
@@ -334,8 +336,8 @@ export class AuthController {
     status: 401,
     description: 'Email not verified or MFA already set up',
   })
-  async setupMfa(@Param('userId') userId: string) {
-    return this.authService.setupMfa(userId);
+  async setupMfa(@Param() params: UserIdParamDto) {
+    return this.authService.setupMfa(params.userId);
   }
 
   @Post('verify-totp/:userId')
@@ -356,10 +358,10 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Invalid TOTP code' })
   async verifyTotp(
-    @Param('userId') userId: string,
+    @Param() params: UserIdParamDto,
     @Body() verifyTotpDto: VerifyTotpDto,
   ) {
-    return this.authService.verifyTotpSetup(userId, verifyTotpDto.code);
+    return this.authService.verifyTotpSetup(params.userId, verifyTotpDto.code);
   }
 
   @UseGuards(JwtAuthGuard)

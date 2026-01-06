@@ -9,7 +9,6 @@ import { ForumNotifications } from 'src/notifications/helpers/notification-helpe
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ReputationService } from '../reputation/reputation.service';
-import { AddReactionDto } from './dto/add-reaction.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -19,6 +18,7 @@ import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
 import { enrichAuthorData } from './utils/author-enrichment.util';
+import { AddForumReactionDto } from './dto/add-reaction.dto';
 
 @Injectable()
 export class ForumService {
@@ -831,7 +831,7 @@ export class ForumService {
     return { message: 'Post deleted successfully' };
   }
 
-  async addRemoveReaction(userId: string, dto: AddReactionDto) {
+  async addRemoveReaction(userId: string, dto: AddForumReactionDto) {
     const post = await this.prisma.forumPost.findUnique({
       where: { id: dto.postId },
     });

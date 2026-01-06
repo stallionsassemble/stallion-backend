@@ -23,9 +23,11 @@ import { OwnerGuard } from 'src/common/guards/owner.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UserIdParamDto } from '../users/dto/user-id-param.dto';
 import { AdminService } from './admin.service';
 import { BountiesService } from './bounties.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
+import { BountyIdParamDto } from './dto/bounty-id-param.dto';
 import {
   BountyWinnersResponseDto,
   SelectWinnersResponseDto,
@@ -213,8 +215,8 @@ export class BountyController {
       ],
     },
   })
-  async getUserBounties(@Param('id') userId: string) {
-    return this.bountyService.getOwnerBounties(userId);
+  async getUserBounties(@Param() params: UserIdParamDto) {
+    return this.bountyService.getOwnerBounties(params.userId);
   }
 
   @Get('id/:id')
@@ -270,8 +272,8 @@ export class BountyController {
       },
     },
   })
-  async getBounty(@Param('id') id: string) {
-    return this.bountyService.getBounty(id);
+  async getBounty(@Param() params: BountyIdParamDto) {
+    return this.bountyService.getBounty(params.id);
   }
 
   @Get('submissions')
@@ -326,8 +328,8 @@ export class BountyController {
       ],
     },
   })
-  async getBountySubmissionsDetailed(@Param('id') id: string) {
-    return this.bountyService.getBountySubmissionsDetailed(id);
+  async getBountySubmissionsDetailed(@Param() params: BountyIdParamDto) {
+    return this.bountyService.getBountySubmissionsDetailed(params.id);
   }
 
   @Get(':id/applicants')
@@ -336,8 +338,8 @@ export class BountyController {
     status: 200,
     description: 'List of applicant addresses',
   })
-  async getBountyApplicants(@Param('id') id: string) {
-    return this.bountyService.getBountyApplicants(id);
+  async getBountyApplicants(@Param() params: BountyIdParamDto) {
+    return this.bountyService.getBountyApplicants(params.id);
   }
 
   @Get(':id/winners')
@@ -398,8 +400,8 @@ export class BountyController {
       },
     },
   })
-  async getBountyWinners(@Param('id') id: string) {
-    return this.bountyService.getBountyWinners(id);
+  async getBountyWinners(@Param() params: BountyIdParamDto) {
+    return this.bountyService.getBountyWinners(params.id);
   }
 
   @Post()
@@ -464,10 +466,10 @@ export class BountyController {
   })
   async updateBounty(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
     @Body() dto: UpdateBountyDto,
   ) {
-    return this.bountyService.updateBounty(userId, id, dto);
+    return this.bountyService.updateBounty(userId, params.id, dto);
   }
 
   @Patch(':id/close')
@@ -506,9 +508,9 @@ export class BountyController {
   })
   async closeBounty(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
   ) {
-    return this.bountyService.closeBounty(userId, id);
+    return this.bountyService.closeBounty(userId, params.id);
   }
 
   @Delete(':id')
@@ -521,9 +523,9 @@ export class BountyController {
   })
   async deleteBounty(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
   ) {
-    return this.bountyService.deleteBounty(userId, id);
+    return this.bountyService.deleteBounty(userId, params.id);
   }
 
   @Post(':id/apply')
@@ -551,10 +553,10 @@ export class BountyController {
   @ApiResponse({ status: 403, description: 'MFA required' })
   async applyToBounty(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
     @Body() dto: ApplyToBountyDto,
   ) {
-    return this.bountyService.applyToBounty(userId, id, dto);
+    return this.bountyService.applyToBounty(userId, params.id, dto);
   }
 
   @Patch(':id/submission')
@@ -582,10 +584,10 @@ export class BountyController {
   })
   async updateSubmission(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
     @Body() dto: UpdateBountyApplicationDto,
   ) {
-    return this.bountyService.updateSubmission(userId, id, dto);
+    return this.bountyService.updateSubmission(userId, params.id, dto);
   }
 
   @Post(':id/winners')
@@ -639,10 +641,10 @@ export class BountyController {
   })
   async selectWinners(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
     @Body() dto: SelectWinnersDto,
   ) {
-    return this.bountyService.selectWinners(userId, id, dto);
+    return this.bountyService.selectWinners(userId, params.id, dto);
   }
 
   // Admin endpoints
@@ -828,8 +830,8 @@ export class BountyController {
   })
   async checkJudging(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: BountyIdParamDto,
   ) {
-    return this.adminService.checkJudging(userId, id);
+    return this.adminService.checkJudging(userId, params.id);
   }
 }

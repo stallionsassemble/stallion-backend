@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString } from 'class-validator';
 
-export class AddReactionDto {
+export class AddForumReactionDto {
   @ApiProperty({
     description: 'ID of the post to react to',
     example: 'post-uuid',

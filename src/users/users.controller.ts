@@ -21,7 +21,9 @@ import {
   GetAllSubmissionsQueryDto,
   PaginatedAllSubmissionsDto,
 } from './dto/get-all-submissions.dto';
+import { IdentifierParamDto } from './dto/identifier-param.dto';
 import { PublicUserProfileDto } from './dto/public-user-profile.dto';
+import { UserIdParamDto } from './dto/user-id-param.dto';
 import { UsersService } from './users.service';
 
 @ApiTags('Users')
@@ -47,13 +49,13 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'User not found' })
   async createReview(
-    @Param('userId') userId: string,
+    @Param() params: UserIdParamDto,
     @CurrentUser('id') reviewerId: string,
     @Body() dto: CreateReviewDto,
   ) {
     return this.usersService.createReview(
       reviewerId,
-      userId,
+      params.userId,
       dto.rating,
       dto.message,
     );
@@ -98,8 +100,8 @@ export class UsersController {
     },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserReviews(@Param('userId') userId: string) {
-    return this.usersService.getUserReviews(userId);
+  async getUserReviews(@Param() params: UserIdParamDto) {
+    return this.usersService.getUserReviews(params.userId);
   }
 
   @Get('submissions')
@@ -141,8 +143,8 @@ export class UsersController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getPublicProfile(
-    @Param('identifier') identifier: string,
+    @Param() params: IdentifierParamDto,
   ): Promise<PublicUserProfileDto> {
-    return this.usersService.getPublicProfile(identifier);
+    return this.usersService.getPublicProfile(params.identifier);
   }
 }

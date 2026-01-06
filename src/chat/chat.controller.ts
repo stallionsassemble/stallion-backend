@@ -10,6 +10,8 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ChatGateway } from './chat.gateway';
 import { ChatService } from './chat.service';
+import { ConversationIdParamDto } from './dto/conversation-id-param.dto';
+import { SearchMessagesQueryDto } from './dto/search-messages-query.dto';
 
 @ApiTags('Chat')
 @Controller('chat')
@@ -113,8 +115,11 @@ export class ChatController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
-  getConversation(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.chatService.getConversation(id, userId);
+  getConversation(
+    @Param() params: ConversationIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.chatService.getConversation(params.id, userId);
   }
 
   @Get('conversations/:id/unread-count')
@@ -135,15 +140,11 @@ export class ChatController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getUnreadCount(
-    @Param('id') conversationId: string,
+    @Param() params: ConversationIdParamDto,
     @CurrentUser('id') userId: string,
   ) {
     return {
-      conversationId,
-      unreadCount: await this.chatService.getUnreadCount(
-        conversationId,
-        userId,
-      ),
+      count: await this.chatService.getUnreadCount(params.id, userId),
     };
   }
 
@@ -175,10 +176,10 @@ export class ChatController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   searchMessages(
-    @Param('id') conversationId: string,
-    @Query('q') query: string,
+    @Param() params: ConversationIdParamDto,
+    @Query() query: SearchMessagesQueryDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.chatService.searchMessages(conversationId, userId, query);
+    return this.chatService.searchMessages(params.id, userId, query.q);
   }
 }

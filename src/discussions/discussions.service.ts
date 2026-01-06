@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
-  AddReactionDto,
+  AddDiscussionReactionDto,
   CreateDiscussionDto,
   CreateReplyDto,
 } from './dto/create-discussion.dto';
@@ -325,7 +325,7 @@ export class DiscussionsService {
   async toggleDiscussionReaction(
     userId: string,
     discussionId: string,
-    dto: AddReactionDto,
+    dto: AddDiscussionReactionDto,
     type: 'bounty' | 'project',
   ) {
     // Verify discussion exists
@@ -398,7 +398,7 @@ export class DiscussionsService {
   async toggleReplyReaction(
     userId: string,
     replyId: string,
-    dto: AddReactionDto,
+    dto: AddDiscussionReactionDto,
   ) {
     const reply = await this.prisma.discussionReply.findUnique({
       where: { id: replyId },

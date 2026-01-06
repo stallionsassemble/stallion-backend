@@ -3,14 +3,15 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { ActivityType } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { IdParamDto } from '../common/dto/id-param.dto';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { ActivitiesService } from './activities.service';
+import { GetActivitiesQueryDto } from './dto/get-activities-query.dto';
 
 @ApiTags('Activities')
 @Controller('activities')
@@ -22,9 +23,6 @@ export class ActivitiesController {
     summary: 'Get all app-wide activities',
     description: 'Retrieve all activities across the platform',
   })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 50 })
-  @ApiQuery({ name: 'type', required: false, enum: ActivityType })
   @ApiResponse({
     status: 200,
     description: 'Activities retrieved successfully',
@@ -66,18 +64,11 @@ export class ActivitiesController {
       },
     },
   })
-  async getAllActivities(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('type') type?: ActivityType,
-  ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
+  async getAllActivities(@Query() query: GetActivitiesQueryDto) {
     return this.activitiesService.getActivities({
-      page: pageNum,
-      limit: limitNum,
-      type,
+      page: query.page!,
+      limit: query.limit!,
+      type: query.type,
     });
   }
 
@@ -88,8 +79,6 @@ export class ActivitiesController {
     summary: 'Get my activities',
     description: 'Retrieve activities for the current user',
   })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 50 })
   @ApiResponse({
     status: 200,
     description: 'User activities retrieved successfully',
@@ -97,13 +86,13 @@ export class ActivitiesController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMyActivities(
     @CurrentUser('id') userId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
-    return this.activitiesService.getUserActivities(userId, pageNum, limitNum);
+    return this.activitiesService.getActivities({
+      userId,
+      page: query.page!,
+      limit: query.limit!,
+    });
   }
 
   @Get('user/:userId')
@@ -112,21 +101,19 @@ export class ActivitiesController {
     description: 'Retrieve activities for a specific user',
   })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 50 })
   @ApiResponse({
     status: 200,
     description: 'User activities retrieved successfully',
   })
   async getUserActivities(
-    @Param('userId') userId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Param() params: IdParamDto,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
-    return this.activitiesService.getUserActivities(userId, pageNum, limitNum);
+    return this.activitiesService.getActivities({
+      userId: params.id,
+      page: query.page!,
+      limit: query.limit!,
+    });
   }
 
   @Get('bounty/:bountyId')
@@ -135,25 +122,19 @@ export class ActivitiesController {
     description: 'Retrieve all activities for a specific bounty',
   })
   @ApiParam({ name: 'bountyId', description: 'Bounty ID' })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 50 })
   @ApiResponse({
     status: 200,
     description: 'Bounty activities retrieved successfully',
   })
   async getBountyActivities(
-    @Param('bountyId') bountyId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Param() params: IdParamDto,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
-    return this.activitiesService.getBountyActivities(
-      bountyId,
-      pageNum,
-      limitNum,
-    );
+    return this.activitiesService.getActivities({
+      bountyId: params.id,
+      page: query.page!,
+      limit: query.limit!,
+    });
   }
 
   @Get('project/:projectId')
@@ -162,25 +143,19 @@ export class ActivitiesController {
     description: 'Retrieve all activities for a specific project',
   })
   @ApiParam({ name: 'projectId', description: 'Project ID' })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 50 })
   @ApiResponse({
     status: 200,
     description: 'Project activities retrieved successfully',
   })
   async getProjectActivities(
-    @Param('projectId') projectId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Param() params: IdParamDto,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
-    return this.activitiesService.getProjectActivities(
-      projectId,
-      pageNum,
-      limitNum,
-    );
+    return this.activitiesService.getActivities({
+      projectId: params.id,
+      page: query.page!,
+      limit: query.limit!,
+    });
   }
 
   @Get('hackathon/:hackathonId')
@@ -189,24 +164,18 @@ export class ActivitiesController {
     description: 'Retrieve all activities for a specific hackathon',
   })
   @ApiParam({ name: 'hackathonId', description: 'Hackathon ID' })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 50 })
   @ApiResponse({
     status: 200,
     description: 'Hackathon activities retrieved successfully',
   })
   async getHackathonActivities(
-    @Param('hackathonId') hackathonId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Param() params: IdParamDto,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
-    return this.activitiesService.getHackathonActivities(
-      hackathonId,
-      pageNum,
-      limitNum,
-    );
+    return this.activitiesService.getActivities({
+      hackathonId: params.id,
+      page: query.page!,
+      limit: query.limit!,
+    });
   }
 }

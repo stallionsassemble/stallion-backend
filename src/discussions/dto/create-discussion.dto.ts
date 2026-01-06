@@ -48,7 +48,7 @@ export class CreateReplyDto {
   parentId?: string;
 }
 
-export class AddReactionDto {
+export class AddDiscussionReactionDto {
   @ApiProperty({
     description: 'Emoji reaction',
     example: '👍',

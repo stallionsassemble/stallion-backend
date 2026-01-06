@@ -16,6 +16,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CreatePayoutMethodDto } from './dto/create-payout-method.dto';
 import { PayoutMethodResponseDto } from './dto/payout-method-response.dto';
@@ -126,9 +127,9 @@ export class PayoutMethodsController {
   })
   async getPayoutMethod(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: IdParamDto,
   ) {
-    return this.payoutMethodsService.getPayoutMethod(userId, id);
+    return this.payoutMethodsService.getPayoutMethod(userId, params.id);
   }
 
   @Patch(':id')
@@ -148,10 +149,10 @@ export class PayoutMethodsController {
   })
   async updatePayoutMethod(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: IdParamDto,
     @Body() dto: UpdatePayoutMethodDto,
   ) {
-    return this.payoutMethodsService.updatePayoutMethod(userId, id, dto);
+    return this.payoutMethodsService.updatePayoutMethod(userId, params.id, dto);
   }
 
   @Delete(':id')
@@ -167,8 +168,8 @@ export class PayoutMethodsController {
   })
   async deletePayoutMethod(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: IdParamDto,
   ) {
-    await this.payoutMethodsService.deletePayoutMethod(userId, id);
+    await this.payoutMethodsService.deletePayoutMethod(userId, params.id);
   }
 }

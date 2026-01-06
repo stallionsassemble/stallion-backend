@@ -22,10 +22,13 @@ import { ActivitiesService } from '../activities/activities.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
+import { ApplicationIdParamDto } from './dto/application-id-param.dto';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { GetMyMilestonesQueryDto } from './dto/get-my-milestones-query.dto';
 import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
+import { MilestoneIdParamDto } from './dto/milestone-id-param.dto';
+import { ProjectIdParamDto } from './dto/project-id-param.dto';
 import {
   ActivityResponseDto,
   ApplicationResponseDto,
@@ -201,10 +204,10 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Project not found' })
   async getProject(
-    @Param('id') id: string,
+    @Param() params: ProjectIdParamDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.projectsService.getProject(id, currentUserId);
+    return this.projectsService.getProject(params.id, currentUserId);
   }
 
   @Post()
@@ -255,11 +258,11 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Project not found' })
   async updateProject(
-    @Param('id') id: string,
+    @Param() params: ProjectIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateProjectDto,
   ) {
-    return this.projectsService.updateProject(id, userId, dto);
+    return this.projectsService.updateProject(params.id, userId, dto);
   }
 
   @Patch(':id/cancel')
@@ -281,10 +284,10 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Project not found' })
   async cancelProject(
-    @Param('id') id: string,
+    @Param() params: ProjectIdParamDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.projectsService.cancelProject(id, userId);
+    return this.projectsService.cancelProject(params.id, userId);
   }
 
   @Post(':id/apply')
@@ -303,11 +306,11 @@ export class ProjectsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not a contributor' })
   @ApiResponse({ status: 404, description: 'Project not found' })
   async applyToProject(
-    @Param('id') projectId: string,
+    @Param() params: ProjectIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: ApplyToProjectDto,
   ) {
-    return this.applicationsService.applyToProject(userId, projectId, dto);
+    return this.applicationsService.applyToProject(params.id, userId, dto);
   }
 
   @Patch('applications/:applicationId')
@@ -331,12 +334,12 @@ export class ProjectsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not your application' })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async updateApplication(
-    @Param('applicationId') applicationId: string,
+    @Param() params: ApplicationIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: ApplyToProjectDto,
   ) {
     return this.applicationsService.updateApplication(
-      applicationId,
+      params.applicationId,
       userId,
       dto,
     );
@@ -355,8 +358,8 @@ export class ProjectsController {
     description: 'Applications retrieved successfully',
     type: [ApplicationResponseDto],
   })
-  async getProjectApplications(@Param('id') projectId: string) {
-    return this.applicationsService.getApplicationsByProject(projectId);
+  async getProjectApplications(@Param() params: ProjectIdParamDto) {
+    return this.applicationsService.getApplicationsByProject(params.id);
   }
 
   @Get('applications/me')
@@ -396,12 +399,12 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async reviewApplication(
-    @Param('id') applicationId: string,
+    @Param() params: ApplicationIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: ReviewApplicationDto,
   ) {
     return this.applicationsService.reviewApplication(
-      applicationId,
+      params.applicationId,
       userId,
       dto.status,
       dto.rejectionReason,
@@ -428,10 +431,13 @@ export class ProjectsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not your application' })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async withdrawApplication(
-    @Param('id') applicationId: string,
+    @Param() params: ApplicationIdParamDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.applicationsService.withdrawApplication(applicationId, userId);
+    return this.applicationsService.withdrawApplication(
+      params.applicationId,
+      userId,
+    );
   }
 
   @Get(':id/milestones')
@@ -445,8 +451,8 @@ export class ProjectsController {
     description: 'Milestones retrieved successfully',
     type: [MilestoneResponseDto],
   })
-  async getProjectMilestones(@Param('id') projectId: string) {
-    return this.milestonesService.getMilestonesByProject(projectId);
+  async getProjectMilestones(@Param() params: ProjectIdParamDto) {
+    return this.milestonesService.getMilestonesByProject(params.id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -490,11 +496,11 @@ export class ProjectsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not your milestone' })
   @ApiResponse({ status: 404, description: 'Milestone not found' })
   async submitMilestone(
-    @Param('id') milestoneId: string,
+    @Param() params: MilestoneIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: SubmitMilestoneDto,
   ) {
-    return this.milestonesService.submitMilestone(milestoneId, userId, dto);
+    return this.milestonesService.submitMilestone(params.id, userId, dto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -518,12 +524,12 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Milestone not found' })
   async reviewMilestone(
-    @Param('id') milestoneId: string,
+    @Param() params: MilestoneIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: ReviewMilestoneDto,
   ) {
     return this.milestonesService.reviewMilestone(
-      milestoneId,
+      params.id,
       userId,
       dto.approve,
       dto.reviewNote,
@@ -542,7 +548,7 @@ export class ProjectsController {
     description: 'Activities retrieved successfully',
     type: [ActivityResponseDto],
   })
-  async getProjectActivities(@Param('id') projectId: string) {
-    return this.activitiesService.getProjectActivities(projectId);
+  async getProjectActivities(@Param() params: ProjectIdParamDto) {
+    return this.activitiesService.getProjectActivities(params.id);
   }
 }

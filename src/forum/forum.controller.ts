@@ -18,15 +18,24 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
-import { AddReactionDto } from './dto/add-reaction.dto';
+import { AddForumReactionDto } from './dto/add-reaction.dto';
+import { CategorySlugParamDto } from './dto/category-slug-param.dto';
+import { CommentIdParamDto } from './dto/comment-id-param.dto';
 import { AddCommentReactionDto } from './dto/comment-reaction.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
 import { CreateThreadDto } from './dto/create-thread.dto';
+import { GetThreadsQueryDto } from './dto/get-threads-query.dto';
+import { PostIdParamDto } from './dto/post-id-param.dto';
+import { ReactionsQueryDto } from './dto/reactions-query.dto';
+import { SearchThreadsQueryDto } from './dto/search-threads-query.dto';
+import { ThreadIdParamDto } from './dto/thread-id-param.dto';
 import { AddThreadReactionDto } from './dto/thread-reaction.dto';
+import { ThreadSlugParamDto } from './dto/thread-slug-param.dto';
 import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
@@ -173,8 +182,11 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  getCategory(@Param('slug') slug: string, @CurrentUser('id') userId?: string) {
-    return this.forumService.getCategory(slug, userId);
+  getCategory(
+    @Param() params: CategorySlugParamDto,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.forumService.getCategory(params.slug, userId);
   }
 
   @Delete('categories/:id')
@@ -196,8 +208,11 @@ export class ForumController {
     description: 'Forbidden - not the category creator',
   })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  deleteCategory(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.forumService.deleteCategory(id, userId);
+  deleteCategory(
+    @Param() params: IdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.forumService.deleteCategory(params.id, userId);
   }
 
   @Post('threads')
@@ -328,13 +343,15 @@ export class ForumController {
     },
   })
   getAllThreads(
-    @Query('categoryId') categoryId?: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
+    @Query() query: GetThreadsQueryDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
     return this.forumService.getAllThreads(
-      { categoryId, limit, offset },
+      {
+        categoryId: query.categoryId,
+        limit: query.limit,
+        offset: query.offset,
+      },
       currentUserId,
     );
   }
@@ -380,11 +397,14 @@ export class ForumController {
     },
   })
   searchThreads(
-    @Query('q') query: string,
-    @Query('categoryId') categoryId?: string,
+    @Query() query: SearchThreadsQueryDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.forumService.searchThreads(query, categoryId, currentUserId);
+    return this.forumService.searchThreads(
+      query.q,
+      query.categoryId,
+      currentUserId,
+    );
   }
 
   @Get('threads/pinned')
@@ -498,10 +518,10 @@ export class ForumController {
   })
   @ApiResponse({ status: 404, description: 'Thread not found' })
   getThread(
-    @Param('slug') slug: string,
+    @Param() params: ThreadSlugParamDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.forumService.getThread(slug, currentUserId);
+    return this.forumService.getThread(params.slug, currentUserId);
   }
 
   @Patch('threads/:id')
@@ -528,11 +548,11 @@ export class ForumController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Thread not found' })
   updateThread(
-    @Param('id') id: string,
+    @Param() params: ThreadIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateThreadDto,
   ) {
-    return this.forumService.updateThread(id, userId, dto);
+    return this.forumService.updateThread(params.id, userId, dto);
   }
 
   @Delete('threads/:id')
@@ -549,8 +569,11 @@ export class ForumController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Thread not found' })
-  deleteThread(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.forumService.deleteThread(id, userId);
+  deleteThread(
+    @Param() params: ThreadIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.forumService.deleteThread(params.id, userId);
   }
 
   @Patch('threads/:id/pin')
@@ -574,8 +597,11 @@ export class ForumController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Thread not found' })
-  togglePinThread(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.forumService.togglePinThread(userId, id);
+  togglePinThread(
+    @Param() params: ThreadIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.forumService.togglePinThread(userId, params.id);
   }
 
   @Post('posts')
@@ -648,11 +674,11 @@ export class ForumController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
   updatePost(
-    @Param('id') id: string,
+    @Param() params: PostIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: UpdatePostDto,
   ) {
-    return this.forumService.updatePost(id, userId, dto);
+    return this.forumService.updatePost(params.id, userId, dto);
   }
 
   @Delete('posts/:id')
@@ -669,8 +695,11 @@ export class ForumController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  deletePost(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.forumService.deletePost(id, userId);
+  deletePost(
+    @Param() params: PostIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.forumService.deletePost(params.id, userId);
   }
 
   @Get('posts/:id/reactions')
@@ -718,8 +747,8 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 404, description: 'Post not found' })
-  getPostReactions(@Param('id') id: string) {
-    return this.forumService.getPostReactions(id);
+  getPostReactions(@Param() params: PostIdParamDto) {
+    return this.forumService.getPostReactions(params.id);
   }
 
   @Patch('reactions')
@@ -745,7 +774,7 @@ export class ForumController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   addRemoveReaction(
     @CurrentUser('id') userId: string,
-    @Body() dto: AddReactionDto,
+    @Body() dto: AddForumReactionDto,
   ) {
     return this.forumService.addRemoveReaction(userId, dto);
   }
@@ -808,8 +837,8 @@ export class ForumController {
     },
   })
   @ApiResponse({ status: 404, description: 'Tag not found' })
-  getThreadsByTag(@Param('slug') slug: string) {
-    return this.forumService.getThreadsByTag(slug);
+  getThreadsByTag(@Param() params: CategorySlugParamDto) {
+    return this.forumService.getThreadsByTag(params.slug);
   }
 
   @Post('comments')
@@ -915,10 +944,10 @@ export class ForumController {
   })
   @ApiResponse({ status: 404, description: 'Post not found' })
   getPostComments(
-    @Param('id') postId: string,
+    @Param() params: PostIdParamDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
-    return this.forumService.getPostComments(postId, currentUserId);
+    return this.forumService.getPostComments(params.id, currentUserId);
   }
 
   @Patch('comments/:id')
@@ -948,11 +977,11 @@ export class ForumController {
   })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   updateComment(
-    @Param('id') id: string,
+    @Param() params: CommentIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: UpdateCommentDto,
   ) {
-    return this.forumService.updateComment(id, userId, dto);
+    return this.forumService.updateComment(params.id, userId, dto);
   }
 
   @Delete('comments/:id')
@@ -974,8 +1003,11 @@ export class ForumController {
     description: 'Forbidden - not the comment author',
   })
   @ApiResponse({ status: 404, description: 'Comment not found' })
-  deleteComment(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.forumService.deleteComment(id, userId);
+  deleteComment(
+    @Param() params: CommentIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.forumService.deleteComment(params.id, userId);
   }
 
   @Post('comments/:id/reactions')
@@ -1000,11 +1032,11 @@ export class ForumController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   addRemoveCommentReaction(
-    @Param('id') commentId: string,
+    @Param() params: CommentIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: AddCommentReactionDto,
   ) {
-    return this.forumService.addRemoveCommentReaction(userId, commentId, dto);
+    return this.forumService.addRemoveCommentReaction(userId, params.id, dto);
   }
 
   @Get('comments/:id/reactions')
@@ -1044,10 +1076,10 @@ export class ForumController {
   })
   @ApiResponse({ status: 404, description: 'Comment not found' })
   getCommentReactions(
-    @Param('id') commentId: string,
-    @Query('userId') userId?: string,
+    @Param() params: CommentIdParamDto,
+    @Query() query: ReactionsQueryDto,
   ) {
-    return this.forumService.getCommentReactions(commentId, userId);
+    return this.forumService.getCommentReactions(params.id, query.userId);
   }
 
   @Post('threads/:id/reactions')
@@ -1072,11 +1104,11 @@ export class ForumController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Thread not found' })
   addRemoveThreadReaction(
-    @Param('id') threadId: string,
+    @Param() params: ThreadIdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: AddThreadReactionDto,
   ) {
-    return this.forumService.addRemoveThreadReaction(userId, threadId, dto);
+    return this.forumService.addRemoveThreadReaction(userId, params.id, dto);
   }
 
   @Get('threads/:id/reactions')
@@ -1126,9 +1158,9 @@ export class ForumController {
   })
   @ApiResponse({ status: 404, description: 'Thread not found' })
   getThreadReactions(
-    @Param('id') threadId: string,
-    @Query('userId') userId?: string,
+    @Param() params: ThreadIdParamDto,
+    @Query() query: ReactionsQueryDto,
   ) {
-    return this.forumService.getThreadReactions(threadId, userId);
+    return this.forumService.getThreadReactions(params.id, query.userId);
   }
 }

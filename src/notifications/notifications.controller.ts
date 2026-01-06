@@ -13,12 +13,14 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { FcmTokenParamDto } from './dto/fcm-token-param.dto';
+import { GetNotificationsQueryDto } from './dto/get-notifications-query.dto';
 import { RegisterFcmTokenDto } from './dto/register-fcm-token.dto';
 import { UpdateNotificationSettingsDto } from './dto/update-notification-settings.dto';
 import { NotificationsService } from './notifications.service';
@@ -34,16 +36,6 @@ export class NotificationsController {
   @ApiOperation({
     summary: 'Get notifications',
     description: 'Retrieve user notifications with pagination',
-  })
-  @ApiQuery({
-    name: 'limit',
-    required: false,
-    description: 'Number of notifications to retrieve (default: 50)',
-  })
-  @ApiQuery({
-    name: 'offset',
-    required: false,
-    description: 'Offset for pagination (default: 0)',
   })
   @ApiResponse({
     status: 200,
@@ -82,13 +74,12 @@ export class NotificationsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getNotifications(
     @CurrentUser('id') userId: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
+    @Query() query: GetNotificationsQueryDto,
   ) {
     return this.notificationsService.getNotifications(
       userId,
-      limit ? parseInt(limit, 10) : 50,
-      offset ? parseInt(offset, 10) : 0,
+      query.limit ?? 20,
+      query.offset ?? 0,
     );
   }
 
@@ -134,8 +125,8 @@ export class NotificationsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
-  markAsRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.notificationsService.markAsRead(id, userId);
+  markAsRead(@Param() params: IdParamDto, @CurrentUser('id') userId: string) {
+    return this.notificationsService.markAsRead(params.id, userId);
   }
 
   @Patch('read-all')
@@ -171,10 +162,10 @@ export class NotificationsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
   deleteNotification(
-    @Param('id') id: string,
+    @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.notificationsService.deleteNotification(id, userId);
+    return this.notificationsService.deleteNotification(params.id, userId);
   }
 
   @Get('settings')
@@ -274,10 +265,10 @@ export class NotificationsController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   removeFcmToken(
-    @Param('token') token: string,
+    @Param() params: FcmTokenParamDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.notificationsService.removeFcmToken(token, userId);
+    return this.notificationsService.removeFcmToken(params.token, userId);
   }
 
   @Get('fcm-tokens')

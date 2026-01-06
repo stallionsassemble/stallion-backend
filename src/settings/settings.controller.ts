@@ -15,6 +15,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { PasskeyService } from '../passkey/passkey.service';
 import { UpdateContributorProfileDto } from '../users/dto/update-contributor-profile.dto';
@@ -72,10 +73,10 @@ export class SettingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async updatePasskeyName(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: IdParamDto,
     @Body('name') name: string,
   ) {
-    return this.passkeyService.updatePasskeyName(userId, id, name);
+    return this.passkeyService.updatePasskeyName(userId, params.id, name);
   }
 
   @Delete('passkeys/:id')
@@ -96,9 +97,9 @@ export class SettingsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async deletePasskey(
     @CurrentUser('id') userId: string,
-    @Param('id') id: string,
+    @Param() params: IdParamDto,
   ) {
-    return this.passkeyService.deletePasskey(userId, id);
+    return this.passkeyService.deletePasskey(userId, params.id);
   }
 
   @Patch('profile/contributor')

@@ -8,7 +8,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UserIdParamDto } from '../users/dto/user-id-param.dto';
+import { GetLeaderboardQueryDto } from './dto/get-leaderboard-query.dto';
 import { RecentEarnersQueryDto } from './dto/recent-earners-query.dto';
 import { ReputationService } from './reputation.service';
 
@@ -99,9 +102,11 @@ export class ReputationController {
     },
   })
   @ApiResponse({ status: 404, description: 'User not found' })
-  async getUserReputation(@Param('userId') userId: string) {
-    const reputation = await this.reputationService.getUserReputation(userId);
-    const rank = await this.reputationService.getUserRank(userId);
+  async getUserReputation(@Param() dto: UserIdParamDto) {
+    const reputation = await this.reputationService.getUserReputation(
+      dto.userId,
+    );
+    const rank = await this.reputationService.getUserRank(dto.userId);
     return { ...reputation, rank };
   }
 
@@ -252,21 +257,14 @@ export class ReputationController {
       },
     },
   })
-  async getLeaderboard(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('category') category?: string,
-  ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
+  async getLeaderboard(@Query() query: GetLeaderboardQueryDto) {
     const result = await this.reputationService.getLeaderboard(
-      pageNum,
-      limitNum,
-      category,
+      query.page ?? 1,
+      query.limit ?? 50,
+      query.category,
     );
 
-    const startRank = (pageNum - 1) * limitNum;
+    const startRank = ((query.page ?? 1) - 1) * (query.limit ?? 50);
 
     return {
       data: result.data.map((entry, index) => ({
@@ -358,16 +356,12 @@ export class ReputationController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getMyHistory(
     @CurrentUser('id') userId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
     return this.reputationService.getReputationHistory(
       userId,
-      pageNum,
-      limitNum,
+      query.page ?? 1,
+      query.limit ?? 50,
     );
   }
 
@@ -414,17 +408,13 @@ export class ReputationController {
   })
   @ApiResponse({ status: 404, description: 'User not found' })
   async getUserHistory(
-    @Param('userId') userId: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Param() params: UserIdParamDto,
+    @Query() query: PaginationQueryDto,
   ) {
-    const pageNum = page ? parseInt(page) : 1;
-    const limitNum = limit ? parseInt(limit) : 50;
-
     return this.reputationService.getReputationHistory(
-      userId,
-      pageNum,
-      limitNum,
+      params.userId,
+      query.page ?? 1,
+      query.limit ?? 50,
     );
   }
 

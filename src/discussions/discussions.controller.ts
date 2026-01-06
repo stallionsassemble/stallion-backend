@@ -10,11 +10,15 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { DiscussionsService } from './discussions.service';
+import { BountyIdParamDto } from './dto/bounty-id-param.dto';
 import {
-  AddReactionDto,
+  AddDiscussionReactionDto,
   CreateDiscussionDto,
   CreateReplyDto,
 } from './dto/create-discussion.dto';
+import { DiscussionIdParamDto } from './dto/discussion-id-param.dto';
+import { ProjectIdParamDto } from './dto/project-id-param.dto';
+import { ReplyIdParamDto } from './dto/reply-id-param.dto';
 
 @ApiTags('Discussions')
 @Controller('discussions')
@@ -53,11 +57,11 @@ export class DiscussionsController {
   })
   @ApiResponse({ status: 404, description: 'Bounty not found' })
   getBountyDiscussions(
-    @Param('bountyId') bountyId: string,
+    @Param() params: BountyIdParamDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
     return this.discussionsService.getBountyDiscussions(
-      bountyId,
+      params.bountyId,
       currentUserId,
     );
   }
@@ -76,11 +80,11 @@ export class DiscussionsController {
   })
   @ApiResponse({ status: 404, description: 'Project not found' })
   getProjectDiscussions(
-    @Param('projectId') projectId: string,
+    @Param() params: ProjectIdParamDto,
     @CurrentUser('id') currentUserId?: string,
   ) {
     return this.discussionsService.getProjectDiscussions(
-      projectId,
+      params.projectId,
       currentUserId,
     );
   }
@@ -98,12 +102,12 @@ export class DiscussionsController {
   @ApiResponse({ status: 404, description: 'Discussion not found' })
   replyToBountyDiscussion(
     @CurrentUser('id') userId: string,
-    @Param('discussionId') discussionId: string,
+    @Param() params: DiscussionIdParamDto,
     @Body() dto: CreateReplyDto,
   ) {
     return this.discussionsService.createReply(
       userId,
-      discussionId,
+      params.discussionId,
       dto,
       'bounty',
     );
@@ -122,12 +126,12 @@ export class DiscussionsController {
   @ApiResponse({ status: 404, description: 'Discussion not found' })
   replyToProjectDiscussion(
     @CurrentUser('id') userId: string,
-    @Param('discussionId') discussionId: string,
+    @Param() params: DiscussionIdParamDto,
     @Body() dto: CreateReplyDto,
   ) {
     return this.discussionsService.createReply(
       userId,
-      discussionId,
+      params.discussionId,
       dto,
       'project',
     );
@@ -149,12 +153,12 @@ export class DiscussionsController {
   @ApiResponse({ status: 404, description: 'Discussion not found' })
   reactToBountyDiscussion(
     @CurrentUser('id') userId: string,
-    @Param('discussionId') discussionId: string,
-    @Body() dto: AddReactionDto,
+    @Param() params: DiscussionIdParamDto,
+    @Body() dto: AddDiscussionReactionDto,
   ) {
     return this.discussionsService.toggleDiscussionReaction(
       userId,
-      discussionId,
+      params.discussionId,
       dto,
       'bounty',
     );
@@ -176,12 +180,12 @@ export class DiscussionsController {
   @ApiResponse({ status: 404, description: 'Discussion not found' })
   reactToProjectDiscussion(
     @CurrentUser('id') userId: string,
-    @Param('discussionId') discussionId: string,
-    @Body() dto: AddReactionDto,
+    @Param() params: DiscussionIdParamDto,
+    @Body() dto: AddDiscussionReactionDto,
   ) {
     return this.discussionsService.toggleDiscussionReaction(
       userId,
-      discussionId,
+      params.discussionId,
       dto,
       'project',
     );
@@ -203,9 +207,13 @@ export class DiscussionsController {
   @ApiResponse({ status: 404, description: 'Reply not found' })
   reactToReply(
     @CurrentUser('id') userId: string,
-    @Param('replyId') replyId: string,
-    @Body() dto: AddReactionDto,
+    @Param() params: ReplyIdParamDto,
+    @Body() dto: AddDiscussionReactionDto,
   ) {
-    return this.discussionsService.toggleReplyReaction(userId, replyId, dto);
+    return this.discussionsService.toggleReplyReaction(
+      userId,
+      params.replyId,
+      dto,
+    );
   }
 }
