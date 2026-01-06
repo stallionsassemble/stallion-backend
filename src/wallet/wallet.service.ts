@@ -89,6 +89,7 @@ export class WalletService {
     amount: number,
     currency: string,
     payoutMethodId?: string,
+    address?: string,
   ) {
     return this.prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUnique({
@@ -106,9 +107,13 @@ export class WalletService {
 
       const userId = wallet.users[0].id;
 
-      // Resolve destination from payout method
+      // Resolve destination: address takes precedence over payout method
       let destination: string;
-      if (payoutMethodId) {
+      if (address) {
+        // Use provided address directly
+        destination = address;
+      } else if (payoutMethodId) {
+        // Use specified payout method
         const payoutMethod = await tx.payoutMethod.findFirst({
           where: {
             id: payoutMethodId,

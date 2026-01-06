@@ -22,7 +22,16 @@ export class WithdrawDto {
 
   @ApiPropertyOptional({
     description:
-      'Payout method ID (if not provided, default payout method will be used)',
+      'Destination address for withdrawal (takes precedence over payoutMethodId if both provided)',
+    example: 'GXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX',
+  })
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Payout method ID (if not provided and no address, default payout method will be used)',
     example: 'payout-method-uuid',
   })
   @IsOptional()

@@ -117,7 +117,8 @@ export class WalletController {
   @UseGuards(MFAGuard)
   @ApiOperation({
     summary: 'Withdraw funds',
-    description: 'Create a withdrawal request from wallet (requires MFA)',
+    description:
+      'Create a withdrawal request from wallet (requires MFA). Provide either an address or payoutMethodId. If both are provided, address takes precedence.',
   })
   @ApiResponse({
     status: 201,
@@ -136,6 +137,7 @@ export class WalletController {
       withdrawDto.amount,
       withdrawDto.currency,
       withdrawDto.payoutMethodId,
+      withdrawDto.address,
     );
   }
 
