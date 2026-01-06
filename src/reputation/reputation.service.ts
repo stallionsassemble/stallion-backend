@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ReputationLevel } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ReputationNotifications } from '../notifications/helpers/notification-helper';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -554,6 +555,199 @@ export class ReputationService {
     });
 
     return rank + 1;
+  }
+
+  async getRecentEarners(page = 1, limit = 20, days = 30) {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+
+    // Get users who have earned from bounties or projects in the specified period
+    const [bountyWinners, projectEarners] = await Promise.all([
+      this.prisma.bountyWinner.findMany({
+        where: {
+          awardedAt: {
+            gte: cutoffDate,
+          },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              profilePicture: true,
+            },
+          },
+          bounty: {
+            select: {
+              reward: true,
+              rewardDistribution: true,
+            },
+          },
+        },
+        orderBy: {
+          awardedAt: 'desc',
+        },
+      }),
+      this.prisma.userMilestone.findMany({
+        where: {
+          paidAt: {
+            gte: cutoffDate,
+          },
+        },
+        include: {
+          contributor: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              profilePicture: true,
+            },
+          },
+          milestone: {
+            select: {
+              amount: true,
+            },
+          },
+        },
+        orderBy: {
+          paidAt: 'desc',
+        },
+      }),
+    ]);
+
+    // Aggregate earnings by user
+    const userEarningsMap = new Map<
+      string,
+      {
+        userId: string;
+        username: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        profilePicture: string | null;
+        bountyEarnings: bigint;
+        projectEarnings: bigint;
+        lastEarnedAt: Date;
+        recentWinsCount: number;
+      }
+    >();
+
+    // Process bounty winners
+    for (const winner of bountyWinners) {
+      if (!winner.awardedAt) continue;
+
+      const userId = winner.user.id;
+      const distribution = winner.bounty.rewardDistribution as any[];
+      const positionReward = distribution.find(
+        (d) => d.rank === winner.position,
+      );
+
+      if (positionReward) {
+        const bountyReward = BigInt(winner.bounty.reward);
+        const percentage = BigInt(positionReward.percentage);
+        const earnings = (bountyReward * percentage) / BigInt(100);
+
+        const existing = userEarningsMap.get(userId);
+        if (existing) {
+          existing.bountyEarnings += earnings;
+          existing.recentWinsCount += 1;
+          if (winner.awardedAt > existing.lastEarnedAt) {
+            existing.lastEarnedAt = winner.awardedAt;
+          }
+        } else {
+          userEarningsMap.set(userId, {
+            userId: winner.user.id,
+            username: winner.user.username,
+            firstName: winner.user.firstName,
+            lastName: winner.user.lastName,
+            profilePicture: winner.user.profilePicture,
+            bountyEarnings: earnings,
+            projectEarnings: BigInt(0),
+            lastEarnedAt: winner.awardedAt,
+            recentWinsCount: 1,
+          });
+        }
+      }
+    }
+
+    // Process project earners
+    for (const userMilestone of projectEarners) {
+      const userId = userMilestone.contributor.id;
+      const earnings = BigInt(userMilestone.milestone.amount);
+
+      const existing = userEarningsMap.get(userId);
+      if (existing) {
+        existing.projectEarnings += earnings;
+        existing.recentWinsCount += 1;
+        if (userMilestone.paidAt! > existing.lastEarnedAt) {
+          existing.lastEarnedAt = userMilestone.paidAt!;
+        }
+      } else {
+        userEarningsMap.set(userId, {
+          userId: userMilestone.contributor.id,
+          username: userMilestone.contributor.username,
+          firstName: userMilestone.contributor.firstName,
+          lastName: userMilestone.contributor.lastName,
+          profilePicture: userMilestone.contributor.profilePicture,
+          bountyEarnings: BigInt(0),
+          projectEarnings: earnings,
+          lastEarnedAt: userMilestone.paidAt!,
+          recentWinsCount: 1,
+        });
+      }
+    }
+
+    // Convert to array and sort by total earnings
+    const earners = Array.from(userEarningsMap.values())
+      .map((earner) => ({
+        ...earner,
+        totalEarned: earner.bountyEarnings + earner.projectEarnings,
+      }))
+      .sort((a, b) => {
+        const diff = b.totalEarned - a.totalEarned;
+        return diff > 0 ? 1 : diff < 0 ? -1 : 0;
+      });
+
+    // Paginate
+    const total = earners.length;
+    const skip = (page - 1) * limit;
+    const paginatedEarners = earners.slice(skip, skip + limit);
+
+    // Get reputation data for each earner
+    const enrichedData = await Promise.all(
+      paginatedEarners.map(async (earner) => {
+        const reputation = await this.prisma.userReputation.findUnique({
+          where: { userId: earner.userId },
+        });
+
+        return {
+          userId: earner.userId,
+          username: earner.username,
+          firstName: earner.firstName,
+          lastName: earner.lastName,
+          profilePicture: earner.profilePicture,
+          totalEarned: earner.totalEarned.toString(),
+          bountyEarnings: earner.bountyEarnings.toString(),
+          projectEarnings: earner.projectEarnings.toString(),
+          lastEarnedAt: earner.lastEarnedAt,
+          recentWinsCount: earner.recentWinsCount,
+          level: reputation?.level || ReputationLevel.NEWCOMER,
+          isVerified: reputation ? reputation.score > 0 : false,
+        };
+      }),
+    );
+
+    return {
+      data: enrichedData,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getReputationHistory(userId: string, page = 1, limit = 50) {

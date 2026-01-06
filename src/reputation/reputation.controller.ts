@@ -9,6 +9,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RecentEarnersQueryDto } from './dto/recent-earners-query.dto';
 import { ReputationService } from './reputation.service';
 
 @ApiTags('Reputation')
@@ -102,6 +103,79 @@ export class ReputationController {
     const reputation = await this.reputationService.getUserReputation(userId);
     const rank = await this.reputationService.getUserRank(userId);
     return { ...reputation, rank };
+  }
+
+  @Get('leaderboard/recent-earners')
+  @ApiOperation({
+    summary: 'Get recent earners',
+    description:
+      'Retrieve users who have recently earned from bounties or projects',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number (default: 1)',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of users per page (default: 20)',
+  })
+  @ApiQuery({
+    name: 'days',
+    required: false,
+    description: 'Number of days to look back (default: 30)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Recent earners with their earnings',
+    schema: {
+      example: {
+        data: [
+          {
+            userId: 'user-uuid-1',
+            username: 'top_earner',
+            firstName: 'Alice',
+            lastName: 'Johnson',
+            profilePicture: 'https://example.com/alice.jpg',
+            totalEarned: '5000',
+            bountyEarnings: '3000',
+            projectEarnings: '2000',
+            lastEarnedAt: '2024-03-01T12:00:00.000Z',
+            recentWinsCount: 3,
+            level: 'VETERAN',
+            isVerified: true,
+          },
+          {
+            userId: 'user-uuid-2',
+            username: 'code_master',
+            firstName: 'Bob',
+            lastName: 'Smith',
+            profilePicture: 'https://example.com/bob.jpg',
+            totalEarned: '3500',
+            bountyEarnings: '2500',
+            projectEarnings: '1000',
+            lastEarnedAt: '2024-02-28T10:00:00.000Z',
+            recentWinsCount: 2,
+            level: 'MASTER',
+            isVerified: false,
+          },
+        ],
+        pagination: {
+          total: 45,
+          page: 1,
+          limit: 20,
+          totalPages: 3,
+        },
+      },
+    },
+  })
+  async getRecentEarners(@Query() query: RecentEarnersQueryDto) {
+    return this.reputationService.getRecentEarners(
+      query.page,
+      query.limit,
+      query.days,
+    );
   }
 
   @Get('leaderboard')
