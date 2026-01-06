@@ -37,4 +37,12 @@ export class WithdrawDto {
   @IsOptional()
   @IsString()
   payoutMethodId?: string;
+
+  @ApiProperty({
+    description:
+      'TOTP code from authenticator app (required for 2FA verification)',
+    example: '123456',
+  })
+  @IsString()
+  totpCode: string;
 }

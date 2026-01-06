@@ -1,6 +1,8 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { TwoFactorVerificationService } from '../common/services/two-factor-verification.service';
 import { SorobanModule } from '../soroban/soroban.module';
 import { PayoutMethodsController } from './payout-methods.controller';
 import { PayoutMethodsService } from './payout-methods.service';
@@ -14,6 +16,7 @@ import { WalletService } from './wallet.service';
   imports: [
     PrismaModule,
     SorobanModule,
+    ConfigModule,
     BullModule.registerQueue({
       name: 'withdrawal',
     }),
@@ -25,6 +28,7 @@ import { WalletService } from './wallet.service';
     StellarWalletService,
     WalletSigningService,
     PayoutMethodsService,
+    TwoFactorVerificationService,
   ],
   exports: [
     WalletService,

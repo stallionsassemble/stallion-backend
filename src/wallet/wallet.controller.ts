@@ -5,9 +5,9 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { TwoFactorVerificationService } from '../common/services/two-factor-verification.service';
 import { SetupTrustlineDto } from './dto/setup-trustline.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
@@ -15,7 +15,10 @@ import { WalletService } from './wallet.service';
 @ApiTags('Wallet')
 @Controller('wallet')
 export class WalletController {
-  constructor(private readonly walletService: WalletService) {}
+  constructor(
+    private readonly walletService: WalletService,
+    private readonly twoFactorVerificationService: TwoFactorVerificationService,
+  ) {}
 
   @Get('supported-currencies')
   @ApiOperation({ summary: 'Get supported currencies' })
@@ -114,23 +117,33 @@ export class WalletController {
   }
 
   @Post('withdraw')
-  @UseGuards(MFAGuard)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Withdraw funds',
     description:
-      'Create a withdrawal request from wallet (requires MFA). Provide either an address or payoutMethodId. If both are provided, address takes precedence.',
+      'Create a withdrawal request from wallet (requires 2FA verification). Provide either an address or payoutMethodId. If both are provided, address takes precedence. Must include totpCode from your authenticator app for 2FA verification.',
   })
   @ApiResponse({
     status: 201,
     description: 'Withdrawal initiated successfully',
   })
-  @ApiResponse({ status: 400, description: 'Insufficient balance' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'MFA required' })
+  @ApiResponse({
+    status: 400,
+    description: 'Insufficient balance or invalid 2FA',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized or invalid 2FA code' })
+  @ApiResponse({ status: 403, description: '2FA required' })
   async withdraw(
     @CurrentUser('id') userId: string,
     @Body() withdrawDto: WithdrawDto,
   ) {
+    // Verify 2FA before processing withdrawal
+    await this.twoFactorVerificationService.verify2FA(
+      userId,
+      withdrawDto.totpCode,
+    );
+
     const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.createWithdrawal(
       wallet.id,
