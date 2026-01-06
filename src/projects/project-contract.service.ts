@@ -2,7 +2,6 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { getTokenAddress } from '../bounties/utils/supported-currencies';
-import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
 import { Client } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
@@ -13,23 +12,18 @@ export class ProjectContractService {
   private readonly logger = new Logger(ProjectContractService.name);
   private readonly contractId: string;
   private readonly networkPassphrase: string;
-  private readonly sorobanClient: Client;
+  readonly sorobanClient: Client;
 
   constructor(
     private configService: ConfigService,
     private walletSigning: WalletSigningService,
-    private prisma: PrismaService,
   ) {
     this.contractId = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_CONTRACT_ID,
     );
-    const network = this.configService.getOrThrow<string>(
-      EnvConfig.SOROBAN_NETWORK,
+    this.networkPassphrase = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
     );
-    this.networkPassphrase =
-      network === 'testnet'
-        ? 'Test SDF Network ; September 2015'
-        : 'Public Global Stellar Network ; September 2015';
 
     this.sorobanClient = new Client({
       contractId: this.contractId,
@@ -452,5 +446,71 @@ export class ProjectContractService {
       refundedAmount,
       txHash,
     };
+  }
+
+  /**
+   * Get all projects from contract
+   * Returns array of contract project IDs
+   */
+  async getProjects(): Promise<number[]> {
+    try {
+      const assembled = await this.sorobanClient.get_projects();
+      const simulated = await assembled.simulate();
+      return simulated.result.map(Number);
+    } catch (error) {
+      this.logger.error('Failed to get projects from contract', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get owner projects from contract
+   * Returns array of contract project IDs for a specific owner
+   */
+  async getOwnerProjects(ownerPublicKey: string): Promise<number[]> {
+    try {
+      const assembled = await this.sorobanClient.get_owner_projects({
+        owner: ownerPublicKey,
+      });
+      const simulated = await assembled.simulate();
+      return simulated.result.map(Number);
+    } catch (error) {
+      this.logger.error('Failed to get owner projects from contract', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get projects by status from contract
+   * Returns array of contract project IDs with specific status
+   */
+  async getProjectsByStatus(status: string): Promise<number[]> {
+    try {
+      // Map database status to contract status
+      let contractStatus: any;
+      if (status === 'OPEN') {
+        contractStatus = { tag: 'Open' };
+      } else if (status === 'IN_PROGRESS') {
+        contractStatus = { tag: 'InProgress' };
+      } else if (status === 'COMPLETED') {
+        contractStatus = { tag: 'Completed' };
+      } else if (status === 'CANCELLED') {
+        contractStatus = { tag: 'Cancelled' };
+      } else {
+        throw new BadRequestException(`Invalid project status: ${status}`);
+      }
+
+      const assembled = await this.sorobanClient.get_projects_by_status({
+        status: contractStatus,
+      });
+      const simulated = await assembled.simulate();
+      return simulated.result.map(Number);
+    } catch (error) {
+      this.logger.error(
+        'Failed to get projects by status from contract',
+        error,
+      );
+      throw error;
+    }
   }
 }

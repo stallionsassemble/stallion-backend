@@ -25,172 +25,199 @@ export class ProjectsService {
   ) {}
 
   async getProject(projectId: string, currentUserId?: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            profilePicture: true,
-          },
-        },
-        applications: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                username: true,
-                firstName: true,
-                lastName: true,
-                profilePicture: true,
-                skills: true,
-              },
+    try {
+      // Fetch database project details first
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              companyName: true,
+              profilePicture: true,
             },
-            userMilestones: {
-              include: {
-                milestone: true,
+          },
+          applications: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  username: true,
+                  firstName: true,
+                  lastName: true,
+                  profilePicture: true,
+                  skills: true,
+                },
               },
-              orderBy: {
-                milestone: {
-                  order: 'asc',
+              userMilestones: {
+                include: {
+                  milestone: true,
+                },
+                orderBy: {
+                  milestone: {
+                    order: 'asc',
+                  },
                 },
               },
             },
           },
-        },
-        milestones: {
-          orderBy: { order: 'asc' },
-        },
-      },
-    });
-
-    if (!project) {
-      throw new NotFoundException('Project not found');
-    }
-
-    // Check if current user has applied
-    let applied = false;
-    if (currentUserId) {
-      const application = await this.prisma.projectApplication.findFirst({
-        where: {
-          projectId,
-          userId: currentUserId,
+          milestones: {
+            orderBy: { order: 'asc' },
+          },
         },
       });
-      applied = !!application;
-    }
 
-    // Get winner information (accepted application)
-    const acceptedApplication = project.applications.find(
-      (app) => app.status === 'ACCEPTED',
-    );
+      if (!project || project.contractProjectId === null) {
+        throw new NotFoundException('Project not found');
+      }
 
-    // Calculate owner stats
-    const [totalPaidResult, totalBounties, totalProjects] = await Promise.all([
-      this.prisma.transaction.aggregate({
-        where: {
-          walletId: project.owner.id,
-          type: 'WITHDRAWAL',
-          state: 'COMPLETED',
-        },
-        _sum: {
-          amount: true,
-        },
-      }),
-      this.prisma.bounty.count({
-        where: { ownerId: project.ownerId },
-      }),
-      this.prisma.project.count({
-        where: { ownerId: project.ownerId },
-      }),
-    ]);
+      // Verify project exists in contract
+      const contractProjectId = project.contractProjectId;
 
-    const totalPaid = totalPaidResult._sum.amount?.toString() || '0';
+      // Make sure contractProjectId is valid u32
+      if (contractProjectId < 0 || contractProjectId > 4294967295) {
+        throw new NotFoundException('Project not found');
+      }
 
-    // Calculate released and escrowed amounts from user milestones
-    const acceptedApp = project.applications.find(
-      (app) => app.status === 'ACCEPTED',
-    );
+      const assembled = await this.contractService.sorobanClient.get_project({
+        project_id: contractProjectId,
+      });
+      const simulated = await assembled.simulate();
 
-    let released = '0';
-    let escrowed = '0';
+      if (!simulated.result.isOk()) {
+        throw new NotFoundException('Project not found in contract');
+      }
 
-    if (acceptedApp && acceptedApp.userMilestones.length > 0) {
-      released = acceptedApp.userMilestones
-        .filter((um) => um.status === 'PAID')
-        .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
-        .toString();
+      // Contract verification passed, continue with existing logic
 
-      escrowed = acceptedApp.userMilestones
-        .filter((um) => um.status !== 'PAID')
-        .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
-        .toString();
-    }
+      // Check if current user has applied
+      let applied = false;
+      if (currentUserId) {
+        const application = await this.prisma.projectApplication.findFirst({
+          where: {
+            projectId,
+            userId: currentUserId,
+          },
+        });
+        applied = !!application;
+      }
 
-    // Combine milestone templates with user milestone data for accepted application
-    const milestonesWithStatus =
-      acceptedApp && acceptedApplication
-        ? project.milestones.map((milestone) => {
-            const userMilestone = acceptedApp.userMilestones.find(
-              (um) => um.milestone.id === milestone.id,
-            );
-            return {
-              id: userMilestone?.id || milestone.id,
-              userMilestoneId: userMilestone?.id,
+      // Get winner information (accepted application)
+      const acceptedApplication = project.applications.find(
+        (app) => app.status === 'ACCEPTED',
+      );
+
+      // Calculate owner stats
+      const [totalPaidResult, totalBounties, totalProjects] = await Promise.all(
+        [
+          this.prisma.transaction.aggregate({
+            where: {
+              walletId: project.owner.id,
+              type: 'WITHDRAWAL',
+              state: 'COMPLETED',
+            },
+            _sum: {
+              amount: true,
+            },
+          }),
+          this.prisma.bounty.count({
+            where: { ownerId: project.ownerId },
+          }),
+          this.prisma.project.count({
+            where: { ownerId: project.ownerId },
+          }),
+        ],
+      );
+
+      const totalPaid = totalPaidResult._sum.amount?.toString() || '0';
+
+      // Calculate released and escrowed amounts from user milestones
+      const acceptedApp = project.applications.find(
+        (app) => app.status === 'ACCEPTED',
+      );
+
+      let released = '0';
+      let escrowed = '0';
+
+      if (acceptedApp && acceptedApp.userMilestones.length > 0) {
+        released = acceptedApp.userMilestones
+          .filter((um) => um.status === 'PAID')
+          .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
+          .toString();
+
+        escrowed = acceptedApp.userMilestones
+          .filter((um) => um.status !== 'PAID')
+          .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
+          .toString();
+      }
+
+      // Combine milestone templates with user milestone data for accepted application
+      const milestonesWithStatus =
+        acceptedApp && acceptedApplication
+          ? project.milestones.map((milestone) => {
+              const userMilestone = acceptedApp.userMilestones.find(
+                (um) => um.milestone.id === milestone.id,
+              );
+              return {
+                id: userMilestone?.id || milestone.id,
+                userMilestoneId: userMilestone?.id,
+                title: milestone.title,
+                description: milestone.description,
+                amount: milestone.amount,
+                dueDate: milestone.dueDate,
+                order: milestone.order,
+                status: userMilestone?.status || 'PENDING',
+                submissionNote: userMilestone?.submissionNote,
+                submissionUrl: userMilestone?.submissionUrl,
+                submittedAt: userMilestone?.submittedAt,
+                reviewNote: userMilestone?.reviewNote,
+                reviewedAt: userMilestone?.reviewedAt,
+                revisionNote: userMilestone?.revisionNote,
+                txHash: userMilestone?.txHash,
+                paidAt: userMilestone?.paidAt,
+                contributorId: userMilestone?.contributorId,
+                contributor: acceptedApplication.user,
+              };
+            })
+          : project.milestones.map((milestone) => ({
+              id: milestone.id,
               title: milestone.title,
               description: milestone.description,
               amount: milestone.amount,
               dueDate: milestone.dueDate,
               order: milestone.order,
-              status: userMilestone?.status || 'PENDING',
-              submissionNote: userMilestone?.submissionNote,
-              submissionUrl: userMilestone?.submissionUrl,
-              submittedAt: userMilestone?.submittedAt,
-              reviewNote: userMilestone?.reviewNote,
-              reviewedAt: userMilestone?.reviewedAt,
-              revisionNote: userMilestone?.revisionNote,
-              txHash: userMilestone?.txHash,
-              paidAt: userMilestone?.paidAt,
-              contributorId: userMilestone?.contributorId,
-              contributor: acceptedApplication.user,
-            };
-          })
-        : project.milestones.map((milestone) => ({
-            id: milestone.id,
-            title: milestone.title,
-            description: milestone.description,
-            amount: milestone.amount,
-            dueDate: milestone.dueDate,
-            order: milestone.order,
-          }));
+            }));
 
-    return {
-      ...project,
-      applied,
-      released,
-      escrowed,
-      milestones: milestonesWithStatus,
-      winner: acceptedApplication
-        ? {
-            userId: acceptedApplication.user.id,
-            username: acceptedApplication.user.username,
-            firstName: acceptedApplication.user.firstName,
-            lastName: acceptedApplication.user.lastName,
-            profilePicture: acceptedApplication.user.profilePicture,
-            acceptedAt: acceptedApplication.updatedAt,
-          }
-        : null,
-      owner: {
-        ...project.owner,
-        totalPaid,
-        totalBounties,
-        totalProjects,
-      },
-    };
+      return {
+        ...project,
+        applied,
+        released,
+        escrowed,
+        milestones: milestonesWithStatus,
+        winner: acceptedApplication
+          ? {
+              userId: acceptedApplication.user.id,
+              username: acceptedApplication.user.username,
+              firstName: acceptedApplication.user.firstName,
+              lastName: acceptedApplication.user.lastName,
+              profilePicture: acceptedApplication.user.profilePicture,
+              acceptedAt: acceptedApplication.updatedAt,
+            }
+          : null,
+        owner: {
+          ...project.owner,
+          totalPaid,
+          totalBounties,
+          totalProjects,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Failed to get project', error);
+      throw error;
+    }
   }
 
   async listProjects(
@@ -201,92 +228,126 @@ export class ProjectsService {
     },
     currentUserId?: string,
   ) {
-    const projects = await this.prisma.project.findMany({
-      where: {
-        type: filters?.type,
-        status: filters?.status,
-        ownerId: filters?.ownerId,
-      },
-      include: {
-        owner: {
-          select: {
-            id: true,
-            username: true,
-            firstName: true,
-            lastName: true,
-            companyName: true,
-            profilePicture: true,
-          },
-        },
-        applications: {
-          select: {
-            userId: true,
-            status: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    try {
+      // Fetch contract project IDs based on filters
+      let contractProjectIds: number[] = [];
 
-    // Get owner stats for all unique owners
-    const ownerIds = [...new Set(projects.map((p) => p.ownerId))];
-    const ownerStatsMap = new Map<
-      string,
-      { totalPaid: string; totalBounties: number; totalProjects: number }
-    >();
-
-    await Promise.all(
-      ownerIds.map(async (ownerId) => {
-        const [totalPaidResult, totalBounties, totalProjects] =
-          await Promise.all([
-            this.prisma.transaction.aggregate({
-              where: {
-                walletId: ownerId,
-                type: 'WITHDRAWAL',
-                state: 'COMPLETED',
-              },
-              _sum: {
-                amount: true,
-              },
-            }),
-            this.prisma.bounty.count({
-              where: { ownerId },
-            }),
-            this.prisma.project.count({
-              where: { ownerId },
-            }),
-          ]);
-
-        ownerStatsMap.set(ownerId, {
-          totalPaid: totalPaidResult._sum.amount?.toString() || '0',
-          totalBounties,
-          totalProjects,
+      if (filters?.ownerId) {
+        // Get projects for specific owner from contract
+        const owner = await this.prisma.user.findUnique({
+          where: { id: filters.ownerId },
+          include: { wallet: true },
         });
-      }),
-    );
 
-    // Map projects with applied field and owner stats
-    return projects.map((project) => {
-      const applied = currentUserId
-        ? project.applications.some((app) => app.userId === currentUserId)
-        : false;
+        if (!owner || !owner.wallet) {
+          return [];
+        }
 
-      const ownerStats = ownerStatsMap.get(project.ownerId) || {
-        totalPaid: '0',
-        totalBounties: 0,
-        totalProjects: 0,
-      };
+        contractProjectIds = await this.contractService.getOwnerProjects(
+          owner.wallet.publicKey,
+        );
+      } else if (filters?.status) {
+        // Get projects by status from contract
+        contractProjectIds = await this.contractService.getProjectsByStatus(
+          filters.status,
+        );
+      } else {
+        // Get all projects from contract
+        contractProjectIds = await this.contractService.getProjects();
+      }
 
-      return {
-        ...project,
-        applied,
-        owner: {
-          ...project.owner,
-          ...ownerStats,
+      // Fetch projects from database based on contract IDs
+      const projects = await this.prisma.project.findMany({
+        where: {
+          contractProjectId: {
+            in: contractProjectIds,
+          },
+          type: filters?.type,
         },
-        applications: undefined, // Remove applications from response
-      };
-    });
+        include: {
+          owner: {
+            select: {
+              id: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              companyName: true,
+              profilePicture: true,
+            },
+          },
+          applications: {
+            select: {
+              userId: true,
+              status: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Get owner stats for all unique owners
+      const ownerIds = [...new Set(projects.map((p) => p.ownerId))];
+      const ownerStatsMap = new Map<
+        string,
+        { totalPaid: string; totalBounties: number; totalProjects: number }
+      >();
+
+      await Promise.all(
+        ownerIds.map(async (ownerId) => {
+          const [totalPaidResult, totalBounties, totalProjects] =
+            await Promise.all([
+              this.prisma.transaction.aggregate({
+                where: {
+                  walletId: ownerId,
+                  type: 'WITHDRAWAL',
+                  state: 'COMPLETED',
+                },
+                _sum: {
+                  amount: true,
+                },
+              }),
+              this.prisma.bounty.count({
+                where: { ownerId },
+              }),
+              this.prisma.project.count({
+                where: { ownerId },
+              }),
+            ]);
+
+          ownerStatsMap.set(ownerId, {
+            totalPaid: totalPaidResult._sum.amount?.toString() || '0',
+            totalBounties,
+            totalProjects,
+          });
+        }),
+      );
+
+      // Map projects with applied field and owner stats
+      return projects.map((project) => {
+        const applied = currentUserId
+          ? project.applications.some((app) => app.userId === currentUserId)
+          : false;
+
+        const ownerStats = ownerStatsMap.get(project.ownerId) || {
+          totalPaid: '0',
+          totalBounties: 0,
+          totalProjects: 0,
+        };
+
+        return {
+          ...project,
+          applied,
+          owner: {
+            ...project.owner,
+            ...ownerStats,
+          },
+          applications: undefined, // Remove applications from response
+        };
+      });
+    } catch (error) {
+      this.logger.error('Failed to list projects', error);
+      throw error;
+    }
   }
 
   async createProject(ownerId: string, dto: CreateProjectDto) {
