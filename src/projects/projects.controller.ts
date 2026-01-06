@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { GetMyMilestonesQueryDto } from './dto/get-my-milestones-query.dto';
 import { ListProjectsQueryDto } from './dto/list-projects-query.dto';
 import {
   ActivityResponseDto,
@@ -447,15 +448,22 @@ export class ProjectsController {
   @Get('milestones/me')
   @ApiOperation({
     summary: 'Get my milestones',
-    description: 'Get all milestones assigned to the current user',
+    description:
+      'Get all milestones assigned to the current user, optionally filtered by project',
   })
   @ApiResponse({
     status: 200,
     description: 'Milestones retrieved successfully',
     type: [MilestoneResponseDto],
   })
-  async getMyMilestones(@CurrentUser('id') userId: string) {
-    return this.milestonesService.getUserMilestonesByContributor(userId);
+  async getMyMilestones(
+    @Query() query: GetMyMilestonesQueryDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.milestonesService.getUserMilestonesByContributor(
+      userId,
+      query.projectId,
+    );
   }
 
   @Post('milestones/:id/submit')

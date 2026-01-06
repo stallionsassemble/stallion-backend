@@ -189,6 +189,7 @@ export class ProjectApplicationsService {
       include: {
         project: {
           include: {
+            owner: true,
             applications: {
               where: { status: ApplicationStatus.ACCEPTED },
             },

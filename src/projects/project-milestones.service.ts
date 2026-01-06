@@ -277,9 +277,19 @@ export class ProjectMilestonesService {
     });
   }
 
-  async getUserMilestonesByContributor(contributorId: string) {
+  async getUserMilestonesByContributor(
+    contributorId: string,
+    projectId?: string,
+  ) {
     return this.prisma.userMilestone.findMany({
-      where: { contributorId },
+      where: {
+        contributorId,
+        ...(projectId && {
+          milestone: {
+            projectId,
+          },
+        }),
+      },
       include: {
         milestone: {
           include: {
