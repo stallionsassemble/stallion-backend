@@ -375,6 +375,8 @@ export class ProjectsController {
     return this.applicationsService.getApplicationsByUser(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Patch('applications/:id/review')
   @ApiOperation({
     summary: 'Review an application',
@@ -406,6 +408,8 @@ export class ProjectsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Delete('applications/:id')
   @ApiOperation({
     summary: 'Withdraw an application',
@@ -445,6 +449,8 @@ export class ProjectsController {
     return this.milestonesService.getMilestonesByProject(projectId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Get('milestones/me')
   @ApiOperation({
     summary: 'Get my milestones',
@@ -466,6 +472,8 @@ export class ProjectsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Post('milestones/:id/submit')
   @ApiOperation({
     summary: 'Submit a milestone',
@@ -489,6 +497,8 @@ export class ProjectsController {
     return this.milestonesService.submitMilestone(milestoneId, userId, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @Patch('milestones/:id/review')
   @ApiOperation({
     summary: 'Review a milestone',

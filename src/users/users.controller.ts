@@ -29,29 +29,6 @@ import { UsersService } from './users.service';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Get(':identifier')
-  @ApiOperation({
-    summary: 'Get public user profile',
-    description:
-      'Fetch public user profile by username or user ID. No authentication required.',
-  })
-  @ApiParam({
-    name: 'identifier',
-    description: 'Username or user ID',
-    example: 'johndoe',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'User profile retrieved successfully',
-    type: PublicUserProfileDto,
-  })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  async getPublicProfile(
-    @Param('identifier') identifier: string,
-  ): Promise<PublicUserProfileDto> {
-    return this.usersService.getPublicProfile(identifier);
-  }
-
   @Post(':userId/reviews')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
@@ -144,5 +121,28 @@ export class UsersController {
     @Query() query: GetAllSubmissionsQueryDto,
   ): Promise<PaginatedAllSubmissionsDto> {
     return this.usersService.getAllSubmissions(userId, query);
+  }
+
+  @Get(':identifier')
+  @ApiOperation({
+    summary: 'Get public user profile',
+    description:
+      'Fetch public user profile by username or user ID. No authentication required.',
+  })
+  @ApiParam({
+    name: 'identifier',
+    description: 'Username or user ID',
+    example: 'johndoe',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+    type: PublicUserProfileDto,
+  })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  async getPublicProfile(
+    @Param('identifier') identifier: string,
+  ): Promise<PublicUserProfileDto> {
+    return this.usersService.getPublicProfile(identifier);
   }
 }
