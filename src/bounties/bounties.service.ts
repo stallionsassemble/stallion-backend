@@ -21,6 +21,8 @@ import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { EnvConfig } from 'src/config/env.config';
 import { ReputationService } from 'src/reputation/reputation.service';
 import { ensureTrustline } from 'src/wallet/utils/trustline.util';
+import { ActivitiesService } from '../activities/activities.service';
+import { BountyActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { Client as SorobanClient, Status } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
@@ -64,6 +66,7 @@ export class BountiesService {
     private walletSigning: WalletSigningService,
     private stellarAccount: StellarAccountService,
     private stellarWallet: StellarWalletService,
+    private activitiesService: ActivitiesService,
     @InjectQueue('bounty-winner') private bountyWinnerQueue: Queue,
   ) {
     this.contractId = this.configService.getOrThrow<string>(
@@ -737,6 +740,17 @@ export class BountiesService {
         },
       });
 
+      // Record activity
+      await this.activitiesService.recordActivity(
+        BountyActivities.created(
+          userId,
+          bounty.id,
+          bounty.title,
+          bounty.reward,
+          bounty.rewardCurrency,
+        ),
+      );
+
       return {
         message: 'Bounty created successfully',
         bounty,
@@ -1095,6 +1109,11 @@ export class BountiesService {
         );
       }
 
+      // Record activity
+      await this.activitiesService.recordActivity(
+        BountyActivities.submission(userId, bounty.id, bounty.title),
+      );
+
       this.logger.log(
         `User ${userId} applied to bounty ${dbBountyId}, tx: ${txHash}`,
       );
@@ -1429,6 +1448,11 @@ export class BountiesService {
       const dbBounty = await this.prisma.bounty.findUnique({
         where: { id: dbBountyId },
       });
+
+      // Record activity for bounty completion
+      await this.activitiesService.recordActivity(
+        BountyActivities.completed(userId, dbBountyId, dbBounty!.title),
+      );
 
       // Parse reward distribution (array format: [{rank: 1, percentage: 70}, ...])
       const rewardDistribution = dbBounty!.rewardDistribution as Array<{

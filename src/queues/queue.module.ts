@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module, forwardRef } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ActivitiesModule } from '../activities/activities.module';
 import { EnvConfig } from '../config/env.config';
 import { EmailModule } from '../email/email.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -20,6 +21,7 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
     forwardRef(() => NotificationsModule),
     forwardRef(() => EmailModule),
     forwardRef(() => ReputationModule),
+    forwardRef(() => ActivitiesModule),
     SorobanModule,
     PointsModule,
     BullModule.forRootAsync({

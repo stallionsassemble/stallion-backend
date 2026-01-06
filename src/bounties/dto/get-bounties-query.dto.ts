@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { BountyStatus } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -92,12 +92,20 @@ export class GetBountiesQueryDto {
   @ApiPropertyOptional({
     description: 'Filter by skills (comma-separated or array)',
     type: [String],
-    example: ['React', 'TypeScript', 'Web3'],
+    example: 'React,TypeScript,Web3',
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((skill) => skill.trim())
+        .filter(Boolean);
+    }
+    return Array.isArray(value) ? value : [];
+  })
   @IsArray()
   @IsString({ each: true })
-  @Type(() => String)
   skills?: string[];
 
   @ApiPropertyOptional({

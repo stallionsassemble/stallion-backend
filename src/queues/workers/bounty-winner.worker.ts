@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
+import { ActivitiesService } from '../../activities/activities.service';
+import { BountyActivities } from '../../activities/helpers/activity-helper';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { BountyNotifications } from '../../notifications/helpers/notification-helper';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -27,6 +29,7 @@ export class BountyWinnerWorker extends WorkerHost {
     private prisma: PrismaService,
     private reputationService: ReputationService,
     private notificationsService: NotificationsService,
+    private activitiesService: ActivitiesService,
   ) {
     super();
   }
@@ -103,6 +106,27 @@ export class BountyWinnerWorker extends WorkerHost {
         } catch (error) {
           this.logger.error(
             `Failed to send notification to winner ${winner.userId}`,
+            error,
+          );
+        }
+
+        // Record activity for bounty win
+        try {
+          await this.activitiesService.recordActivity(
+            BountyActivities.won(
+              winner.userId,
+              bountyId,
+              bountyTitle,
+              winner.position,
+              winner.payoutAmount.toString(),
+              currency,
+            ),
+          );
+
+          this.logger.log(`Recorded activity for winner ${winner.userId}`);
+        } catch (error) {
+          this.logger.error(
+            `Failed to record activity for winner ${winner.userId}`,
             error,
           );
         }
