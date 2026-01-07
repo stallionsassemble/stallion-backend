@@ -486,16 +486,14 @@ export class ProjectContractService {
    */
   async getProjectsByStatus(status: string): Promise<number[]> {
     try {
-      // Map database status to contract status
       let contractStatus: any;
-      if (status === 'OPEN') {
-        contractStatus = { tag: 'Open' };
-      } else if (status === 'IN_PROGRESS') {
-        contractStatus = { tag: 'InProgress' };
+      if (status === 'OPEN' || status === 'IN_PROGRESS') {
+        // Both OPEN and IN_PROGRESS map to Active in the contract
+        contractStatus = { tag: 'Active', values: undefined };
       } else if (status === 'COMPLETED') {
-        contractStatus = { tag: 'Completed' };
+        contractStatus = { tag: 'Completed', values: undefined };
       } else if (status === 'CANCELLED') {
-        contractStatus = { tag: 'Cancelled' };
+        contractStatus = { tag: 'Cancelled', values: undefined };
       } else {
         throw new BadRequestException(`Invalid project status: ${status}`);
       }
