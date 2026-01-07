@@ -292,6 +292,21 @@ export class ProjectMilestonesService {
       if (!project) {
         throw new NotFoundException('Project not found');
       }
+
+      // Check if user has applied to project and been approved
+      const application = await this.prisma.projectApplication.findFirst({
+        where: {
+          projectId,
+          userId: contributorId,
+          status: 'ACCEPTED',
+        },
+      });
+
+      if (!application) {
+        throw new ForbiddenException(
+          'You do not have access to milestones for this project. Only contributors with accepted applications can view milestones.',
+        );
+      }
     }
 
     return this.prisma.userMilestone.findMany({
