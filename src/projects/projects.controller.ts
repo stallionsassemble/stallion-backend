@@ -537,6 +537,36 @@ export class ProjectsController {
     );
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Get('applications/:applicationId/milestones')
+  @ApiOperation({
+    summary: 'Get milestones for an approved application',
+    description:
+      'Get all milestones for an approved application. Only accessible by the project owner.',
+  })
+  @ApiParam({ name: 'applicationId', description: 'Application ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Milestones retrieved successfully',
+    type: [MilestoneResponseDto],
+  })
+  @ApiResponse({ status: 400, description: 'Application not accepted' })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - not the project owner',
+  })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  async getApplicationMilestones(
+    @Param() params: ApplicationIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.milestonesService.getMilestonesByApplication(
+      params.applicationId,
+      userId,
+    );
+  }
+
   @Get(':id/activities')
   @ApiOperation({
     summary: 'Get project activity timeline',

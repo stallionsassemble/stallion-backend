@@ -316,4 +316,70 @@ export class ProjectMilestonesService {
       },
     });
   }
+
+  async getMilestonesByApplication(applicationId: string, ownerId: string) {
+    // First verify the application exists and belongs to a project owned by this user
+    const application = await this.prisma.projectApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        project: true,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException('Application not found');
+    }
+
+    if (application.project.ownerId !== ownerId) {
+      throw new ForbiddenException(
+        'You can only view milestones for your own projects',
+      );
+    }
+
+    if (application.status !== 'ACCEPTED') {
+      throw new BadRequestException(
+        'Can only view milestones for accepted applications',
+      );
+    }
+
+    // Get all user milestones for this application
+    return this.prisma.userMilestone.findMany({
+      where: {
+        applicationId,
+      },
+      include: {
+        milestone: {
+          include: {
+            project: {
+              include: {
+                owner: {
+                  select: {
+                    id: true,
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                    companyName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        contributor: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+          },
+        },
+      },
+      orderBy: {
+        milestone: {
+          order: 'asc',
+        },
+      },
+    });
+  }
 }
