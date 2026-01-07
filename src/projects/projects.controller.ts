@@ -310,7 +310,7 @@ export class ProjectsController {
     @CurrentUser('id') userId: string,
     @Body() dto: ApplyToProjectDto,
   ) {
-    return this.applicationsService.applyToProject(params.id, userId, dto);
+    return this.applicationsService.applyToProject(userId, params.id, dto);
   }
 
   @Patch('applications/:applicationId')
