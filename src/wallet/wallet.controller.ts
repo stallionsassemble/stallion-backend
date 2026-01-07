@@ -56,6 +56,8 @@ export class WalletController {
   }
 
   @Get('balance')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get wallet balance',
     description: 'Retrieve wallet balance with available balance',
@@ -69,6 +71,8 @@ export class WalletController {
   }
 
   @Get('deposit-address')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get deposit address',
     description: 'Get the Stellar address for depositing funds',
@@ -81,6 +85,8 @@ export class WalletController {
   }
 
   @Get('transactions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get wallet transactions',
     description: 'Retrieve transaction history for user wallet',
@@ -93,6 +99,8 @@ export class WalletController {
   }
 
   @Post('sync')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Sync wallet with blockchain',
     description:
@@ -155,6 +163,8 @@ export class WalletController {
   }
 
   @Post('trustline')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Setup trustline for a currency',
     description:
@@ -189,6 +199,8 @@ export class WalletController {
   }
 
   @Delete('trustline')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Remove trustline for a currency',
     description:
