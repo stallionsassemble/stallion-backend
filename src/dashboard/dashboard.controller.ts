@@ -1,16 +1,16 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import {
-    ApiBearerAuth,
-    ApiOperation,
-    ApiResponse,
-    ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { DashboardService } from './dashboard.service';
 import {
-    ContributorStatsDto,
-    ProjectOwnerStatsDto,
+  ContributorStatsDto,
+  ProjectOwnerStatsDto,
 } from './dto/dashboard-stats.dto';
 
 @ApiTags('Dashboard')
