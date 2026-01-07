@@ -94,19 +94,22 @@ export class BountiesService {
   /**
    * Get all bounties with pagination, sorting, and filtering
    */
-  async getAllBounties(query: {
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
-    status?: string;
-    currency?: string;
-    skills?: string[];
-    search?: string;
-    ownerId?: string;
-    minReward?: string;
-    maxReward?: string;
-  }): Promise<{
+  async getAllBounties(
+    query: {
+      page?: number;
+      limit?: number;
+      sortBy?: string;
+      sortOrder?: 'asc' | 'desc';
+      status?: string;
+      currency?: string;
+      skills?: string[];
+      search?: string;
+      ownerId?: string;
+      minReward?: string;
+      maxReward?: string;
+    },
+    currentUserId?: string,
+  ): Promise<{
     data: Bounty[];
     meta: {
       total: number;
@@ -197,10 +200,30 @@ export class BountiesService {
         owner: sanitizeUser(bounty.owner),
       }));
 
+      // If user is authenticated, add applied field
+      let finalBounties = sanitizedBounties;
+      if (currentUserId) {
+        const bountiesWithApplied = await Promise.all(
+          sanitizedBounties.map(async (bounty) => {
+            const submission = await this.prisma.bountySubmission.findFirst({
+              where: {
+                bountyId: bounty.id,
+                userId: currentUserId,
+              },
+            });
+            return {
+              ...bounty,
+              applied: !!submission,
+            };
+          }),
+        );
+        finalBounties = bountiesWithApplied as any;
+      }
+
       const totalPages = Math.ceil(total / limit);
 
       return {
-        data: sanitizedBounties,
+        data: finalBounties,
         meta: {
           total,
           page,
@@ -272,7 +295,7 @@ export class BountiesService {
    * Get active bounties
    * Returns database bounties based on contract bounty IDs
    */
-  async getActiveBounties(): Promise<Bounty[]> {
+  async getActiveBounties(currentUserId?: string): Promise<Bounty[]> {
     try {
       const contractBountyIds = await this.contractService.getActiveBounties();
 
@@ -286,18 +309,27 @@ export class BountiesService {
         include: {
           owner: true,
         },
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: { createdAt: 'desc' },
       });
 
-      // Sanitize owner data
-      bounties.map((bounty) => {
-        return {
-          ...bounty,
-          owner: sanitizeUser(bounty.owner),
-        };
-      });
+      // If user is authenticated, add applied field
+      if (currentUserId) {
+        const bountiesWithApplied = await Promise.all(
+          bounties.map(async (bounty) => {
+            const submission = await this.prisma.bountySubmission.findFirst({
+              where: {
+                bountyId: bounty.id,
+                userId: currentUserId,
+              },
+            });
+            return {
+              ...bounty,
+              applied: !!submission,
+            };
+          }),
+        );
+        return bountiesWithApplied as any;
+      }
 
       return bounties;
     } catch (error) {
@@ -312,7 +344,8 @@ export class BountiesService {
    */
   async getBounty(
     dbBountyId: string,
-  ): Promise<Bounty & { ownerDetails: SanitizedUser }> {
+    currentUserId?: string,
+  ): Promise<Bounty & { ownerDetails: SanitizedUser; applied?: boolean }> {
     try {
       // Fetch database bounty details first
       const dbBounty = await this.prisma.bounty.findUnique({
@@ -369,7 +402,7 @@ export class BountiesService {
 
       // Consolidate contract and database details
       // Contract details take precedence
-      return {
+      const bountyDetails = {
         ...dbBounty,
         title: contractBounty.title,
         token: contractBounty.token,
@@ -379,6 +412,22 @@ export class BountiesService {
         submissionDeadline,
         ownerDetails: sanitizeUser(dbBounty.owner),
       };
+
+      // If user is authenticated, add applied field
+      if (currentUserId) {
+        const submission = await this.prisma.bountySubmission.findFirst({
+          where: {
+            bountyId: dbBounty.id,
+            userId: currentUserId,
+          },
+        });
+        return {
+          ...bountyDetails,
+          applied: !!submission,
+        };
+      }
+
+      return bountyDetails;
     } catch (error) {
       this.logger.error('Failed to get bounty', error);
       throw error;

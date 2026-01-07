@@ -23,6 +23,7 @@ import { OwnerGuard } from 'src/common/guards/owner.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { UserIdParamDto } from '../users/dto/user-id-param.dto';
 import { AdminService } from './admin.service';
 import { BountiesService } from './bounties.service';
@@ -54,10 +55,11 @@ export class BountyController {
   ) {}
 
   @Get('all')
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: 'Get all bounties with pagination, sorting, and filtering',
     description:
-      'Retrieve bounties with support for pagination, sorting by various fields, and filtering by status, currency, skills, reward range, and search terms',
+      'Retrieve bounties with support for pagination, sorting by various fields, and filtering by status, currency, skills, reward range, and search terms. Authentication is optional - if provided, includes applied field.',
   })
   @ApiResponse({
     status: 200,
@@ -79,6 +81,7 @@ export class BountyController {
             judgingDeadline: '2025-01-07T23:59:59.000Z',
             contractBountyId: 1,
             ownerId: 'user-uuid-123',
+            applied: true,
             createdAt: '2024-01-01T00:00:00.000Z',
             updatedAt: '2024-01-01T00:00:00.000Z',
           },
@@ -94,8 +97,11 @@ export class BountyController {
       },
     },
   })
-  async getAllBounties(@Query() query: GetBountiesQueryDto) {
-    return this.bountyService.getAllBounties(query);
+  async getAllBounties(
+    @Query() query: GetBountiesQueryDto,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.bountyService.getAllBounties(query, currentUserId);
   }
 
   @Get()
@@ -131,7 +137,12 @@ export class BountyController {
   }
 
   @Get('active')
-  @ApiOperation({ summary: 'Get active bounties' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get active bounties',
+    description:
+      'Get a list of active bounties. Authentication is optional - if provided, includes applied field.',
+  })
   @ApiResponse({
     status: 200,
     description: 'List of active bounties',
@@ -174,6 +185,7 @@ export class BountyController {
           contractBountyId: 1,
           txHash: '0x1234567890abcdef...',
           ownerId: 'user-uuid-123',
+          applied: true,
           owner: {
             id: 'user-uuid-123',
             username: 'project_owner',
@@ -185,8 +197,8 @@ export class BountyController {
       ],
     },
   })
-  async getActiveBounties() {
-    return this.bountyService.getActiveBounties();
+  async getActiveBounties(@CurrentUser('id') currentUserId?: string) {
+    return this.bountyService.getActiveBounties(currentUserId);
   }
 
   @Get('user/:id')
@@ -220,7 +232,12 @@ export class BountyController {
   }
 
   @Get('id/:id')
-  @ApiOperation({ summary: 'Get bounty details' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: 'Get bounty details',
+    description:
+      'Get detailed information about a specific bounty. Authentication is optional - if provided, includes applied field.',
+  })
   @ApiResponse({
     status: 200,
     description: 'Bounty details from contract',
@@ -262,6 +279,7 @@ export class BountyController {
         contractBountyId: 1,
         txHash: '0x1234567890abcdef...',
         ownerId: 'user-uuid-123',
+        applied: true,
         owner: {
           id: 'user-uuid-123',
           username: 'project_owner',
@@ -272,8 +290,11 @@ export class BountyController {
       },
     },
   })
-  async getBounty(@Param() params: BountyIdParamDto) {
-    return this.bountyService.getBounty(params.id);
+  async getBounty(
+    @Param() params: BountyIdParamDto,
+    @CurrentUser('id') currentUserId?: string,
+  ) {
+    return this.bountyService.getBounty(params.id, currentUserId);
   }
 
   @Get('submissions')
