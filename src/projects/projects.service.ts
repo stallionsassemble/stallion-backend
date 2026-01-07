@@ -38,6 +38,8 @@ export class ProjectsService {
               lastName: true,
               companyName: true,
               profilePicture: true,
+              bio: true,
+              createdAt: true,
             },
           },
           applications: {
@@ -273,6 +275,8 @@ export class ProjectsService {
               lastName: true,
               companyName: true,
               profilePicture: true,
+              bio: true,
+              createdAt: true,
             },
           },
           applications: {
@@ -484,6 +488,8 @@ export class ProjectsService {
             lastName: true,
             companyName: true,
             profilePicture: true,
+            bio: true,
+            createdAt: true,
           },
         },
         milestones: {
