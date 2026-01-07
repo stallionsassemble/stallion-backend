@@ -22,9 +22,6 @@ export class ProjectMilestonesService {
     private activitiesService: ActivitiesService,
   ) {}
 
-  // This method is no longer needed as UserMilestones are created
-  // automatically when an application is accepted
-
   async submitMilestone(
     userMilestoneId: string,
     contributorId: string,
@@ -271,6 +268,13 @@ export class ProjectMilestonesService {
   }
 
   async getMilestonesByProject(projectId: string) {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+    });
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
     return this.prisma.projectMilestone.findMany({
       where: { projectId },
       orderBy: { order: 'asc' },
@@ -281,6 +285,15 @@ export class ProjectMilestonesService {
     contributorId: string,
     projectId?: string,
   ) {
+    if (projectId) {
+      const project = await this.prisma.project.findUnique({
+        where: { id: projectId },
+      });
+      if (!project) {
+        throw new NotFoundException('Project not found');
+      }
+    }
+
     return this.prisma.userMilestone.findMany({
       where: {
         contributorId,
