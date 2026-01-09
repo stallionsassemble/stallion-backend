@@ -95,12 +95,12 @@ export class ActivitiesController {
     });
   }
 
-  @Get('user/:userId')
+  @Get('user/:id')
   @ApiOperation({
     summary: 'Get user activities',
     description: 'Retrieve activities for a specific user',
   })
-  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiParam({ name: 'id', description: 'User ID' })
   @ApiResponse({
     status: 200,
     description: 'User activities retrieved successfully',
@@ -116,7 +116,7 @@ export class ActivitiesController {
     });
   }
 
-  @Get('bounty/:bountyId')
+  @Get('bounty/:id')
   @ApiOperation({
     summary: 'Get bounty activities',
     description: 'Retrieve all activities for a specific bounty',
@@ -137,7 +137,7 @@ export class ActivitiesController {
     });
   }
 
-  @Get('project/:projectId')
+  @Get('project/:id')
   @ApiOperation({
     summary: 'Get project activities',
     description: 'Retrieve all activities for a specific project',
@@ -158,7 +158,7 @@ export class ActivitiesController {
     });
   }
 
-  @Get('hackathon/:hackathonId')
+  @Get('hackathon/:id')
   @ApiOperation({
     summary: 'Get hackathon activities',
     description: 'Retrieve all activities for a specific hackathon',
