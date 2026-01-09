@@ -174,7 +174,7 @@ export class UploadService {
       // Generate URL
       const port = this.configService.get<number>(EnvConfig.PORT) || 5000;
       const baseUrl =
-        this.configService.get<string>(EnvConfig.APP_URL) ||
+        this.configService.get<string>(EnvConfig.BASE_URL) ||
         `http://localhost:${port}`;
       const url = `${baseUrl}/uploads/${subfolder}/${filename}`;
 

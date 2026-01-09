@@ -6,7 +6,8 @@
 export class EnvConfig {
   // Application
   static readonly APP_NAME = 'APP_NAME';
-  static readonly APP_URL = 'APP_URL';
+  static readonly BASE_URL = 'BASE_URL';
+  static readonly FRONTEND_URL = 'FRONTEND_URL';
   static readonly PORT = 'PORT';
 
   // Database

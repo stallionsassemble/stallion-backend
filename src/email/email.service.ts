@@ -37,7 +37,7 @@ export class EmailService {
     const appName =
       this.configService.get<string>(EnvConfig.APP_NAME) || 'Stallion';
     const appUrl =
-      this.configService.get<string>(EnvConfig.APP_URL) ||
+      this.configService.get<string>(EnvConfig.FRONTEND_URL) ||
       'http://localhost:3000';
 
     const template =
@@ -78,7 +78,7 @@ export class EmailService {
     const appName =
       this.configService.get<string>(EnvConfig.APP_NAME) || 'Stallion';
     const appUrl =
-      this.configService.get<string>(EnvConfig.APP_URL) ||
+      this.configService.get<string>(EnvConfig.FRONTEND_URL) ||
       'http://localhost:3000';
 
     const template =
@@ -177,7 +177,8 @@ export class EmailService {
     try {
       const appName = this.configService.get<string>('APP_NAME') || 'Stallion';
       const appUrl =
-        this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+        this.configService.get<string>(EnvConfig.FRONTEND_URL) ||
+        'http://localhost:3000';
 
       let html: string;
 
