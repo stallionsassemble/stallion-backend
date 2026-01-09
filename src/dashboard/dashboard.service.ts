@@ -351,6 +351,69 @@ export class DashboardService {
             },
           });
 
+        // Calculate total earnings from bounties (for this owner)
+        const bountyWins = await this.prisma.bountyWinner.findMany({
+          where: {
+            userId,
+            bounty: {
+              ownerId,
+            },
+          },
+          include: {
+            bounty: {
+              select: {
+                reward: true,
+                rewardDistribution: true,
+              },
+            },
+          },
+        });
+
+        let totalBountyEarnings = 0;
+        for (const win of bountyWins) {
+          const reward = parseFloat(win.bounty.reward);
+          const distribution = win.bounty
+            .rewardDistribution as unknown as RewardDistributionItem[];
+
+          // Find the percentage for this position
+          const positionReward = distribution.find(
+            (d) => d.rank === win.position,
+          );
+          const percentage = positionReward?.percentage || 0;
+
+          const earnings = (reward * percentage) / 100;
+          totalBountyEarnings += earnings;
+        }
+
+        // Calculate total earnings from project milestones (for this owner)
+        const paidMilestones = await this.prisma.userMilestone.findMany({
+          where: {
+            contributorId: userId,
+            application: {
+              project: {
+                ownerId,
+              },
+            },
+            paidAt: {
+              not: null,
+            },
+          },
+          include: {
+            milestone: {
+              select: {
+                amount: true,
+              },
+            },
+          },
+        });
+
+        let totalProjectEarnings = 0;
+        for (const userMilestone of paidMilestones) {
+          totalProjectEarnings += parseFloat(userMilestone.milestone.amount);
+        }
+
+        const totalEarned = totalBountyEarnings + totalProjectEarnings;
+
         return {
           id: user.id,
           username: user.username,
@@ -362,6 +425,7 @@ export class DashboardService {
           skills: user.skills,
           totalBountiesParticipated,
           totalProjectsParticipated,
+          totalEarned: totalEarned.toFixed(2),
           createdAt: user.createdAt,
         };
       }),

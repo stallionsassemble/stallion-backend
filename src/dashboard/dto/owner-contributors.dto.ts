@@ -68,6 +68,12 @@ export class ContributorParticipationDto {
   totalProjectsParticipated: number;
 
   @ApiProperty({
+    description: 'Total amount earned by the contributor',
+    example: '2000',
+  })
+  totalEarned: string;
+
+  @ApiProperty({
     description: 'Account creation date',
     example: '2024-01-01T00:00:00.000Z',
   })
