@@ -17,11 +17,15 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { ProjectStatus, ProjectType } from '@prisma/client';
+import { ProjectStatus, ProjectType, Role } from '@prisma/client';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 import { ActivitiesService } from '../activities/activities.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { RequiresCompleteProfile } from '../common/decorators/requires-complete-profile.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
+import { ProfileCompleteGuard } from '../common/guards/profile-complete.guard';
 import { ApplicationIdParamDto } from './dto/application-id-param.dto';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -211,12 +215,14 @@ export class ProjectsController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Create a new project',
     description:
-      'Create a GIG or JOB project. Only accessible by project owners.',
+      'Create a GIG or JOB project. Only accessible by project owners. Requires a complete profile.',
   })
   @ApiResponse({
     status: 201,
@@ -234,12 +240,14 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Update a project',
     description:
-      'Update project details. Only accessible by the project owner. Only OPEN projects can be updated.',
+      'Update project details. Only accessible by the project owner. Only OPEN projects can be updated. Requires a complete profile.',
   })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({
@@ -266,7 +274,9 @@ export class ProjectsController {
   }
 
   @Patch(':id/cancel')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Cancel a project',
@@ -291,11 +301,14 @@ export class ProjectsController {
   }
 
   @Post(':id/apply')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Apply to project',
-    description: 'Submit an application to a project',
+    description:
+      'Submit an application to a project. Requires a complete profile.',
   })
   @ApiParam({ name: 'id', description: 'Project ID' })
   @ApiResponse({
@@ -314,7 +327,9 @@ export class ProjectsController {
   }
 
   @Patch('applications/:applicationId')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Update project application',
@@ -363,7 +378,9 @@ export class ProjectsController {
   }
 
   @Get('applications/me')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get my applications',
@@ -378,7 +395,9 @@ export class ProjectsController {
     return this.applicationsService.getApplicationsByUser(userId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @Patch('applications/:id/review')
   @ApiOperation({
@@ -411,7 +430,9 @@ export class ProjectsController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @Delete('applications/:id')
   @ApiOperation({
@@ -455,7 +476,9 @@ export class ProjectsController {
     return this.milestonesService.getMilestonesByProject(params.id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.CONTRIBUTOR, Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @Get('milestones/me')
   @ApiOperation({
@@ -478,7 +501,9 @@ export class ProjectsController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @Post('milestones/:id/submit')
   @ApiOperation({
@@ -503,7 +528,9 @@ export class ProjectsController {
     return this.milestonesService.submitMilestone(params.id, userId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @RequiresCompleteProfile()
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @Patch('milestones/:id/review')
   @ApiOperation({

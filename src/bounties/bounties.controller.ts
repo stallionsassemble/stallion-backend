@@ -17,9 +17,11 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { RequiresCompleteProfile } from 'src/common/decorators/requires-complete-profile.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { OwnerGuard } from 'src/common/guards/owner.guard';
+import { ProfileCompleteGuard } from 'src/common/guards/profile-complete.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -426,11 +428,13 @@ export class BountyController {
   }
 
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard)
+  @RequiresCompleteProfile()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Create a new bounty',
-    description: 'Create a bounty on the Soroban contract.',
+    description:
+      'Create a bounty on the Soroban contract. Requires a complete profile.',
   })
   @ApiResponse({
     status: 201,
@@ -465,7 +469,8 @@ export class BountyController {
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, OwnerGuard)
+  @RequiresCompleteProfile()
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
   @ApiOperation({ summary: 'Update bounty' })
@@ -550,9 +555,12 @@ export class BountyController {
   }
 
   @Post(':id/apply')
-  @UseGuards(JwtAuthGuard, MFAGuard)
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, MFAGuard)
+  @RequiresCompleteProfile()
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Apply to bounty (requires MFA)' })
+  @ApiOperation({
+    summary: 'Apply to bounty (requires MFA and complete profile)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Application submitted successfully',

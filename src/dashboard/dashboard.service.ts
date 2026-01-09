@@ -5,6 +5,7 @@ import {
   ContributorStatsDto,
   ProjectOwnerStatsDto,
 } from './dto/dashboard-stats.dto';
+import { ContributorParticipationDto } from './dto/owner-contributors.dto';
 
 @Injectable()
 export class DashboardService {
@@ -267,5 +268,113 @@ export class DashboardService {
       paidOutPercentageChange: parseFloat(paidOutPercentageChange.toFixed(2)),
       pendingPayments: pendingPayments.toFixed(2),
     };
+  }
+
+  async getOwnerContributors(
+    ownerId: string,
+  ): Promise<ContributorParticipationDto[]> {
+    // Get all unique contributors from bounties
+    const bountyContributors = await this.prisma.bountySubmission.findMany({
+      where: {
+        bounty: {
+          ownerId,
+        },
+      },
+      select: {
+        userId: true,
+      },
+      distinct: ['userId'],
+    });
+
+    // Get all unique contributors from projects
+    const projectContributors = await this.prisma.projectApplication.findMany({
+      where: {
+        project: {
+          ownerId,
+        },
+        status: 'ACCEPTED',
+      },
+      select: {
+        userId: true,
+      },
+      distinct: ['userId'],
+    });
+
+    // Combine and get unique user IDs
+    const allContributorIds = [
+      ...new Set([
+        ...bountyContributors.map((bc) => bc.userId),
+        ...projectContributors.map((pc) => pc.userId),
+      ]),
+    ];
+
+    // Fetch detailed user information and participation counts
+    const contributors = await Promise.all(
+      allContributorIds.map(async (userId) => {
+        const user = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+            bio: true,
+            location: true,
+            skills: true,
+            createdAt: true,
+          },
+        });
+
+        if (!user) return null;
+
+        // Count bounties participated in (for this owner)
+        const totalBountiesParticipated =
+          await this.prisma.bountySubmission.count({
+            where: {
+              userId,
+              bounty: {
+                ownerId,
+              },
+            },
+          });
+
+        // Count projects participated in (for this owner)
+        const totalProjectsParticipated =
+          await this.prisma.projectApplication.count({
+            where: {
+              userId,
+              project: {
+                ownerId,
+              },
+              status: 'ACCEPTED',
+            },
+          });
+
+        return {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profilePicture: user.profilePicture,
+          bio: user.bio,
+          location: user.location,
+          skills: user.skills,
+          totalBountiesParticipated,
+          totalProjectsParticipated,
+          createdAt: user.createdAt,
+        };
+      }),
+    );
+
+    // Filter out null values and sort by total participation (descending)
+    return contributors
+      .filter((c): c is ContributorParticipationDto => c !== null)
+      .sort(
+        (a, b) =>
+          b.totalBountiesParticipated +
+          b.totalProjectsParticipated -
+          (a.totalBountiesParticipated + a.totalProjectsParticipated),
+      );
   }
 }
