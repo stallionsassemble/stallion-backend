@@ -112,9 +112,9 @@ export class ReputationController {
 
   @Get('leaderboard/recent-earners')
   @ApiOperation({
-    summary: 'Get recent earners',
+    summary: 'Get recent individual earnings',
     description:
-      'Retrieve users who have recently earned from bounties or projects',
+      'Retrieve individual bounty wins and project milestone completions from recent days. Each win/completion is returned as a separate entry.',
   })
   @ApiQuery({
     name: 'page',
@@ -124,7 +124,7 @@ export class ReputationController {
   @ApiQuery({
     name: 'limit',
     required: false,
-    description: 'Number of users per page (default: 20)',
+    description: 'Number of earnings per page (default: 20)',
   })
   @ApiQuery({
     name: 'days',
@@ -133,44 +133,60 @@ export class ReputationController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Recent earners with their earnings',
+    description: 'Recent individual earnings sorted by date',
     schema: {
       example: {
         data: [
           {
+            type: 'bounty',
             userId: 'user-uuid-1',
-            username: 'top_earner',
-            firstName: 'Alice',
-            lastName: 'Johnson',
-            profilePicture: 'https://example.com/alice.jpg',
-            totalEarnings: '5000',
-            bountyEarnings: '3000',
-            projectEarnings: '2000',
-            lastEarnedAt: '2024-03-01T12:00:00.000Z',
-            recentWinsCount: 3,
-            level: 'VETERAN',
-            isVerified: true,
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/john.jpg',
+            rewardAmount: '500',
+            rewardCurrency: 'XLM',
+            usdValue: '45.50',
+            earnedAt: '2024-03-01T12:00:00.000Z',
+            bountyId: 'bounty-uuid-1',
+            bountyTitle: 'Build authentication system',
           },
           {
+            type: 'bounty',
+            userId: 'user-uuid-1',
+            username: 'john_doe',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/john.jpg',
+            rewardAmount: '300',
+            rewardCurrency: 'USDC',
+            usdValue: '300.00',
+            earnedAt: '2024-02-28T10:00:00.000Z',
+            bountyId: 'bounty-uuid-2',
+            bountyTitle: 'Fix payment bug',
+          },
+          {
+            type: 'project',
             userId: 'user-uuid-2',
-            username: 'code_master',
-            firstName: 'Bob',
+            username: 'jane_smith',
+            firstName: 'Jane',
             lastName: 'Smith',
-            profilePicture: 'https://example.com/bob.jpg',
-            totalEarnings: '3500',
-            bountyEarnings: '2500',
-            projectEarnings: '1000',
-            lastEarnedAt: '2024-02-28T10:00:00.000Z',
-            recentWinsCount: 2,
-            level: 'MASTER',
-            isVerified: false,
+            profilePicture: 'https://example.com/jane.jpg',
+            rewardAmount: '1000',
+            rewardCurrency: 'XLM',
+            usdValue: '91.00',
+            earnedAt: '2024-02-27T15:30:00.000Z',
+            projectId: 'project-uuid-1',
+            projectTitle: 'DeFi Dashboard',
+            milestoneId: 'milestone-uuid-1',
+            milestoneTitle: 'Complete frontend',
           },
         ],
         pagination: {
-          total: 45,
+          total: 125,
           page: 1,
           limit: 20,
-          totalPages: 3,
+          totalPages: 7,
         },
       },
     },

@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { ReputationLevel } from '@prisma/client';
+import { calculateUsdValue } from 'src/common/utils/token-price.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ReputationNotifications } from '../notifications/helpers/notification-helper';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -561,7 +561,7 @@ export class ReputationService {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - days);
 
-    // Get users who have earned from bounties or projects in the specified period
+    // Get individual bounty wins and project milestone payments
     const [bountyWinners, projectEarners] = await Promise.all([
       this.prisma.bountyWinner.findMany({
         where: {
@@ -569,7 +569,11 @@ export class ReputationService {
             gte: cutoffDate,
           },
         },
-        include: {
+        select: {
+          id: true,
+          position: true,
+          awardedAt: true,
+          usdValueAtCompletion: true,
           user: {
             select: {
               id: true,
@@ -581,13 +585,13 @@ export class ReputationService {
           },
           bounty: {
             select: {
+              id: true,
+              title: true,
               reward: true,
               rewardDistribution: true,
+              rewardCurrency: true,
             },
           },
-        },
-        orderBy: {
-          awardedAt: 'desc',
         },
       }),
       this.prisma.userMilestone.findMany({
@@ -596,7 +600,10 @@ export class ReputationService {
             gte: cutoffDate,
           },
         },
-        include: {
+        select: {
+          id: true,
+          paidAt: true,
+          usdValueAtCompletion: true,
           contributor: {
             select: {
               id: true,
@@ -608,139 +615,114 @@ export class ReputationService {
           },
           milestone: {
             select: {
+              id: true,
+              title: true,
               amount: true,
+              project: {
+                select: {
+                  id: true,
+                  title: true,
+                  currency: true,
+                },
+              },
             },
           },
-        },
-        orderBy: {
-          paidAt: 'desc',
         },
       }),
     ]);
 
-    // Aggregate earnings by user
-    const userEarningsMap = new Map<
-      string,
-      {
-        userId: string;
-        username: string | null;
-        firstName: string | null;
-        lastName: string | null;
-        profilePicture: string | null;
-        bountyEarnings: bigint;
-        projectEarnings: bigint;
-        lastEarnedAt: Date;
-        recentWinsCount: number;
-      }
-    >();
+    // Transform bounty wins into individual earning records
+    const bountyEarnings = await Promise.all(
+      bountyWinners.map(async (winner) => {
+        if (!winner.awardedAt) return null;
 
-    // Process bounty winners
-    for (const winner of bountyWinners) {
-      if (!winner.awardedAt) continue;
+        const distribution = winner.bounty.rewardDistribution as any[];
+        const positionReward = distribution.find(
+          (d) => d.rank === winner.position,
+        );
 
-      const userId = winner.user.id;
-      const distribution = winner.bounty.rewardDistribution as any[];
-      const positionReward = distribution.find(
-        (d) => d.rank === winner.position,
-      );
+        if (!positionReward) return null;
 
-      if (positionReward) {
-        const bountyReward = BigInt(winner.bounty.reward);
-        const percentage = BigInt(positionReward.percentage);
-        const earnings = (bountyReward * percentage) / BigInt(100);
+        const reward = parseFloat(winner.bounty.reward);
+        const percentage = positionReward.percentage;
+        const tokenAmount = (reward * percentage) / 100;
 
-        const existing = userEarningsMap.get(userId);
-        if (existing) {
-          existing.bountyEarnings += earnings;
-          existing.recentWinsCount += 1;
-          if (winner.awardedAt > existing.lastEarnedAt) {
-            existing.lastEarnedAt = winner.awardedAt;
-          }
+        let usdValue: number;
+        if (winner.usdValueAtCompletion) {
+          usdValue = parseFloat(winner.usdValueAtCompletion.toString());
         } else {
-          userEarningsMap.set(userId, {
-            userId: winner.user.id,
-            username: winner.user.username,
-            firstName: winner.user.firstName,
-            lastName: winner.user.lastName,
-            profilePicture: winner.user.profilePicture,
-            bountyEarnings: earnings,
-            projectEarnings: BigInt(0),
-            lastEarnedAt: winner.awardedAt,
-            recentWinsCount: 1,
-          });
+          usdValue = await calculateUsdValue(
+            tokenAmount.toString(),
+            winner.bounty.rewardCurrency || 'XLM',
+          );
         }
-      }
-    }
 
-    // Process project earners
-    for (const userMilestone of projectEarners) {
-      const userId = userMilestone.contributor.id;
-      const earnings = BigInt(userMilestone.milestone.amount);
+        return {
+          type: 'bounty' as const,
+          userId: winner.user.id,
+          username: winner.user.username,
+          firstName: winner.user.firstName,
+          lastName: winner.user.lastName,
+          profilePicture: winner.user.profilePicture,
+          rewardAmount: tokenAmount.toString(),
+          rewardCurrency: winner.bounty.rewardCurrency || 'XLM',
+          usdValue: usdValue.toFixed(2),
+          earnedAt: winner.awardedAt,
+          bountyId: winner.bounty.id,
+          bountyTitle: winner.bounty.title,
+        };
+      }),
+    );
 
-      const existing = userEarningsMap.get(userId);
-      if (existing) {
-        existing.projectEarnings += earnings;
-        existing.recentWinsCount += 1;
-        if (userMilestone.paidAt! > existing.lastEarnedAt) {
-          existing.lastEarnedAt = userMilestone.paidAt!;
+    // Transform project milestones into individual earning records
+    const projectEarnings = await Promise.all(
+      projectEarners.map(async (userMilestone) => {
+        if (!userMilestone.paidAt) return null;
+
+        let usdValue: number;
+        if (userMilestone.usdValueAtCompletion) {
+          usdValue = parseFloat(userMilestone.usdValueAtCompletion.toString());
+        } else {
+          usdValue = await calculateUsdValue(
+            userMilestone.milestone.amount,
+            userMilestone.milestone.project.currency,
+          );
         }
-      } else {
-        userEarningsMap.set(userId, {
+
+        return {
+          type: 'project' as const,
           userId: userMilestone.contributor.id,
           username: userMilestone.contributor.username,
           firstName: userMilestone.contributor.firstName,
           lastName: userMilestone.contributor.lastName,
           profilePicture: userMilestone.contributor.profilePicture,
-          bountyEarnings: BigInt(0),
-          projectEarnings: earnings,
-          lastEarnedAt: userMilestone.paidAt!,
-          recentWinsCount: 1,
-        });
-      }
-    }
-
-    // Convert to array and sort by total earnings
-    const earners = Array.from(userEarningsMap.values())
-      .map((earner) => ({
-        ...earner,
-        totalEarnings: earner.bountyEarnings + earner.projectEarnings,
-      }))
-      .sort((a, b) => {
-        const diff = b.totalEarnings - a.totalEarnings;
-        return diff > 0 ? 1 : diff < 0 ? -1 : 0;
-      });
-
-    // Paginate
-    const total = earners.length;
-    const skip = (page - 1) * limit;
-    const paginatedEarners = earners.slice(skip, skip + limit);
-
-    // Get reputation data for each earner
-    const enrichedData = await Promise.all(
-      paginatedEarners.map(async (earner) => {
-        const reputation = await this.prisma.userReputation.findUnique({
-          where: { userId: earner.userId },
-        });
-
-        return {
-          userId: earner.userId,
-          username: earner.username,
-          firstName: earner.firstName,
-          lastName: earner.lastName,
-          profilePicture: earner.profilePicture,
-          totalEarnings: earner.totalEarnings.toString(),
-          bountyEarnings: earner.bountyEarnings.toString(),
-          projectEarnings: earner.projectEarnings.toString(),
-          lastEarnedAt: earner.lastEarnedAt,
-          recentWinsCount: earner.recentWinsCount,
-          level: reputation?.level || ReputationLevel.NEWCOMER,
-          isVerified: reputation ? reputation.score > 0 : false,
+          rewardAmount: userMilestone.milestone.amount,
+          rewardCurrency: userMilestone.milestone.project.currency,
+          usdValue: usdValue.toFixed(2),
+          earnedAt: userMilestone.paidAt,
+          projectId: userMilestone.milestone.project.id,
+          projectTitle: userMilestone.milestone.project.title,
+          milestoneId: userMilestone.milestone.id,
+          milestoneTitle: userMilestone.milestone.title,
         };
       }),
     );
 
+    // Combine and filter out nulls
+    const allEarnings = [...bountyEarnings, ...projectEarnings].filter(
+      (earning): earning is NonNullable<typeof earning> => earning !== null,
+    );
+
+    // Sort by date (most recent first)
+    allEarnings.sort((a, b) => b.earnedAt.getTime() - a.earnedAt.getTime());
+
+    // Paginate
+    const total = allEarnings.length;
+    const skip = (page - 1) * limit;
+    const paginatedEarnings = allEarnings.slice(skip, skip + limit);
+
     return {
-      data: enrichedData,
+      data: paginatedEarnings,
       pagination: {
         total,
         page,
