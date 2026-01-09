@@ -276,9 +276,10 @@ model BountySubmission {
 }
 
 model BountyWinner {
-  id        String    @id @default(cuid())
-  position  Int
-  awardedAt DateTime? @map("awarded_at")
+  id                    String    @id @default(cuid())
+  position              Int
+  awardedAt             DateTime? @map("awarded_at")
+  usdValueAtCompletion  Decimal?  @map("usd_value_at_completion") @db.Decimal(20, 7)
 
   // Relations
   userId   String @map("user_id")
@@ -1118,8 +1119,9 @@ model UserMilestone {
   revisionNote String?   @map("revision_note") @db.Text
 
   // Payment
-  txHash String?   @map("tx_hash") // Transaction hash from payment
-  paidAt DateTime? @map("paid_at")
+  txHash               String?   @map("tx_hash") // Transaction hash from payment
+  paidAt               DateTime? @map("paid_at")
+  usdValueAtCompletion Decimal?  @map("usd_value_at_completion") @db.Decimal(20, 7)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

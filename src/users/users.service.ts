@@ -10,6 +10,7 @@ import {
   ProjectApplication,
   Role,
 } from '@prisma/client';
+import { calculateUserTotalEarnings } from 'src/common/utils/user-earnings.util';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { PublicUserProfileDto } from './dto/public-user-profile.dto';
@@ -67,8 +68,7 @@ export class UsersService {
       projectApplicationsCount,
       bountyWinsCount,
       acceptedProjectsCount,
-      bountyEarnings,
-      projectEarnings,
+      totalEarnings,
     ] = await Promise.all([
       this.prisma.bountySubmission.count({
         where: { userId: user.id },
@@ -82,56 +82,15 @@ export class UsersService {
       this.prisma.projectApplication.count({
         where: { userId: user.id, status: 'ACCEPTED' },
       }),
-      this.prisma.bountyWinner.findMany({
-        where: { userId: user.id },
-        include: {
-          bounty: {
-            select: { reward: true, rewardDistribution: true },
-          },
-        },
-      }),
-      this.prisma.userMilestone.findMany({
-        where: {
-          contributorId: user.id,
-          status: 'PAID',
-        },
-        include: {
-          milestone: {
-            select: {
-              amount: true,
-            },
-          },
-        },
-      }),
+      calculateUserTotalEarnings(this.prisma, user.id),
     ]);
 
     const totalSubmissions = bountySubmissionsCount + projectApplicationsCount;
     const totalWon = bountyWinsCount + acceptedProjectsCount;
 
-    // Calculate total earned
-    let totalEarned = BigInt(0);
-
-    // Add bounty earnings
-    bountyEarnings.forEach((winner) => {
-      const distribution = winner.bounty.rewardDistribution as any[];
-      const positionReward = distribution.find(
-        (d) => d.rank === winner.position,
-      );
-      if (positionReward) {
-        const bountyReward = BigInt(winner.bounty.reward);
-        const percentage = BigInt(positionReward.percentage);
-        totalEarned += (bountyReward * percentage) / BigInt(100);
-      }
-    });
-
-    // Add project earnings
-    projectEarnings.forEach((userMilestone) => {
-      totalEarned += BigInt(userMilestone.milestone.amount);
-    });
-
     return {
       ...user,
-      totalEarned: totalEarned.toString(),
+      totalEarnings,
       totalSubmissions,
       totalWon,
     } as PublicUserProfileDto;

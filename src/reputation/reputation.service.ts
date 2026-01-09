@@ -703,10 +703,10 @@ export class ReputationService {
     const earners = Array.from(userEarningsMap.values())
       .map((earner) => ({
         ...earner,
-        totalEarned: earner.bountyEarnings + earner.projectEarnings,
+        totalEarnings: earner.bountyEarnings + earner.projectEarnings,
       }))
       .sort((a, b) => {
-        const diff = b.totalEarned - a.totalEarned;
+        const diff = b.totalEarnings - a.totalEarnings;
         return diff > 0 ? 1 : diff < 0 ? -1 : 0;
       });
 
@@ -728,7 +728,7 @@ export class ReputationService {
           firstName: earner.firstName,
           lastName: earner.lastName,
           profilePicture: earner.profilePicture,
-          totalEarned: earner.totalEarned.toString(),
+          totalEarnings: earner.totalEarnings.toString(),
           bountyEarnings: earner.bountyEarnings.toString(),
           projectEarnings: earner.projectEarnings.toString(),
           lastEarnedAt: earner.lastEarnedAt,

@@ -71,7 +71,7 @@ export class ContributorParticipationDto {
     description: 'Total amount earned by the contributor',
     example: '2000',
   })
-  totalEarned: string;
+  totalEarnings: string;
 
   @ApiProperty({
     description: 'Account creation date',

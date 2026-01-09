@@ -107,7 +107,7 @@ export class DashboardController {
           skills: ['JavaScript', 'TypeScript', 'React'],
           totalBountiesParticipated: 5,
           totalProjectsParticipated: 3,
-          totalEarned: 2000,
+          totalEarnings: 2000,
           createdAt: '2024-01-01T00:00:00.000Z',
         },
       ],

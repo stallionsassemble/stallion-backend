@@ -4,6 +4,7 @@ import { Job } from 'bullmq';
 import { ActivitiesService } from '../../activities/activities.service';
 import { BountyActivities } from '../../activities/helpers/activity-helper';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { calculateUsdValue } from '../../common/utils/token-price.util';
 import { BountyNotifications } from '../../notifications/helpers/notification-helper';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { ReputationService } from '../../reputation/reputation.service';
@@ -50,6 +51,12 @@ export class BountyWinnerWorker extends WorkerHost {
 
     for (const winner of winners) {
       try {
+        // Calculate USD value at time of completion
+        const usdValue = await calculateUsdValue(
+          winner.payoutAmount.toString(),
+          currency,
+        );
+
         // Create winner record
         await this.prisma.bountyWinner.create({
           data: {
@@ -57,11 +64,12 @@ export class BountyWinnerWorker extends WorkerHost {
             userId: winner.userId,
             position: winner.position,
             awardedAt: new Date(),
+            usdValueAtCompletion: usdValue,
           },
         });
 
         this.logger.log(
-          `Created winner record for user ${winner.userId} at position ${winner.position}`,
+          `Created winner record for user ${winner.userId} at position ${winner.position} (USD value: $${usdValue.toFixed(2)})`,
         );
 
         // Award reputation based on position

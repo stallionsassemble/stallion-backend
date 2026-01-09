@@ -93,7 +93,7 @@ export class PublicUserProfileDto {
     description: 'Total amount earned from bounties and projects',
     example: '50000',
   })
-  totalEarned: string;
+  totalEarnings: string;
 
   @ApiProperty({
     description: 'Total number of submissions (bounties + projects)',

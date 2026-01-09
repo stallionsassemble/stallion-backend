@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { RewardDistributionItem } from 'src/bounties/dto';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { calculateUsdValue } from '../common/utils/token-price.util';
+import { calculateUserTotalEarnings } from '../common/utils/user-earnings.util';
 import {
   ContributorStatsDto,
   ProjectOwnerStatsDto,
@@ -17,16 +19,20 @@ export class DashboardService {
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-    // Calculate total earnings from bounties using BountyWinner
+    // Calculate total earnings from bounties using BountyWinner with USD values
     const bountyWins = await this.prisma.bountyWinner.findMany({
       where: {
         userId,
       },
-      include: {
+      select: {
+        usdValueAtCompletion: true,
+        position: true,
+        awardedAt: true,
         bounty: {
           select: {
             reward: true,
             rewardDistribution: true,
+            rewardCurrency: true,
           },
         },
       },
@@ -37,15 +43,28 @@ export class DashboardService {
     let lastMonthBountyEarnings = 0;
 
     for (const win of bountyWins) {
-      const reward = parseFloat(win.bounty.reward);
-      const distribution = win.bounty
-        .rewardDistribution as unknown as RewardDistributionItem[];
+      let earnings: number;
 
-      // Find the percentage for this position
-      const positionReward = distribution.find((d) => d.rank === win.position);
-      const percentage = positionReward?.percentage || 0;
+      if (win.usdValueAtCompletion) {
+        // Use stored USD value
+        earnings = parseFloat(win.usdValueAtCompletion.toString());
+      } else {
+        // Calculate USD value based on current token price
+        const reward = parseFloat(win.bounty.reward);
+        const distribution = win.bounty
+          .rewardDistribution as unknown as RewardDistributionItem[];
+        const positionReward = distribution.find(
+          (d) => d.rank === win.position,
+        );
+        const percentage = positionReward?.percentage || 0;
+        const tokenAmount = (reward * percentage) / 100;
 
-      const earnings = (reward * percentage) / 100;
+        earnings = await calculateUsdValue(
+          tokenAmount.toString(),
+          win.bounty.rewardCurrency || 'XLM',
+        );
+      }
+
       totalBountyEarnings += earnings;
 
       if (win.awardedAt) {
@@ -61,14 +80,25 @@ export class DashboardService {
       }
     }
 
-    // Calculate total earnings from projects (paid user milestones)
+    // Calculate total earnings from projects (paid user milestones) with USD values
     const userMilestones = await this.prisma.userMilestone.findMany({
       where: {
         contributorId: userId,
         paidAt: { not: null },
       },
-      include: {
-        milestone: true,
+      select: {
+        usdValueAtCompletion: true,
+        paidAt: true,
+        milestone: {
+          select: {
+            amount: true,
+            project: {
+              select: {
+                currency: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -77,7 +107,19 @@ export class DashboardService {
     let lastMonthProjectEarnings = 0;
 
     for (const userMilestone of userMilestones) {
-      const amount = parseFloat(userMilestone.milestone.amount);
+      let amount: number;
+
+      if (userMilestone.usdValueAtCompletion) {
+        // Use stored USD value
+        amount = parseFloat(userMilestone.usdValueAtCompletion.toString());
+      } else {
+        // Calculate USD value based on current token price
+        amount = await calculateUsdValue(
+          userMilestone.milestone.amount,
+          userMilestone.milestone.project.currency,
+        );
+      }
+
       totalProjectEarnings += amount;
 
       if (userMilestone.paidAt) {
@@ -351,68 +393,12 @@ export class DashboardService {
             },
           });
 
-        // Calculate total earnings from bounties (for this owner)
-        const bountyWins = await this.prisma.bountyWinner.findMany({
-          where: {
-            userId,
-            bounty: {
-              ownerId,
-            },
-          },
-          include: {
-            bounty: {
-              select: {
-                reward: true,
-                rewardDistribution: true,
-              },
-            },
-          },
-        });
-
-        let totalBountyEarnings = 0;
-        for (const win of bountyWins) {
-          const reward = parseFloat(win.bounty.reward);
-          const distribution = win.bounty
-            .rewardDistribution as unknown as RewardDistributionItem[];
-
-          // Find the percentage for this position
-          const positionReward = distribution.find(
-            (d) => d.rank === win.position,
-          );
-          const percentage = positionReward?.percentage || 0;
-
-          const earnings = (reward * percentage) / 100;
-          totalBountyEarnings += earnings;
-        }
-
-        // Calculate total earnings from project milestones (for this owner)
-        const paidMilestones = await this.prisma.userMilestone.findMany({
-          where: {
-            contributorId: userId,
-            application: {
-              project: {
-                ownerId,
-              },
-            },
-            paidAt: {
-              not: null,
-            },
-          },
-          include: {
-            milestone: {
-              select: {
-                amount: true,
-              },
-            },
-          },
-        });
-
-        let totalProjectEarnings = 0;
-        for (const userMilestone of paidMilestones) {
-          totalProjectEarnings += parseFloat(userMilestone.milestone.amount);
-        }
-
-        const totalEarned = totalBountyEarnings + totalProjectEarnings;
+        // Calculate total earnings using utility function
+        const totalEarnings = await calculateUserTotalEarnings(
+          this.prisma,
+          userId,
+          ownerId,
+        );
 
         return {
           id: user.id,
@@ -425,7 +411,7 @@ export class DashboardService {
           skills: user.skills,
           totalBountiesParticipated,
           totalProjectsParticipated,
-          totalEarned: totalEarned.toFixed(2),
+          totalEarnings,
           createdAt: user.createdAt,
         };
       }),

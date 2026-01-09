@@ -9,6 +9,7 @@ import { MilestoneStatus, ProjectStatus } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { calculateUsdValue } from '../common/utils/token-price.util';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
 import { ProjectContractService } from './project-contract.service';
 
@@ -177,6 +178,8 @@ export class ProjectMilestonesService {
 
     let txHash: string | undefined;
 
+    let usdValue: number | undefined;
+
     if (approve) {
       if (!userMilestone.contributor.wallet) {
         throw new BadRequestException('Contributor does not have a wallet');
@@ -197,6 +200,12 @@ export class ProjectMilestonesService {
       });
 
       txHash = paymentResult.txHash;
+
+      // Calculate USD value at time of payment
+      usdValue = await calculateUsdValue(
+        userMilestone.milestone.amount,
+        userMilestone.milestone.project.currency,
+      );
     }
 
     const updatedUserMilestone = await this.prisma.userMilestone.update({
@@ -210,6 +219,7 @@ export class ProjectMilestonesService {
         reviewedAt: new Date(),
         txHash: approve ? txHash : undefined,
         paidAt: approve ? new Date() : undefined,
+        usdValueAtCompletion: approve ? usdValue : undefined,
       },
       include: {
         milestone: true,
