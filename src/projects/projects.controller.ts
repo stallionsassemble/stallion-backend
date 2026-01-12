@@ -631,6 +631,98 @@ export class ProjectsController {
     return this.milestonesService.submitMilestone(params.id, userId, dto);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @Get('milestones/:id')
+  @ApiOperation({
+    summary: 'Get a user milestone by ID',
+    description:
+      'Get detailed information about a specific user milestone submission. Accessible by the project owner or the contributor who made the submission.',
+  })
+  @ApiParam({ name: 'id', description: 'User Milestone ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'User milestone retrieved successfully',
+    schema: {
+      example: {
+        id: 'user-milestone-uuid',
+        status: 'SUBMITTED',
+        description: 'Completed the UI design with all requested features',
+        links: [
+          'https://github.com/user/repo/pull/123',
+          'https://demo.example.com',
+        ],
+        attachments: [
+          {
+            filename: 'design-mockups.pdf',
+            url: 'https://example.com/uploads/mockups.pdf',
+            size: 204800,
+          },
+        ],
+        submittedAt: '2024-01-28T10:00:00.000Z',
+        reviewNote: null,
+        reviewedAt: null,
+        revisionNote: null,
+        txHash: null,
+        paidAt: null,
+        usdValueAtCompletion: null,
+        createdAt: '2024-01-20T10:00:00.000Z',
+        updatedAt: '2024-01-28T10:00:00.000Z',
+        milestoneId: 'milestone-uuid',
+        applicationId: 'application-uuid',
+        contributorId: 'contributor-uuid',
+        milestone: {
+          id: 'milestone-uuid',
+          title: 'UI Design & Setup',
+          description: 'Create the initial UI mockups',
+          amount: '2000',
+          dueDate: '2024-02-01T00:00:00.000Z',
+          order: 1,
+          projectId: 'project-uuid',
+          project: {
+            id: 'project-uuid',
+            title: 'DeFi Dashboard Development',
+            currency: 'USDC',
+            ownerId: 'owner-uuid',
+            owner: {
+              id: 'owner-uuid',
+              username: 'project_owner',
+              firstName: 'John',
+              lastName: 'Doe',
+              companyName: 'Tech Corp',
+              profilePicture: 'https://example.com/owner.jpg',
+            },
+          },
+        },
+        contributor: {
+          id: 'contributor-uuid',
+          username: 'dev_jane',
+          firstName: 'Jane',
+          lastName: 'Smith',
+          profilePicture: 'https://example.com/jane.jpg',
+          skills: ['React', 'TypeScript', 'Web3'],
+        },
+        application: {
+          id: 'application-uuid',
+          status: 'ACCEPTED',
+          projectId: 'project-uuid',
+          userId: 'contributor-uuid',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - not authorized to view this milestone',
+  })
+  @ApiResponse({ status: 404, description: 'User milestone not found' })
+  async getUserMilestone(
+    @Param() params: MilestoneIdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.milestonesService.getUserMilestoneById(params.id, userId);
+  }
+
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
   @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')

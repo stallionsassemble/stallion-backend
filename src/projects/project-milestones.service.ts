@@ -421,4 +421,57 @@ export class ProjectMilestonesService {
       },
     });
   }
+
+  async getUserMilestoneById(userMilestoneId: string, userId: string) {
+    const userMilestone = await this.prisma.userMilestone.findUnique({
+      where: { id: userMilestoneId },
+      include: {
+        milestone: {
+          include: {
+            project: {
+              include: {
+                owner: {
+                  select: {
+                    id: true,
+                    username: true,
+                    firstName: true,
+                    lastName: true,
+                    companyName: true,
+                    profilePicture: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        contributor: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+            skills: true,
+          },
+        },
+        application: true,
+      },
+    });
+
+    if (!userMilestone) {
+      throw new NotFoundException('User milestone not found');
+    }
+
+    // Check if user is either the project owner or the contributor
+    const isOwner = userMilestone.milestone.project.ownerId === userId;
+    const isContributor = userMilestone.contributorId === userId;
+
+    if (!isOwner && !isContributor) {
+      throw new ForbiddenException(
+        'You can only view milestones for your own projects or submissions',
+      );
+    }
+
+    return userMilestone;
+  }
 }
