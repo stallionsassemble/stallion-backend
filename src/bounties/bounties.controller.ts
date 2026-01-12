@@ -17,7 +17,6 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { RequiresCompleteProfile } from 'src/common/decorators/requires-complete-profile.decorator';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { MFAGuard } from 'src/common/guards/mfa.guard';
 import { OwnerGuard } from 'src/common/guards/owner.guard';
@@ -429,7 +428,6 @@ export class BountyController {
 
   @Post()
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard)
-  @RequiresCompleteProfile()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Create a new bounty',
@@ -470,7 +468,6 @@ export class BountyController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, OwnerGuard)
-  @RequiresCompleteProfile()
   @ApiBearerAuth('JWT-auth')
   @HttpCode(200)
   @ApiOperation({ summary: 'Update bounty' })
@@ -556,7 +553,6 @@ export class BountyController {
 
   @Post(':id/apply')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, MFAGuard)
-  @RequiresCompleteProfile()
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Apply to bounty (requires MFA and complete profile)',

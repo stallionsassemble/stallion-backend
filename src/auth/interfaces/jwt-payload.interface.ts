@@ -10,4 +10,5 @@ export interface RequestUser {
   id: string;
   email: string;
   role: Role;
+  profileCompleted: boolean;
 }

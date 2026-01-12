@@ -22,7 +22,6 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { ActivitiesService } from '../activities/activities.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { RequiresCompleteProfile } from '../common/decorators/requires-complete-profile.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { ProfileCompleteGuard } from '../common/guards/profile-complete.guard';
@@ -216,7 +215,6 @@ export class ProjectsController {
 
   @Post()
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -241,7 +239,6 @@ export class ProjectsController {
 
   @Patch(':id')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -275,7 +272,6 @@ export class ProjectsController {
 
   @Patch(':id/cancel')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -302,7 +298,6 @@ export class ProjectsController {
 
   @Post(':id/apply')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -328,7 +323,6 @@ export class ProjectsController {
 
   @Patch('applications/:applicationId')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -379,7 +373,6 @@ export class ProjectsController {
 
   @Get('applications/me')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
@@ -396,7 +389,6 @@ export class ProjectsController {
   }
 
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @Patch('applications/:id/review')
@@ -431,7 +423,6 @@ export class ProjectsController {
   }
 
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @Delete('applications/:id')
@@ -477,7 +468,6 @@ export class ProjectsController {
   }
 
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.CONTRIBUTOR, Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @Get('milestones/me')
@@ -502,7 +492,6 @@ export class ProjectsController {
   }
 
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
   @Post('milestones/:id/submit')
@@ -529,7 +518,6 @@ export class ProjectsController {
   }
 
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
-  @RequiresCompleteProfile()
   @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
   @Patch('milestones/:id/review')
