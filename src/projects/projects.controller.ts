@@ -19,13 +19,13 @@ import {
 } from '@nestjs/swagger';
 import { ProjectStatus, ProjectType, Role } from '@prisma/client';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { IdParamDto } from 'src/common/dto/id-param.dto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { ActivitiesService } from '../activities/activities.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { ProfileCompleteGuard } from '../common/guards/profile-complete.guard';
-import { ApplicationIdParamDto } from './dto/application-id-param.dto';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { GetMyMilestonesQueryDto } from './dto/get-my-milestones-query.dto';
@@ -323,7 +323,7 @@ export class ProjectsController {
     return this.applicationsService.applyToProject(userId, params.id, dto);
   }
 
-  @Patch('applications/:applicationId')
+  @Patch('applications/:id')
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
   @Roles(Role.CONTRIBUTOR)
   @ApiBearerAuth('JWT-auth')
@@ -332,7 +332,7 @@ export class ProjectsController {
     description:
       'Update an existing application (only before deadline and if not reviewed)',
   })
-  @ApiParam({ name: 'applicationId', description: 'Application ID' })
+  @ApiParam({ name: 'id', description: 'Application ID' })
   @ApiResponse({
     status: 200,
     description: 'Application updated successfully',
@@ -345,15 +345,11 @@ export class ProjectsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not your application' })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async updateApplication(
-    @Param() params: ApplicationIdParamDto,
+    @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: ApplyToProjectDto,
   ) {
-    return this.applicationsService.updateApplication(
-      params.applicationId,
-      userId,
-      dto,
-    );
+    return this.applicationsService.updateApplication(params.id, userId, dto);
   }
 
   @Get(':id/applications')
@@ -520,12 +516,12 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async reviewApplication(
-    @Param() params: ApplicationIdParamDto,
+    @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: ReviewApplicationDto,
   ) {
     return this.applicationsService.reviewApplication(
-      params.applicationId,
+      params.id,
       userId,
       dto.status,
       dto.rejectionReason,
@@ -553,13 +549,10 @@ export class ProjectsController {
   @ApiResponse({ status: 403, description: 'Forbidden - not your application' })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async withdrawApplication(
-    @Param() params: ApplicationIdParamDto,
+    @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.applicationsService.withdrawApplication(
-      params.applicationId,
-      userId,
-    );
+    return this.applicationsService.withdrawApplication(params.id, userId);
   }
 
   @Get(':id/milestones')
@@ -664,13 +657,13 @@ export class ProjectsController {
 
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @Get('applications/:applicationId/milestones')
+  @Get('applications/:id/milestones')
   @ApiOperation({
     summary: 'Get milestones for an approved application',
     description:
       'Get all milestones for an approved application. Only accessible by the project owner.',
   })
-  @ApiParam({ name: 'applicationId', description: 'Application ID' })
+  @ApiParam({ name: 'id', description: 'Application ID' })
   @ApiResponse({
     status: 200,
     description: 'Milestones retrieved successfully',
@@ -683,13 +676,10 @@ export class ProjectsController {
   })
   @ApiResponse({ status: 404, description: 'Application not found' })
   async getApplicationMilestones(
-    @Param() params: ApplicationIdParamDto,
+    @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.milestonesService.getMilestonesByApplication(
-      params.applicationId,
-      userId,
-    );
+    return this.milestonesService.getMilestonesByApplication(params.id, userId);
   }
 
   @Get(':id/activities')
