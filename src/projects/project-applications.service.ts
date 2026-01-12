@@ -395,4 +395,63 @@ export class ProjectApplicationsService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  async getAcceptedApplicationsByProject(projectId: string, ownerId: string) {
+    // Verify project ownership
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    });
+
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    if (project.ownerId !== ownerId) {
+      throw new ForbiddenException(
+        'Only the project owner can view accepted applications',
+      );
+    }
+
+    // Fetch accepted applications with user details and milestones
+    return this.prisma.projectApplication.findMany({
+      where: {
+        projectId,
+        status: ApplicationStatus.ACCEPTED,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            firstName: true,
+            lastName: true,
+            profilePicture: true,
+            skills: true,
+            bio: true,
+          },
+        },
+        userMilestones: {
+          include: {
+            milestone: {
+              select: {
+                id: true,
+                title: true,
+                description: true,
+                amount: true,
+                dueDate: true,
+                order: true,
+              },
+            },
+          },
+          orderBy: {
+            milestone: {
+              order: 'asc',
+            },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+  }
 }

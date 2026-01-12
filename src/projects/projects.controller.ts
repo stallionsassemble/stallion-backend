@@ -85,6 +85,7 @@ export class ProjectsController {
           deadline: '2024-03-01T00:00:00.000Z',
           createdAt: '2024-01-01T00:00:00.000Z',
           applied: true,
+          projectProgress: 0,
           owner: {
             id: 'owner-uuid',
             username: 'project_owner',
@@ -162,6 +163,7 @@ export class ProjectsController {
           totalBounties: 15,
           totalProjects: 8,
         },
+        projectProgress: 50,
         milestones: [
           {
             id: 'milestone-1',
@@ -386,6 +388,89 @@ export class ProjectsController {
   })
   async getMyApplications(@CurrentUser('id') userId: string) {
     return this.applicationsService.getApplicationsByUser(userId);
+  }
+
+  @Get(':id/applications/accepted')
+  @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)
+  @Roles(Role.PROJECT_OWNER)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Get accepted applications for a project',
+    description:
+      'Get all accepted applications for a specific project. Only accessible by the project owner.',
+  })
+  @ApiParam({ name: 'id', description: 'Project ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Accepted applications retrieved successfully',
+    type: [ApplicationResponseDto],
+    schema: {
+      example: [
+        {
+          id: 'application-uuid',
+          coverLetter: 'I am excited to work on this project...',
+          estimatedCompletionTime: 30,
+          portfolioLinks: ['https://github.com/user/project'],
+          status: 'ACCEPTED',
+          createdAt: '2024-01-05T10:00:00.000Z',
+          updatedAt: '2024-01-10T14:30:00.000Z',
+          projectId: 'project-uuid',
+          userId: 'user-uuid',
+          user: {
+            id: 'user-uuid',
+            username: 'dev_jane',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            profilePicture: 'https://example.com/jane.jpg',
+            skills: ['React', 'TypeScript', 'Web3'],
+            bio: 'Full-stack developer with 5 years experience',
+          },
+          userMilestones: [
+            {
+              id: 'user-milestone-1',
+              status: 'PAID',
+              submissionNote: 'Completed UI design',
+              submittedAt: '2024-01-28T10:00:00.000Z',
+              paidAt: '2024-01-30T09:00:00.000Z',
+              milestone: {
+                id: 'milestone-1',
+                title: 'UI Design & Setup',
+                description: 'Create the initial UI mockups',
+                amount: '2000',
+                dueDate: '2024-02-01T00:00:00.000Z',
+                order: 1,
+              },
+            },
+            {
+              id: 'user-milestone-2',
+              status: 'IN_PROGRESS',
+              milestone: {
+                id: 'milestone-2',
+                title: 'Backend Integration',
+                description: 'Integrate with DeFi protocols',
+                amount: '3000',
+                dueDate: '2024-02-15T00:00:00.000Z',
+                order: 2,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Not the project owner',
+  })
+  @ApiResponse({ status: 404, description: 'Project not found' })
+  async getAcceptedApplications(
+    @Param() params: ProjectIdParamDto,
+    @CurrentUser('id') ownerId: string,
+  ) {
+    return this.applicationsService.getAcceptedApplicationsByProject(
+      params.id,
+      ownerId,
+    );
   }
 
   @UseGuards(JwtAuthGuard, ProfileCompleteGuard, RolesGuard)

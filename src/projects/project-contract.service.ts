@@ -261,8 +261,8 @@ export class ProjectContractService {
     ownerId: string;
     ownerPublicKey: string;
     walletId: string;
-    deadline?: Date;
-    milestones?: Array<{ amount: string; order: number }>;
+    deadline: Date;
+    milestones: Array<{ amount: string; order: number }>;
   }): Promise<{ txHash: string }> {
     this.logger.log(
       `Updating GIG project ${params.projectId} on smart contract`,
@@ -270,23 +270,15 @@ export class ProjectContractService {
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const updateParams: any = {
+    const updateParams = {
       owner: params.ownerPublicKey,
       project_id: params.projectId,
-    };
-
-    if (params.deadline) {
-      updateParams.deadline = BigInt(
-        Math.floor(params.deadline.getTime() / 1000),
-      );
-    }
-
-    if (params.milestones) {
-      updateParams.milestones = params.milestones.map((m) => ({
+      new_deadline: BigInt(Math.floor(params.deadline.getTime() / 1000)),
+      new_milestones: params.milestones.map((m) => ({
         amount: BigInt(m.amount),
         order: m.order,
-      }));
-    }
+      })),
+    };
 
     const tx = await this.sorobanClient.update_project_gig(updateParams);
 

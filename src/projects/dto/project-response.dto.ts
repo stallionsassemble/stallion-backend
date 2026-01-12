@@ -115,6 +115,12 @@ export class ProjectResponseDto {
     description: 'Project milestones (only in detailed view)',
   })
   milestones?: MilestoneResponseDto[];
+
+  @ApiProperty({
+    description: 'Project completion progress as a percentage (0-100)',
+    example: 65.5,
+  })
+  projectProgress: number;
 }
 
 export class ApplicationResponseDto {

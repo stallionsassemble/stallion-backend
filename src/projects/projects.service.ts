@@ -193,12 +193,22 @@ export class ProjectsService {
               order: milestone.order,
             }));
 
+      // Calculate project progress based on paid milestones
+      let projectProgress = 0;
+      if (project.milestones.length > 0 && acceptedApp) {
+        const paidMilestones = acceptedApp.userMilestones.filter(
+          (um) => um.status === 'PAID',
+        ).length;
+        projectProgress = (paidMilestones / project.milestones.length) * 100;
+      }
+
       return {
         ...project,
         applied,
         released,
         escrowed,
         milestones: milestonesWithStatus,
+        projectProgress,
         winner: acceptedApplication
           ? {
               userId: acceptedApplication.user.id,
@@ -283,8 +293,14 @@ export class ProjectsService {
             select: {
               userId: true,
               status: true,
+              userMilestones: {
+                select: {
+                  status: true,
+                },
+              },
             },
           },
+          milestones: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -326,7 +342,7 @@ export class ProjectsService {
         }),
       );
 
-      // Map projects with applied field and owner stats
+      // Map projects with applied field, owner stats, and progress
       return projects.map((project) => {
         const applied = currentUserId
           ? project.applications.some((app) => app.userId === currentUserId)
@@ -338,14 +354,28 @@ export class ProjectsService {
           totalProjects: 0,
         };
 
+        // Calculate project progress
+        let projectProgress = 0;
+        const acceptedApp = project.applications.find(
+          (app) => app.status === 'ACCEPTED',
+        );
+        if (project.milestones.length > 0 && acceptedApp) {
+          const paidMilestones = acceptedApp.userMilestones.filter(
+            (um) => um.status === 'PAID',
+          ).length;
+          projectProgress = (paidMilestones / project.milestones.length) * 100;
+        }
+
         return {
           ...project,
           applied,
+          projectProgress,
           owner: {
             ...project.owner,
             ...ownerStats,
           },
           applications: undefined, // Remove applications from response
+          milestones: undefined, // Remove milestones from list response
         };
       });
     } catch (error) {
@@ -606,6 +636,8 @@ export class ProjectsService {
           ownerId,
           ownerPublicKey: project.owner.wallet.publicKey,
           walletId: project.owner.wallet.id,
+          deadline: project.deadline,
+          milestones: project.milestones,
         };
 
         if (dto.deadline) {
