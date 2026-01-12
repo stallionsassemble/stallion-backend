@@ -207,10 +207,13 @@ export class MilestoneResponseDto {
   status?: MilestoneStatus;
 
   @ApiPropertyOptional()
-  submissionNote?: string;
+  submissionDescription?: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  submissionLinks?: string[];
 
   @ApiPropertyOptional()
-  submissionUrl?: string;
+  submissionAttachments?: any;
 
   @ApiPropertyOptional()
   submittedAt?: Date;

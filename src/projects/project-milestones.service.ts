@@ -99,8 +99,9 @@ export class ProjectMilestonesService {
     const updatedUserMilestone = await this.prisma.userMilestone.update({
       where: { id: userMilestoneId },
       data: {
-        submissionNote: dto.submissionNote,
-        submissionUrl: dto.submissionUrl,
+        description: dto.description,
+        links: dto.links,
+        attachments: dto.attachments as any,
         submittedAt: new Date(),
         status: MilestoneStatus.SUBMITTED,
       },

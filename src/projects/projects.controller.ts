@@ -450,7 +450,18 @@ export class ProjectsController {
             {
               id: 'user-milestone-1',
               status: 'PAID',
-              submissionNote: 'Completed UI design',
+              description: 'Completed UI design with all requested features',
+              links: [
+                'https://github.com/user/repo/pull/123',
+                'https://demo.example.com',
+              ],
+              attachments: [
+                {
+                  filename: 'design-mockups.pdf',
+                  url: 'https://example.com/uploads/mockups.pdf',
+                  size: 204800,
+                },
+              ],
               submittedAt: '2024-01-28T10:00:00.000Z',
               paidAt: '2024-01-30T09:00:00.000Z',
               milestone: {

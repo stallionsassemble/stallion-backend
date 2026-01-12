@@ -1109,9 +1109,10 @@ model UserMilestone {
   status MilestoneStatus @default(PENDING)
 
   // Submission
-  submissionNote String?   @map("submission_note") @db.Text
-  submissionUrl  String?   @map("submission_url")
-  submittedAt    DateTime? @map("submitted_at")
+  description String?   @db.Text
+  links       String[]  @default([])
+  attachments Json?
+  submittedAt DateTime? @map("submitted_at")
 
   // Review
   reviewNote   String?   @map("review_note") @db.Text
