@@ -368,6 +368,31 @@ export class ProjectsController {
     status: 200,
     description: 'Applications retrieved successfully',
     type: [ApplicationResponseDto],
+    schema: {
+      example: [
+        {
+          id: 'application-uuid',
+          coverLetter: 'I am very interested in this project...',
+          estimatedCompletionTime: 30,
+          portfolioLinks: ['https://github.com/user/project'],
+          status: 'PENDING',
+          createdAt: '2024-01-05T10:00:00.000Z',
+          updatedAt: '2024-01-05T10:00:00.000Z',
+          projectId: 'project-uuid',
+          userId: 'user-uuid',
+          user: {
+            id: 'user-uuid',
+            username: 'dev_john',
+            firstName: 'John',
+            lastName: 'Doe',
+            profilePicture: 'https://example.com/john.jpg',
+            skills: ['React', 'Node.js', 'TypeScript'],
+            bountySubmissionsCount: 15,
+            projectApplicationsCount: 8,
+          },
+        },
+      ],
+    },
   })
   async getProjectApplications(@Param() params: ProjectIdParamDto) {
     return this.applicationsService.getApplicationsByProject(params.id);

@@ -356,7 +356,7 @@ export class ProjectApplicationsService {
   }
 
   async getApplicationsByProject(projectId: string) {
-    return this.prisma.projectApplication.findMany({
+    const applications = await this.prisma.projectApplication.findMany({
       where: { projectId },
       include: {
         user: {
@@ -372,6 +372,32 @@ export class ProjectApplicationsService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Add submission and application counts for each user
+    const applicationsWithCounts = await Promise.all(
+      applications.map(async (app) => {
+        const [bountySubmissionsCount, projectApplicationsCount] =
+          await Promise.all([
+            this.prisma.bountySubmission.count({
+              where: { userId: app.userId },
+            }),
+            this.prisma.projectApplication.count({
+              where: { userId: app.userId },
+            }),
+          ]);
+
+        return {
+          ...app,
+          user: {
+            ...app.user,
+            bountySubmissionsCount,
+            projectApplicationsCount,
+          },
+        };
+      }),
+    );
+
+    return applicationsWithCounts;
   }
 
   async getApplicationsByUser(userId: string) {
