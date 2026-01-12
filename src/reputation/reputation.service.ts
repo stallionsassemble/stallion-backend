@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { calculateUsdValue } from 'src/common/utils/token-price.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ReputationNotifications } from '../notifications/helpers/notification-helper';
@@ -95,7 +96,7 @@ export class ReputationService {
     const newLevel = calculateLevel(newScore);
 
     // Update category scores
-    const categoryUpdates: any = {};
+    const categoryUpdates: Prisma.UserReputationUpdateInput = {};
     switch (action.category) {
       case 'BOUNTY':
         categoryUpdates.bountyScore = {
@@ -344,7 +345,9 @@ export class ReputationService {
   }
 
   async getLeaderboard(page = 1, limit = 50, category?: string) {
-    const orderBy: any = { score: 'desc' };
+    const orderBy: Prisma.UserReputationOrderByWithRelationInput = {
+      score: 'desc',
+    };
 
     if (category === 'bounty') {
       orderBy.bountyScore = 'desc';

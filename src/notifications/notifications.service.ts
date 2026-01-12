@@ -1,6 +1,6 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { NotificationType } from '@prisma/client';
+import { NotificationSettings, NotificationType } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { RegisterFcmTokenDto } from './dto/register-fcm-token.dto';
@@ -175,7 +175,7 @@ export class NotificationsService {
 
   private shouldSendInApp(
     category: NotificationCategory,
-    settings: any,
+    settings: NotificationSettings,
     override?: boolean,
   ): boolean {
     if (override !== undefined) return override;
@@ -198,7 +198,7 @@ export class NotificationsService {
 
   private shouldSendEmail(
     category: NotificationCategory,
-    settings: any,
+    settings: NotificationSettings,
     override?: boolean,
   ): boolean {
     if (override !== undefined) return override;
@@ -221,7 +221,7 @@ export class NotificationsService {
 
   private shouldSendPush(
     category: NotificationCategory,
-    settings: any,
+    settings: NotificationSettings,
     override?: boolean,
   ): boolean {
     if (override !== undefined) return override;

@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import {
   ApplicationStatus,
+  Prisma,
   ProjectStatus,
   ProjectType,
   Role,
@@ -85,7 +86,7 @@ export class ProjectApplicationsService {
         coverLetter: dto.coverLetter,
         estimatedCompletionTime: dto.estimatedCompletionTime,
         portfolioLinks: dto.portfolioLinks || [],
-        attachments: dto.attachments,
+        attachments: dto.attachments as unknown as Prisma.InputJsonValue,
         status: ApplicationStatus.PENDING,
       },
       include: {
@@ -154,7 +155,7 @@ export class ProjectApplicationsService {
         coverLetter: dto.coverLetter,
         estimatedCompletionTime: dto.estimatedCompletionTime,
         portfolioLinks: dto.portfolioLinks || [],
-        attachments: dto.attachments,
+        attachments: dto.attachments as unknown as Prisma.InputJsonValue,
       },
       include: {
         user: {

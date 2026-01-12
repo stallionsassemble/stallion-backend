@@ -804,14 +804,22 @@ export class BountiesService {
         ? new Date(dto.submissionDeadline)
         : undefined;
 
-      // Update bounty on contract using contract service
-      const { txHash } = await this.contractService.updateBounty({
-        ownerPublicKey: user.wallet.publicKey,
-        walletId: user.wallet.id,
-        bountyId: contractBountyId,
-        submissionDeadline,
-        judgingDeadline: undefined,
-      });
+      let txHash: string | undefined;
+
+      if (submissionDeadline) {
+        // Update bounty on contract using contract service
+        ({ txHash } = await this.contractService.updateBounty({
+          ownerPublicKey: user.wallet.publicKey,
+          walletId: user.wallet.id,
+          bountyId: contractBountyId,
+          title: dto.title,
+          distribution: dto.distribution?.map((d) => ({
+            position: d.rank,
+            percentage: d.percentage,
+          })),
+          submissionDeadline,
+        }));
+      }
 
       // Update in database
       const bounty = await this.prisma.bounty.update({
@@ -842,7 +850,9 @@ export class BountiesService {
         },
       });
 
-      this.logger.log(`Bounty updated: ${dbBountyId}, tx: ${txHash}`);
+      this.logger.log(
+        `Bounty updated: ${dbBountyId}${txHash ? `, tx: ${txHash}` : ''}`,
+      );
 
       return {
         message: 'Bounty updated successfully',

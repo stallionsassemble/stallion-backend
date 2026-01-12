@@ -83,12 +83,25 @@ export class StellarAccountService {
       this.logger.log(`Fetching all balances for public key: ${publicKey}`);
       const account = await this.loadWithRetry(this.server, publicKey);
 
-      return account.balances.map((bal: any) => ({
-        asset_type: bal.asset_type,
-        asset_code: bal.asset_code,
-        asset_issuer: bal.asset_issuer,
-        balance: bal.balance,
-      }));
+      return account.balances.map((bal) => {
+        const baseBalance = {
+          asset_type: bal.asset_type,
+          balance: bal.balance,
+        };
+
+        if (
+          bal.asset_type === 'credit_alphanum4' ||
+          bal.asset_type === 'credit_alphanum12'
+        ) {
+          return {
+            ...baseBalance,
+            asset_code: bal.asset_code,
+            asset_issuer: bal.asset_issuer,
+          };
+        }
+
+        return baseBalance;
+      });
     } catch (error) {
       this.logger.error(
         `Failed to get account balances for ${publicKey}`,

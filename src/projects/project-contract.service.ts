@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { getTokenAddress } from '../bounties/utils/supported-currencies';
 import { EnvConfig } from '../config/env.config';
-import { Client } from '../soroban/contract-bindings';
+import { Client, ProjectStatus } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
@@ -261,8 +261,8 @@ export class ProjectContractService {
     ownerId: string;
     ownerPublicKey: string;
     walletId: string;
-    deadline: Date;
-    milestones: Array<{ amount: string; order: number }>;
+    deadline: Date | undefined;
+    milestones: Array<{ amount: string; order: number }> | undefined;
   }): Promise<{ txHash: string }> {
     this.logger.log(
       `Updating GIG project ${params.projectId} on smart contract`,
@@ -273,11 +273,15 @@ export class ProjectContractService {
     const updateParams = {
       owner: params.ownerPublicKey,
       project_id: params.projectId,
-      new_deadline: BigInt(Math.floor(params.deadline.getTime() / 1000)),
-      new_milestones: params.milestones.map((m) => ({
-        amount: BigInt(m.amount),
-        order: m.order,
-      })),
+      new_deadline: params.deadline
+        ? BigInt(Math.floor(params.deadline.getTime() / 1000))
+        : undefined,
+      new_milestones: params.milestones
+        ? params.milestones.map((m) => ({
+            amount: BigInt(m.amount),
+            order: m.order,
+          }))
+        : undefined,
     };
 
     const tx = await this.sorobanClient.update_project_gig(updateParams);
@@ -332,16 +336,14 @@ export class ProjectContractService {
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const updateParams: any = {
+    const updateParams: Parameters<
+      typeof this.sorobanClient.update_project_job
+    >[0] = {
       owner: params.ownerPublicKey,
       project_id: params.projectId,
+      new_deadline:
+        params.deadline && BigInt(Math.floor(params.deadline.getTime() / 1000)),
     };
-
-    if (params.deadline) {
-      updateParams.deadline = BigInt(
-        Math.floor(params.deadline.getTime() / 1000),
-      );
-    }
 
     const tx = await this.sorobanClient.update_project_job(updateParams);
 
@@ -478,7 +480,7 @@ export class ProjectContractService {
    */
   async getProjectsByStatus(status: string): Promise<number[]> {
     try {
-      let contractStatus: any;
+      let contractStatus: ProjectStatus;
       if (status === 'OPEN' || status === 'IN_PROGRESS') {
         // Both OPEN and IN_PROGRESS map to Active in the contract
         contractStatus = { tag: 'Active', values: undefined };

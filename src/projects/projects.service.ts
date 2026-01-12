@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ProjectStatus, ProjectType, Role } from '@prisma/client';
+import { Prisma, ProjectStatus, ProjectType, Role } from '@prisma/client';
 import { InputJsonValue } from '@prisma/client/runtime/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
@@ -631,45 +631,40 @@ export class ProjectsService {
     // Update smart contract if needed
     if (needsContractUpdate && project.contractProjectId) {
       if (project.type === ProjectType.GIG) {
-        const contractParams: any = {
+        const contractParams: Parameters<
+          typeof this.contractService.updateGigProject
+        >[0] = {
           projectId: project.contractProjectId,
           ownerId,
           ownerPublicKey: project.owner.wallet.publicKey,
           walletId: project.owner.wallet.id,
-          deadline: project.deadline,
-          milestones: project.milestones,
+          deadline: dto.deadline ? new Date(dto.deadline) : undefined,
+          milestones: dto.milestones
+            ? dto.milestones.map((m, index) => ({
+                amount: m.amount || '0',
+                order: index + 1,
+              }))
+            : undefined,
         };
-
-        if (dto.deadline) {
-          contractParams.deadline = new Date(dto.deadline);
-        }
-
-        if (dto.milestones) {
-          contractParams.milestones = dto.milestones.map((m, index) => ({
-            amount: m.amount || '0',
-            order: index + 1,
-          }));
-        }
 
         await this.contractService.updateGigProject(contractParams);
       } else if (project.type === ProjectType.JOB) {
-        const contractParams: any = {
+        const contractParams: Parameters<
+          typeof this.contractService.updateJobProject
+        >[0] = {
           projectId: project.contractProjectId,
           ownerId,
           ownerPublicKey: project.owner.wallet.publicKey,
           walletId: project.owner.wallet.id,
+          deadline: dto.deadline ? new Date(dto.deadline) : undefined,
         };
-
-        if (dto.deadline) {
-          contractParams.deadline = new Date(dto.deadline);
-        }
 
         await this.contractService.updateJobProject(contractParams);
       }
     }
 
     // Prepare update data
-    const updateData: any = {};
+    const updateData: Prisma.ProjectUpdateInput = {};
     if (dto.title !== undefined) updateData.title = dto.title;
     if (dto.shortDescription !== undefined)
       updateData.shortDescription = dto.shortDescription;
@@ -679,7 +674,8 @@ export class ProjectsService {
     if (dto.deliverables !== undefined)
       updateData.deliverables = dto.deliverables;
     if (dto.skills !== undefined) updateData.skills = dto.skills;
-    if (dto.attachments !== undefined) updateData.attachments = dto.attachments;
+    if (dto.attachments !== undefined)
+      updateData.attachments = dto.attachments as unknown as InputJsonValue;
     if (dto.deadline !== undefined)
       updateData.deadline = new Date(dto.deadline);
     if (dto.peopleNeeded !== undefined)
@@ -696,7 +692,7 @@ export class ProjectsService {
           );
         }
 
-        const milestoneUpdateData: any = {};
+        const milestoneUpdateData: Prisma.ProjectMilestoneUpdateInput = {};
         if (milestone.title !== undefined)
           milestoneUpdateData.title = milestone.title;
         if (milestone.description !== undefined)

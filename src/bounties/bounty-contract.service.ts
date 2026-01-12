@@ -120,29 +120,25 @@ export class BountyContractService {
     ownerPublicKey: string;
     walletId: string;
     bountyId: number;
+    title?: string;
+    distribution?: Array<{ position: number; percentage: number }>;
     submissionDeadline?: Date;
-    judgingDeadline?: Date;
   }): Promise<{ txHash: string }> {
     this.logger.log(`Updating bounty ${params.bountyId} on smart contract`);
 
     this.sorobanClient.options.publicKey = params.ownerPublicKey;
 
-    const updateParams: any = {
+    const updateParams = {
       owner: params.ownerPublicKey,
       bounty_id: params.bountyId,
+      new_title: params.title || undefined,
+      new_distribution: params.distribution
+        ? params.distribution.map((d) => [d.position, d.percentage] as const)
+        : [],
+      new_submission_deadline: params.submissionDeadline
+        ? BigInt(Math.floor(params.submissionDeadline.getTime() / 1000))
+        : undefined,
     };
-
-    if (params.submissionDeadline) {
-      updateParams.submission_deadline = BigInt(
-        Math.floor(params.submissionDeadline.getTime() / 1000),
-      );
-    }
-
-    if (params.judgingDeadline) {
-      updateParams.judging_deadline = BigInt(
-        Math.floor(params.judgingDeadline.getTime() / 1000),
-      );
-    }
 
     const tx = await this.sorobanClient.update_bounty(updateParams);
 

@@ -6,6 +6,7 @@ import {
   ProjectStatus,
   ProjectType,
 } from '@prisma/client';
+import { AttachmentItem } from 'src/bounties/dto';
 
 export class ProjectResponseDto {
   @ApiProperty()
@@ -30,7 +31,7 @@ export class ProjectResponseDto {
   skills: string[];
 
   @ApiPropertyOptional()
-  attachments?: any;
+  attachments?: AttachmentItem[];
 
   @ApiProperty()
   reward: string;
@@ -137,7 +138,7 @@ export class ApplicationResponseDto {
   portfolioLinks: string[];
 
   @ApiPropertyOptional()
-  attachments?: any;
+  attachments?: AttachmentItem[];
 
   @ApiProperty({ enum: ApplicationStatus })
   status: ApplicationStatus;
@@ -256,7 +257,7 @@ export class ActivityResponseDto {
   message: string;
 
   @ApiPropertyOptional()
-  metadata?: any;
+  metadata?: Record<string, any>;
 
   @ApiProperty()
   createdAt: Date;

@@ -68,7 +68,7 @@ export async function validateWalletForBountyCreation(
     if (currencyCode.toUpperCase() === 'XLM') {
       // For native XLM, use the native balance
       const nativeBalance = accountResponse.balances.find(
-        (b: any) => b.asset_type === 'native',
+        (b) => b.asset_type === 'native',
       );
       if (!nativeBalance) {
         throw new BadRequestException(

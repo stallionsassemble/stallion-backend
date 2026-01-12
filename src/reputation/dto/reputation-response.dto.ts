@@ -83,7 +83,7 @@ export class ReputationHistoryDto {
     description: 'Additional metadata',
     example: { bountyId: 'bounty-uuid' },
   })
-  metadata?: any;
+  metadata?: unknown;
 
   @ApiProperty({
     description: 'Timestamp of change',

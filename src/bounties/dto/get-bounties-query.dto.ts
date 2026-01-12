@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { BountyStatus } from '@prisma/client';
+import { Bounty, BountyStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
@@ -146,7 +146,7 @@ export class PaginatedBountiesResponseDto {
     description: 'List of bounties',
     type: 'array',
   })
-  data: any[];
+  data: Bounty[];
 
   @ApiPropertyOptional({
     description: 'Pagination metadata',

@@ -4,11 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ApplicationStatus,
   Bounty,
   BountySubmission,
+  Prisma,
   Project,
   ProjectApplication,
   Role,
+  SubmissionStatus,
 } from '@prisma/client';
 import { calculateUserTotalEarnings } from 'src/common/utils/user-earnings.util';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
@@ -368,8 +371,8 @@ export class UsersService {
 
     // Fetch bounty submissions if needed
     if (query.type === 'bounty' || query.type === 'all') {
-      const bountyWhere: any = { userId };
-      if (query.status) bountyWhere.status = query.status;
+      const bountyWhere: Prisma.BountySubmissionWhereInput = { userId };
+      if (query.status) bountyWhere.status = query.status as SubmissionStatus;
       if (query.search) {
         bountyWhere.bounty = {
           title: { contains: query.search, mode: 'insensitive' },
@@ -403,8 +406,8 @@ export class UsersService {
 
     // Fetch project applications if needed
     if (query.type === 'project' || query.type === 'all') {
-      const projectWhere: any = { userId };
-      if (query.status) projectWhere.status = query.status;
+      const projectWhere: Prisma.ProjectApplicationWhereInput = { userId };
+      if (query.status) projectWhere.status = query.status as ApplicationStatus;
       if (query.search) {
         projectWhere.project = {
           title: { contains: query.search, mode: 'insensitive' },
@@ -442,8 +445,8 @@ export class UsersService {
     // Sort combined results
     const sortField = query.sortBy || 'createdAt';
     allSubmissions.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
+      let aValue: string;
+      let bValue: string;
 
       if (sortField === 'title') {
         aValue = a.type === 'bounty' ? a.bounty.title : a.project.title;

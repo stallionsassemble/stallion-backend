@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { DiscussionReaction } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
   AddDiscussionReactionDto,
@@ -434,7 +435,10 @@ export class DiscussionsService {
   }
 
   // Helper method to consolidate reactions
-  private consolidateReactions(reactions: any[], currentUserId?: string) {
+  private consolidateReactions(
+    reactions: Pick<DiscussionReaction, 'emoji' | 'userId'>[],
+    currentUserId?: string,
+  ) {
     const consolidated = reactions.reduce(
       (acc, reaction) => {
         const emoji = reaction.emoji;

@@ -7,6 +7,7 @@ import {
   IsString,
   Min,
 } from 'class-validator';
+import { AttachmentItem } from 'src/bounties/dto';
 
 export class ApplyToProjectDto {
   @ApiProperty({
@@ -41,5 +42,5 @@ export class ApplyToProjectDto {
     example: [{ filename: 'resume.pdf', url: 'https://...', size: 1024 }],
   })
   @IsOptional()
-  attachments?: any;
+  attachments?: AttachmentItem[];
 }

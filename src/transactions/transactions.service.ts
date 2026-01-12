@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { TxState, TxType } from '@prisma/client';
+import { Prisma, TxState, TxType } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 
 @Injectable()
@@ -60,7 +60,7 @@ export class TransactionsService {
       throw new NotFoundException('User wallet not found');
     }
 
-    const where: any = {
+    const where: Prisma.TransactionWhereInput = {
       walletId: user.walletId,
     };
 

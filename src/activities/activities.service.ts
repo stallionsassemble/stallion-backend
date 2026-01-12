@@ -1,6 +1,6 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { ActivityType } from '@prisma/client';
+import { ActivityType, Prisma } from '@prisma/client';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ActivityPayload } from './types/activity-payload.type';
@@ -62,7 +62,7 @@ export class ActivitiesService {
     const limit = params.limit || 50;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.ActivityWhereInput = {};
     if (params.userId) where.userId = params.userId;
     if (params.bountyId) where.bountyId = params.bountyId;
     if (params.projectId) where.projectId = params.projectId;

@@ -5,10 +5,18 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import {
+  CommentReaction,
+  ForumReaction,
+  Prisma,
+  ThreadReaction,
+  User,
+} from '@prisma/client';
 import { ForumNotifications } from 'src/notifications/helpers/notification-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ReputationService } from '../reputation/reputation.service';
+import { AddForumReactionDto } from './dto/add-reaction.dto';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -18,7 +26,6 @@ import { UpdateCommentDto } from './dto/update-comment.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { UpdateThreadDto } from './dto/update-thread.dto';
 import { enrichAuthorData } from './utils/author-enrichment.util';
-import { AddForumReactionDto } from './dto/add-reaction.dto';
 
 @Injectable()
 export class ForumService {
@@ -913,7 +920,17 @@ export class ForumService {
         });
         return acc;
       },
-      {} as Record<string, { emoji: string; count: number; users: any[] }>,
+      {} as Record<
+        string,
+        {
+          emoji: string;
+          count: number;
+          users: Pick<
+            User,
+            'id' | 'username' | 'firstName' | 'lastName' | 'profilePicture'
+          >[];
+        }
+      >,
     );
 
     return {
@@ -928,7 +945,7 @@ export class ForumService {
     categoryId?: string,
     currentUserId?: string,
   ) {
-    const where: any = {
+    const where: Prisma.ForumThreadWhereInput = {
       OR: [
         { title: { contains: query, mode: 'insensitive' } },
         {
@@ -1440,7 +1457,14 @@ export class ForumService {
     return { message: 'Reaction added', action: 'added' };
   }
 
-  private async consolidateReactions(reactions: any[], currentUserId?: string) {
+  private async consolidateReactions(
+    reactions: (
+      | ThreadReaction
+      | Pick<CommentReaction, 'emoji' | 'userId'>
+      | Pick<ForumReaction, 'emoji' | 'userId'>
+    )[],
+    currentUserId?: string,
+  ) {
     const consolidated = reactions.reduce(
       (acc, reaction) => {
         const emoji = reaction.emoji;
@@ -1530,7 +1554,10 @@ export class ForumService {
           emoji: string;
           count: number;
           userIds: string[];
-          users: any[];
+          users: Pick<
+            User,
+            'id' | 'username' | 'firstName' | 'lastName' | 'profilePicture'
+          >[];
           hasReacted: boolean;
         }
       >,
@@ -1641,7 +1668,10 @@ export class ForumService {
           emoji: string;
           count: number;
           userIds: string[];
-          users: any[];
+          users: Pick<
+            User,
+            'id' | 'username' | 'firstName' | 'lastName' | 'profilePicture'
+          >[];
           hasReacted: boolean;
         }
       >,
