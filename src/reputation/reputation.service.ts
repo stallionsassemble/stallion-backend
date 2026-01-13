@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { RewardDistributionItem } from 'src/bounties/dto';
 import { calculateUsdValue } from 'src/common/utils/token-price.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { ReputationNotifications } from '../notifications/helpers/notification-helper';
@@ -496,7 +497,8 @@ export class ReputationService {
 
         // Calculate bounty earnings
         bountyEarnings.forEach((winner) => {
-          const distribution = winner.bounty.rewardDistribution as any[];
+          const distribution = winner.bounty
+            .rewardDistribution as unknown as RewardDistributionItem[];
           const positionReward = distribution.find(
             (d) => d.rank === winner.position,
           );
