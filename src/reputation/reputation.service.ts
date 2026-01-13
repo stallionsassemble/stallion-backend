@@ -472,9 +472,15 @@ export class ReputationService {
         const [bountyEarnings, projectMilestones] = await Promise.all([
           this.prisma.bountyWinner.findMany({
             where: { userId },
-            include: {
+            select: {
+              usdValueAtCompletion: true,
+              position: true,
               bounty: {
-                select: { reward: true, rewardDistribution: true },
+                select: {
+                  reward: true,
+                  rewardDistribution: true,
+                  rewardCurrency: true,
+                },
               },
             },
           }),
@@ -483,36 +489,68 @@ export class ReputationService {
               contributorId: userId,
               status: 'PAID',
             },
-            include: {
+            select: {
+              usdValueAtCompletion: true,
               milestone: {
                 select: {
                   amount: true,
+                  project: {
+                    select: {
+                      currency: true,
+                    },
+                  },
                 },
               },
             },
           }),
         ]);
 
-        let totalEarnings = BigInt(0);
+        let totalEarnings = 0;
 
-        // Calculate bounty earnings
-        bountyEarnings.forEach((winner) => {
-          const distribution = winner.bounty
-            .rewardDistribution as unknown as RewardDistributionItem[];
-          const positionReward = distribution.find(
-            (d) => d.rank === winner.position,
-          );
-          if (positionReward) {
-            const bountyReward = BigInt(winner.bounty.reward);
-            const percentage = BigInt(positionReward.percentage);
-            totalEarnings += (bountyReward * percentage) / BigInt(100);
+        // Calculate bounty earnings with USD conversion
+        for (const winner of bountyEarnings) {
+          let earnings: number;
+
+          if (winner.usdValueAtCompletion) {
+            // Use stored USD value
+            earnings = parseFloat(winner.usdValueAtCompletion.toString());
+          } else {
+            // Calculate USD value based on current token price
+            const reward = parseFloat(winner.bounty.reward);
+            const distribution = winner.bounty
+              .rewardDistribution as unknown as RewardDistributionItem[];
+            const positionReward = distribution.find(
+              (d) => d.rank === winner.position,
+            );
+            const percentage = positionReward?.percentage || 0;
+            const tokenAmount = (reward * percentage) / 100;
+
+            earnings = await calculateUsdValue(
+              tokenAmount.toString(),
+              winner.bounty.rewardCurrency || 'XLM',
+            );
           }
-        });
 
-        // Add project earnings
-        projectMilestones.forEach((userMilestone) => {
-          totalEarnings += BigInt(userMilestone.milestone.amount);
-        });
+          totalEarnings += earnings;
+        }
+
+        // Add project earnings with USD conversion
+        for (const userMilestone of projectMilestones) {
+          let amount: number;
+
+          if (userMilestone.usdValueAtCompletion) {
+            // Use stored USD value
+            amount = parseFloat(userMilestone.usdValueAtCompletion.toString());
+          } else {
+            // Calculate USD value based on current token price
+            amount = await calculateUsdValue(
+              userMilestone.milestone.amount,
+              userMilestone.milestone.project.currency,
+            );
+          }
+
+          totalEarnings += amount;
+        }
 
         // Get user rating
         const ratingResult = await this.prisma.userReview.aggregate({
@@ -527,7 +565,7 @@ export class ReputationService {
           isVerified,
           primarySkill,
           completedTasksCount: totalWins,
-          earnedAmount: totalEarnings.toString(),
+          earnedAmount: totalEarnings.toFixed(2),
           rating: ratingResult._avg.rating || 0,
           totalReviews: ratingResult._count,
         };

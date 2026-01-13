@@ -159,7 +159,7 @@ export class LeaderboardEntryDto {
   completedTasksCount: number;
 
   @ApiProperty({
-    description: 'Total amount earned from bounties and projects',
+    description: 'Total amount earned from bounties and projects (in USD)',
     example: '15000',
   })
   earnedAmount: string;
