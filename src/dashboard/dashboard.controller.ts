@@ -28,7 +28,7 @@ export class DashboardController {
   @ApiOperation({
     summary: 'Get contributor dashboard statistics',
     description:
-      'Retrieve dashboard statistics for contributors including earnings, active bounties, and completed bounties',
+      'Retrieve dashboard statistics for contributors including earnings, active bounties, completed bounties, and completed projects',
   })
   @ApiResponse({
     status: 200,
@@ -40,6 +40,7 @@ export class DashboardController {
         earningsPercentageChange: 25.5,
         activeBounties: 5,
         completedBounties: 12,
+        completedProjects: 8,
       },
     },
   })

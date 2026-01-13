@@ -167,11 +167,23 @@ export class DashboardService {
       },
     });
 
+    // Count completed projects (projects with ACCEPTED applications where status is COMPLETED)
+    const completedProjects = await this.prisma.projectApplication.count({
+      where: {
+        userId,
+        status: 'ACCEPTED',
+        project: {
+          status: 'COMPLETED',
+        },
+      },
+    });
+
     return {
       totalEarnings: totalEarnings.toFixed(2),
       earningsPercentageChange: parseFloat(earningsPercentageChange.toFixed(2)),
       activeBounties,
       completedBounties,
+      completedProjects,
     };
   }
 

@@ -91,7 +91,7 @@ export class WalletService {
     payoutMethodId?: string,
     address?: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const transaction = await this.prisma.$transaction(async (tx) => {
       const wallet = await tx.wallet.findUnique({
         where: { id: walletId },
         include: { users: true },
@@ -181,18 +181,21 @@ export class WalletService {
         `Created withdrawal transaction ${transaction.id} with lock ${lock.id}`,
       );
 
-      // Queue withdrawal for processing outside the transaction
-      await this.queueWithdrawal(
-        transaction.id,
-        destination,
-        amount,
-        currency,
-        walletId,
-        lock.id,
-      );
-
       return transaction;
     });
+
+    // Queue withdrawal for processing AFTER the transaction is committed
+    const metadata = transaction.metadata as Prisma.JsonObject;
+    await this.queueWithdrawal(
+      transaction.id,
+      metadata.destination as string,
+      Number(transaction.amount),
+      transaction.currency,
+      transaction.walletId,
+      metadata.lockId as string,
+    );
+
+    return transaction;
   }
 
   async queueWithdrawal(

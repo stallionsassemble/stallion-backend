@@ -25,6 +25,12 @@ export class ContributorStatsDto {
     example: 12,
   })
   completedBounties: number;
+
+  @ApiProperty({
+    description: 'Number of completed projects',
+    example: 8,
+  })
+  completedProjects: number;
 }
 
 export class ProjectOwnerStatsDto {
