@@ -15,6 +15,8 @@ import {
 import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ProjectNotifications } from '../notifications/helpers/notification-helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ApplyToProjectDto } from './dto/apply-to-project.dto';
 
 @Injectable()
@@ -24,6 +26,7 @@ export class ProjectApplicationsService {
   constructor(
     private prisma: PrismaService,
     private activitiesService: ActivitiesService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async applyToProject(
@@ -113,6 +116,29 @@ export class ProjectApplicationsService {
     await this.activitiesService.recordActivity(
       ProjectActivities.applicationSubmitted(userId, projectId, project.title),
     );
+
+    if (project.ownerId) {
+      try {
+        const applicantName =
+          application.user?.firstName &&
+          application.user?.lastName &&
+          application.user?.username
+            ? `${application.user.firstName} ${application.user.lastName}`.trim() ||
+              application.user.username
+            : 'A contributor';
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.applicationReceived(
+            project.ownerId,
+            project.title,
+            applicantName,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send application received notification: ${error.message}`,
+        );
+      }
+    }
 
     return application;
   }
@@ -306,6 +332,19 @@ export class ProjectApplicationsService {
           application.project.title,
         ),
       );
+
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.applicationAccepted(
+            application.userId,
+            application.project.title,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send application accepted notification: ${error.message}`,
+        );
+      }
     } else {
       await this.activitiesService.recordActivity(
         ProjectActivities.applicationRejected(
@@ -314,6 +353,20 @@ export class ProjectApplicationsService {
           application.project.title,
         ),
       );
+
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.applicationRejected(
+            application.userId,
+            application.project.title,
+            rejectionReason,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send application rejected notification: ${error.message}`,
+        );
+      }
     }
 
     return updatedApplication;

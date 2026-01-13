@@ -10,6 +10,8 @@ import { InputJsonValue } from '@prisma/client/runtime/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ProjectNotifications } from '../notifications/helpers/notification-helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { ProjectContractService } from './project-contract.service';
@@ -22,6 +24,7 @@ export class ProjectsService {
     private prisma: PrismaService,
     private contractService: ProjectContractService,
     private activitiesService: ActivitiesService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async getProject(projectId: string, currentUserId?: string) {
@@ -539,6 +542,16 @@ export class ProjectsService {
       ),
     );
 
+    try {
+      await this.notificationsService.sendNotification(
+        ProjectNotifications.projectCreated(ownerId, project.title),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send project creation notification: ${error.message}`,
+      );
+    }
+
     return project;
   }
 
@@ -736,6 +749,16 @@ export class ProjectsService {
       ProjectActivities.updated(ownerId, projectId, updatedProject.title),
     );
 
+    try {
+      await this.notificationsService.sendNotification(
+        ProjectNotifications.projectUpdated(ownerId, updatedProject.title),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send project update notification: ${error.message}`,
+      );
+    }
+
     return updatedProject;
   }
 
@@ -764,6 +787,16 @@ export class ProjectsService {
     await this.activitiesService.recordActivity(
       ProjectActivities.cancelled(ownerId, projectId, project.title),
     );
+
+    try {
+      await this.notificationsService.sendNotification(
+        ProjectNotifications.projectCancelled(ownerId, project.title),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send project cancellation notification: ${error.message}`,
+      );
+    }
 
     return updatedProject;
   }

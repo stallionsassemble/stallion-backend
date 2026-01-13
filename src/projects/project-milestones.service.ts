@@ -10,6 +10,8 @@ import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { calculateUsdValue } from '../common/utils/token-price.util';
+import { ProjectNotifications } from '../notifications/helpers/notification-helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
 import { ProjectContractService } from './project-contract.service';
 
@@ -21,6 +23,7 @@ export class ProjectMilestonesService {
     private prisma: PrismaService,
     private contractService: ProjectContractService,
     private activitiesService: ActivitiesService,
+    private notificationsService: NotificationsService,
   ) {}
 
   async submitMilestone(
@@ -118,6 +121,34 @@ export class ProjectMilestonesService {
         userMilestone.milestone.title,
       ),
     );
+
+    if (userMilestone.milestone.project.ownerId) {
+      try {
+        const contributor = await this.prisma.user.findUnique({
+          where: { id: contributorId },
+          select: { firstName: true, lastName: true, username: true },
+        });
+        const contributorName =
+          contributor?.firstName &&
+          contributor?.lastName &&
+          contributor?.username
+            ? `${contributor.firstName} ${contributor.lastName}`.trim() ||
+              contributor.username
+            : 'A contributor';
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.milestoneSubmitted(
+            userMilestone.milestone.project.ownerId,
+            userMilestone.milestone.project.title,
+            userMilestone.milestone.title,
+            contributorName,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send milestone submitted notification: ${error.message}`,
+        );
+      }
+    }
 
     return updatedUserMilestone;
   }
@@ -247,6 +278,51 @@ export class ProjectMilestonesService {
           userMilestone.milestone.project.currency,
         ),
       );
+
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.milestoneApproved(
+            userMilestone.contributorId,
+            userMilestone.milestone.project.title,
+            userMilestone.milestone.title,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send milestone approved notification: ${error.message}`,
+        );
+      }
+
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.milestonePaid(
+            userMilestone.contributorId,
+            userMilestone.milestone.project.title,
+            userMilestone.milestone.title,
+            userMilestone.milestone.amount,
+            userMilestone.milestone.project.currency,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send milestone paid notification: ${error.message}`,
+        );
+      }
+    } else {
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.milestoneRevisionRequested(
+            userMilestone.contributorId,
+            userMilestone.milestone.project.title,
+            userMilestone.milestone.title,
+            revisionNote,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send milestone revision requested notification: ${error.message}`,
+        );
+      }
     }
 
     // Check if all user milestones for this application are completed
@@ -273,6 +349,32 @@ export class ProjectMilestonesService {
           userMilestone.milestone.project.title,
         ),
       );
+
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.projectCompleted(
+            ownerId,
+            userMilestone.milestone.project.title,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send project completed notification: ${error.message}`,
+        );
+      }
+
+      try {
+        await this.notificationsService.sendNotification(
+          ProjectNotifications.projectCompleted(
+            userMilestone.contributorId,
+            userMilestone.milestone.project.title,
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send project completed notification to contributor: ${error.message}`,
+        );
+      }
     }
 
     return updatedUserMilestone;

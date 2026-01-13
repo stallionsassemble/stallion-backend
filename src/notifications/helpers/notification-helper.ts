@@ -228,3 +228,112 @@ export const ReputationNotifications = {
     sendPush: true,
   }),
 };
+
+// Project notification helpers
+export const ProjectNotifications = {
+  projectCreated: (userId: string, projectTitle: string) => ({
+    userId,
+    type: 'PROJECT_CREATED' as NotificationType,
+    title: 'Project created successfully',
+    message: `Your project "${projectTitle}" is now live`,
+  }),
+
+  projectUpdated: (userId: string, projectTitle: string) => ({
+    userId,
+    type: 'PROJECT_UPDATED' as NotificationType,
+    title: 'Project updated',
+    message: `Your project "${projectTitle}" has been updated`,
+  }),
+
+  projectCancelled: (userId: string, projectTitle: string) => ({
+    userId,
+    type: 'PROJECT_CANCELLED' as NotificationType,
+    title: 'Project cancelled',
+    message: `Your project "${projectTitle}" has been cancelled`,
+  }),
+
+  applicationReceived: (
+    ownerId: string,
+    projectTitle: string,
+    applicantName: string,
+  ) => ({
+    userId: ownerId,
+    type: 'APPLICATION_RECEIVED' as NotificationType,
+    title: 'New application received',
+    message: `${applicantName} applied to "${projectTitle}"`,
+  }),
+
+  applicationAccepted: (userId: string, projectTitle: string) => ({
+    userId,
+    type: 'APPLICATION_ACCEPTED' as NotificationType,
+    title: 'Application accepted!',
+    message: `Your application to "${projectTitle}" was accepted`,
+  }),
+
+  applicationRejected: (
+    userId: string,
+    projectTitle: string,
+    reason?: string,
+  ) => ({
+    userId,
+    type: 'APPLICATION_REJECTED' as NotificationType,
+    title: 'Application not accepted',
+    message: `Your application to "${projectTitle}" was not accepted${reason ? `: ${reason}` : ''}`,
+  }),
+
+  milestoneSubmitted: (
+    ownerId: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    contributorName: string,
+  ) => ({
+    userId: ownerId,
+    type: 'MILESTONE_SUBMITTED' as NotificationType,
+    title: 'Milestone submitted for review',
+    message: `${contributorName} submitted "${milestoneTitle}" for "${projectTitle}"`,
+  }),
+
+  milestoneApproved: (
+    userId: string,
+    projectTitle: string,
+    milestoneTitle: string,
+  ) => ({
+    userId,
+    type: 'MILESTONE_APPROVED' as NotificationType,
+    title: 'Milestone approved!',
+    message: `Your milestone "${milestoneTitle}" for "${projectTitle}" was approved`,
+  }),
+
+  milestoneRevisionRequested: (
+    userId: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    revisionNote?: string,
+  ) => ({
+    userId,
+    type: 'MILESTONE_REVISION_REQUESTED' as NotificationType,
+    title: 'Revision requested',
+    message: `Revision requested for "${milestoneTitle}" in "${projectTitle}"${revisionNote ? `: ${revisionNote}` : ''}`,
+  }),
+
+  milestonePaid: (
+    userId: string,
+    projectTitle: string,
+    milestoneTitle: string,
+    amount: string,
+    currency: string,
+  ) => ({
+    userId,
+    type: 'MILESTONE_PAID' as NotificationType,
+    title: 'Payment received!',
+    message: `You received ${amount} ${currency} for "${milestoneTitle}" in "${projectTitle}"`,
+    data: { amount, currency },
+  }),
+
+  projectCompleted: (userId: string, projectTitle: string) => ({
+    userId,
+    type: 'PROJECT_COMPLETED' as NotificationType,
+    title: 'Project completed!',
+    message: `Project "${projectTitle}" has been completed`,
+  }),
+};
