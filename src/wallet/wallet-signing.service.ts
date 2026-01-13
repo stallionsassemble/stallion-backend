@@ -11,6 +11,7 @@ import {
   TransactionBuilder,
   xdr,
 } from '@stellar/stellar-sdk';
+import { EnvConfig } from 'src/config/env.config';
 import { StellarWalletService } from './stellar-wallet.service';
 
 @Injectable()
@@ -23,15 +24,17 @@ export class WalletSigningService {
     private readonly stellarWallet: StellarWalletService,
     private readonly config: ConfigService,
   ) {
-    const rpcUrl = this.config.get<string>('SOROBAN_RPC_URL')!;
-    const network = this.config.get<string>('SOROBAN_NETWORK')!;
+    const rpcUrl = this.config.getOrThrow<string>(
+      EnvConfig.SOROBAN_HORIZON_URL,
+    );
+    const network = this.config.getOrThrow<string>(EnvConfig.SOROBAN_NETWORK);
 
     this.server = new Horizon.Server(rpcUrl, {
       allowHttp: network === 'testnet',
     });
 
     this.networkPassphrase =
-      this.config.get<string>('SOROBAN_NETWORK_PASSPHRASE') ||
+      this.config.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
       (network === 'testnet' ? Networks.TESTNET : Networks.PUBLIC);
   }
 
