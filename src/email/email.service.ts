@@ -287,14 +287,14 @@ export class EmailService {
             }
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${appUrl}/notifications" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View in Dashboard</a>
+              <a href="${appUrl}/dashboard/notifications" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">View in Dashboard</a>
             </div>
             
             <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
             
             <p style="color: #999; font-size: 12px; text-align: center;">
               © ${new Date().getFullYear()} ${appName}. All rights reserved.<br>
-              <a href="${appUrl}/notifications/settings" style="color: #667eea; text-decoration: none;">Manage notification preferences</a>
+              <a href="${appUrl}/dashboard/settings?tab=notification" style="color: #667eea; text-decoration: none;">Manage notification preferences</a>
             </p>
           </div>
         </body>
@@ -532,7 +532,7 @@ export class EmailService {
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${appUrl}/bounties" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Browse Bounties</a>
+              <a href="${appUrl}/dashboard/bounties" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Browse Bounties</a>
               <a href="${appUrl}/dashboard" style="background: #764ba2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a>
             </div>
             
@@ -584,7 +584,7 @@ export class EmailService {
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${appUrl}/bounties/create" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Create Bounty</a>
+              <a href="${appUrl}/dashboard/bounties/create" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; margin-right: 10px;">Create Bounty</a>
               <a href="${appUrl}/dashboard" style="background: #764ba2; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">Go to Dashboard</a>
             </div>
             
