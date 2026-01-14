@@ -10,7 +10,7 @@ export class WithdrawDto {
   })
   @Type(() => Number)
   @IsNumber()
-  @Min(0)
+  @Min(1)
   amount: number;
 
   @ApiProperty({

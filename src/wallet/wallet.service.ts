@@ -13,6 +13,7 @@ import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import {
+  getIssuerAddress,
   getSupportedCurrencies,
   type SupportedCurrency,
 } from '../common/utils/supported-currencies';
@@ -785,10 +786,11 @@ export class WalletService {
       const server = this.stellarAccount.getServer();
       const sourceAccount = await server.loadAccount(wallet.publicKey);
 
-      const asset = new StellarSdk.Asset(
-        currencyCode,
-        this.configService.getOrThrow<string>(`ASSET_${currencyCode}_ISSUER`),
-      );
+      const issuer = getIssuerAddress(currencyCode, networkPassphrase);
+      const asset =
+        issuer === 'native'
+          ? StellarSdk.Asset.native()
+          : new StellarSdk.Asset(currencyCode, issuer);
 
       const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
         fee: StellarSdk.BASE_FEE,
