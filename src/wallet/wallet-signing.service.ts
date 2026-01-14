@@ -98,8 +98,6 @@ export class WalletSigningService {
       keypair = await this.stellarWallet.getDecryptedKeypair(walletId);
 
       // Sign Soroban auth entries if present
-      const publicKey = keypair.publicKey();
-
       for (const op of transaction.operations) {
         if (op.type === 'invokeHostFunction' && (op as any).auth) {
           const authEntries = (op as any).auth;
@@ -109,7 +107,6 @@ export class WalletSigningService {
             authEntries[i] = this.signAuthEntry(
               authEntries[i],
               keypair,
-              publicKey,
               transaction.networkPassphrase,
             );
           }
@@ -138,7 +135,6 @@ export class WalletSigningService {
   private signAuthEntry(
     entry: xdr.SorobanAuthorizationEntry,
     keypair: Keypair,
-    publicKey: string,
     networkPassphrase: string,
   ): xdr.SorobanAuthorizationEntry {
     const credentials = entry.credentials();
