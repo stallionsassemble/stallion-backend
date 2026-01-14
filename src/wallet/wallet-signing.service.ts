@@ -43,6 +43,7 @@ export class WalletSigningService {
     destination: string,
     amount: string,
     asset: Asset = Asset.native(),
+    decimals: number = 7,
   ): Promise<string> {
     let keypair: Keypair | null = null;
 
@@ -60,7 +61,7 @@ export class WalletSigningService {
         Operation.payment({
           destination,
           asset,
-          amount: (parseInt(amount) / 10000000).toString(),
+          amount: (parseInt(amount) / Math.pow(10, decimals)).toString(),
         }),
       );
 

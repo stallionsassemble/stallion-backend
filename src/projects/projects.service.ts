@@ -441,8 +441,6 @@ export class ProjectsService {
       throw new BadRequestException('Deadline must be in the future');
     }
 
-    const platformFee = '100000000';
-
     let contractProjectId: number | undefined;
     let txHash: string | undefined;
 
@@ -460,7 +458,6 @@ export class ProjectsService {
         currency: dto.currency,
         milestones: milestonesWithOrder,
         deadline,
-        platformFee,
       });
       contractProjectId = escrowResult.contractProjectId;
       txHash = escrowResult.txHash;
@@ -471,7 +468,6 @@ export class ProjectsService {
         walletId: owner.wallet.id,
         rewardAmount: dto.reward,
         currency: dto.currency,
-        platformFee,
         deadline,
       });
       contractProjectId = jobResult.contractProjectId;

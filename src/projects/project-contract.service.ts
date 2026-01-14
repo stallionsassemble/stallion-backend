@@ -42,7 +42,6 @@ export class ProjectContractService {
     currency: string;
     milestones: Array<{ amount: string; order: number }>;
     deadline: Date;
-    platformFee: string;
   }): Promise<{ contractProjectId: number; txHash: string }> {
     this.logger.log(
       `Creating GIG escrow for owner ${params.ownerId} with reward ${params.reward}`,
@@ -188,7 +187,6 @@ export class ProjectContractService {
     walletId: string;
     rewardAmount: string;
     currency: string;
-    platformFee: string;
     deadline: Date;
   }): Promise<{ contractProjectId: number; txHash: string }> {
     this.logger.log(

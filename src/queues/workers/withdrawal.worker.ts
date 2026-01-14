@@ -5,7 +5,7 @@ import { TxState } from '@prisma/client';
 import { Asset, Networks } from '@stellar/stellar-sdk';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { getIssuerAddress } from '../../common/utils/supported-currencies';
+import { getCurrency } from '../../common/utils/supported-currencies';
 import { EnvConfig } from '../../config/env.config';
 import { WalletSigningService } from '../../wallet/wallet-signing.service';
 
@@ -70,15 +70,16 @@ export class WithdrawalWorker extends WorkerHost {
         throw new Error(`Wallet ${walletId} not found`);
       }
 
-      // 3. Get Stellar asset
-      const asset = this.getAssetFromCurrency(currency);
+      // 3. Get Stellar asset and decimals
+      const { asset, decimals } = this.getAssetFromCurrency(currency);
 
       // 4. Send payment via Stellar using user's wallet
       const txHash = await this.walletSigning.signAndSubmitPayment(
         walletId,
         destination,
-        (amount * 10000000).toString(), // Convert to stroops
+        (amount * Math.pow(10, decimals)).toString(),
         asset,
+        decimals,
       );
 
       this.logger.log(
@@ -140,15 +141,22 @@ export class WithdrawalWorker extends WorkerHost {
     }
   }
 
-  private getAssetFromCurrency(currency: string): Asset {
+  private getAssetFromCurrency(currency: string): {
+    asset: Asset;
+    decimals: number;
+  } {
     try {
-      const issuer = getIssuerAddress(currency, this.networkPassphrase);
+      const currencyInfo = getCurrency(currency, this.networkPassphrase);
 
-      if (issuer === 'native') {
-        return Asset.native();
-      }
+      const asset =
+        currencyInfo.issuer === 'native'
+          ? Asset.native()
+          : new Asset(currencyInfo.code, currencyInfo.issuer);
 
-      return new Asset(currency, issuer);
+      return {
+        asset,
+        decimals: currencyInfo.decimals,
+      };
     } catch {
       throw new Error(
         `Unsupported currency: ${currency} on network ${this.networkPassphrase}`,
