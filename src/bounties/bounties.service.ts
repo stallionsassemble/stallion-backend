@@ -25,6 +25,8 @@ import { ActivitiesService } from '../activities/activities.service';
 import { BountyActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { getTokenAddress } from '../common/utils/supported-currencies';
+import { BountyNotifications } from '../notifications/helpers/notification-helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import { Client as SorobanClient, Status } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { StellarAccountService } from '../soroban/stellar-account.service';
@@ -69,6 +71,7 @@ export class BountiesService {
     private stellarAccount: StellarAccountService,
     private stellarWallet: StellarWalletService,
     private activitiesService: ActivitiesService,
+    private notificationsService: NotificationsService,
     @InjectQueue('bounty-winner') private bountyWinnerQueue: Queue,
   ) {
     this.contractId = this.configService.getOrThrow<string>(
@@ -746,6 +749,17 @@ export class BountiesService {
         ),
       );
 
+      // Send bounty created notification
+      try {
+        await this.notificationsService.sendNotification(
+          BountyNotifications.bountyCreated(userId, bounty.title),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send bounty created notification: ${error.message}`,
+        );
+      }
+
       return {
         message: 'Bounty created successfully',
         bounty,
@@ -1040,6 +1054,27 @@ export class BountiesService {
       await this.activitiesService.recordActivity(
         BountyActivities.submission(userId, bounty.id, bounty.title),
       );
+
+      // Send submission received notification to bounty owner
+      if (bounty.ownerId) {
+        try {
+          const submitterName =
+            user.username ||
+            `${user.firstName} ${user.lastName}`.trim() ||
+            'A contributor';
+          await this.notificationsService.sendNotification(
+            BountyNotifications.submissionReceived(
+              bounty.ownerId,
+              bounty.title,
+              submitterName,
+            ),
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to send submission received notification: ${error.message}`,
+          );
+        }
+      }
 
       this.logger.log(
         `User ${userId} applied to bounty ${dbBountyId}, tx: ${txHash}`,

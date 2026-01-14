@@ -7,6 +7,8 @@ import { Job } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { getCurrency } from '../../common/utils/supported-currencies';
 import { EnvConfig } from '../../config/env.config';
+import { WalletNotifications } from '../../notifications/helpers/notification-helper';
+import { NotificationsService } from '../../notifications/notifications.service';
 import { WalletSigningService } from '../../wallet/wallet-signing.service';
 
 interface WithdrawalJobData {
@@ -28,6 +30,7 @@ export class WithdrawalWorker extends WorkerHost {
     private prisma: PrismaService,
     private walletSigning: WalletSigningService,
     private config: ConfigService,
+    private notificationsService: NotificationsService,
   ) {
     super();
     const network = this.config.get<string>(EnvConfig.SOROBAN_NETWORK);
@@ -109,6 +112,29 @@ export class WithdrawalWorker extends WorkerHost {
         `Withdrawal ${transactionId} completed successfully with tx hash ${txHash}`,
       );
 
+      // 7. Send withdrawal completed notification
+      try {
+        const wallet = await this.prisma.wallet.findUnique({
+          where: { id: walletId },
+          include: { users: true },
+        });
+        if (wallet?.users && wallet.users.length > 0) {
+          for (const user of wallet.users) {
+            await this.notificationsService.sendNotification(
+              WalletNotifications.withdrawalCompleted(
+                user.id,
+                amount.toString(),
+                currency,
+              ),
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Failed to send withdrawal completed notification: ${error.message}`,
+        );
+      }
+
       return {
         success: true,
         transactionId,
@@ -135,6 +161,30 @@ export class WithdrawalWorker extends WorkerHost {
       // Release lock on failure
       if (job.data.lockId) {
         await this.releaseLedgerLock(job.data.lockId);
+      }
+
+      // Send withdrawal failed notification
+      try {
+        const wallet = await this.prisma.wallet.findUnique({
+          where: { id: walletId },
+          include: { users: true },
+        });
+        if (wallet?.users && wallet.users.length > 0) {
+          for (const user of wallet.users) {
+            await this.notificationsService.sendNotification(
+              WalletNotifications.withdrawalFailed(
+                user.id,
+                amount.toString(),
+                currency,
+                error.message,
+              ),
+            );
+          }
+        }
+      } catch (notifError) {
+        this.logger.error(
+          `Failed to send withdrawal failed notification: ${notifError.message}`,
+        );
       }
 
       throw error;

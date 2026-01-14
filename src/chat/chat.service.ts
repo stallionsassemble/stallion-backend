@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { ConversationType, MessageType, ParticipantRole } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { ChatNotifications } from '../notifications/helpers/notification-helper';
+import { NotificationsService } from '../notifications/notifications.service';
 import { SendMessageWsDto } from './dto/chat.dto';
 import {
   ConversationResponse,
@@ -17,7 +19,10 @@ import {
 export class ChatService {
   private readonly logger = new Logger(ChatService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: NotificationsService,
+  ) {}
 
   /**
    * Find or create a direct conversation between two users
@@ -98,6 +103,29 @@ export class ChatService {
 
       return result as ConversationResponse;
     });
+  }
+
+  private async sendNewConversationNotification(
+    recipientId: string,
+    initiatorId: string,
+  ) {
+    try {
+      const initiator = await this.prisma.user.findUnique({
+        where: { id: initiatorId },
+        select: { username: true, firstName: true, lastName: true },
+      });
+      const initiatorName =
+        initiator?.username ||
+        `${initiator?.firstName} ${initiator?.lastName}`.trim() ||
+        'Someone';
+      await this.notificationsService.sendNotification(
+        ChatNotifications.newConversation(recipientId, initiatorName),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send new conversation notification: ${error.message}`,
+      );
+    }
   }
 
   async findDirectConversation(userId1: string, userId2: string) {
@@ -392,6 +420,31 @@ export class ChatService {
       where: { id: conversation.id },
       data: { updatedAt: new Date() },
     });
+
+    // Send notification to recipient
+    const isNewConversation =
+      !conversation.messages || conversation.messages.length === 0;
+    if (isNewConversation) {
+      await this.sendNewConversationNotification(dto.recipientId, senderId);
+    }
+
+    try {
+      const senderName =
+        message.sender.username ||
+        `${message.sender.firstName} ${message.sender.lastName}`.trim() ||
+        'Someone';
+      const preview =
+        message.content.length > 100
+          ? message.content.substring(0, 100) + '...'
+          : message.content;
+      await this.notificationsService.sendNotification(
+        ChatNotifications.newMessage(dto.recipientId, senderName, preview),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send new message notification: ${error.message}`,
+      );
+    }
 
     // Auto-mark as read for sender
     await this.prisma.messageReadReceipt.create({

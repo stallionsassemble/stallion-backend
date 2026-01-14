@@ -747,6 +747,30 @@ export class ForumService {
       this.logger.error('Failed to add reputation for forum post', error);
     }
 
+    // Send thread reply notification to thread author
+    if (thread.authorId !== userId) {
+      try {
+        const replierName =
+          post.author.username || post.author.firstName || 'Someone';
+        await this.notificationsService.sendNotification(
+          ForumNotifications.threadReply(
+            thread.authorId,
+            replierName,
+            thread.title,
+            {
+              postId: post.id,
+              threadId: dto.threadId,
+              authorId: userId,
+            },
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send thread reply notification: ${error.message}`,
+        );
+      }
+    }
+
     // Enrich author data
     const enrichedAuthor = await enrichAuthorData(this.prisma, post.author);
 
@@ -1453,6 +1477,33 @@ export class ForumService {
         emoji: dto.emoji,
       },
     });
+
+    // Send post reaction notification to thread author
+    if (thread.authorId !== userId) {
+      try {
+        const reactor = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { username: true, firstName: true },
+        });
+        const reactorName =
+          reactor?.username || reactor?.firstName || 'Someone';
+        await this.notificationsService.sendNotification(
+          ForumNotifications.postReaction(
+            thread.authorId,
+            reactorName,
+            dto.emoji,
+            {
+              threadId,
+              reactorId: userId,
+            },
+          ),
+        );
+      } catch (error) {
+        this.logger.error(
+          `Failed to send post reaction notification: ${error.message}`,
+        );
+      }
+    }
 
     return { message: 'Reaction added', action: 'added' };
   }
