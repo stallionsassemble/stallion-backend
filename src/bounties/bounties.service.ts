@@ -24,6 +24,7 @@ import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { ActivitiesService } from '../activities/activities.service';
 import { BountyActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { getTokenAddress } from '../common/utils/supported-currencies';
 import { Client as SorobanClient, Status } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { StellarAccountService } from '../soroban/stellar-account.service';
@@ -43,7 +44,6 @@ import {
   validateSubmissionData,
   type SubmissionField,
 } from './utils/submission-validator';
-import { getTokenAddress } from './utils/supported-currencies';
 import {
   validateWalletForBountyCreation,
   validateWalletForTransaction,

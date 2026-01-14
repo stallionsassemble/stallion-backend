@@ -1,10 +1,12 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { TxState } from '@prisma/client';
-import { Asset } from '@stellar/stellar-sdk';
+import { Asset, Networks } from '@stellar/stellar-sdk';
 import { Job } from 'bullmq';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { SUPPORTED_STELLAR_ASSETS } from '../../wallet/assets.config';
+import { getIssuerAddress } from '../../common/utils/supported-currencies';
+import { EnvConfig } from '../../config/env.config';
 import { WalletSigningService } from '../../wallet/wallet-signing.service';
 
 interface WithdrawalJobData {
@@ -20,12 +22,18 @@ interface WithdrawalJobData {
 @Processor('withdrawal')
 export class WithdrawalWorker extends WorkerHost {
   private readonly logger = new Logger(WithdrawalWorker.name);
+  private readonly networkPassphrase: string;
 
   constructor(
     private prisma: PrismaService,
     private walletSigning: WalletSigningService,
+    private config: ConfigService,
   ) {
     super();
+    const network = this.config.get<string>(EnvConfig.SOROBAN_NETWORK);
+    this.networkPassphrase =
+      this.config.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
+      (network === 'testnet' ? Networks.TESTNET : Networks.PUBLIC);
   }
 
   async process(job: Job<WithdrawalJobData>): Promise<any> {
@@ -133,17 +141,19 @@ export class WithdrawalWorker extends WorkerHost {
   }
 
   private getAssetFromCurrency(currency: string): Asset {
-    const assetConfig = SUPPORTED_STELLAR_ASSETS[currency];
+    try {
+      const issuer = getIssuerAddress(currency, this.networkPassphrase);
 
-    if (!assetConfig) {
-      throw new Error(`Unsupported currency: ${currency}`);
+      if (issuer === 'native') {
+        return Asset.native();
+      }
+
+      return new Asset(currency, issuer);
+    } catch {
+      throw new Error(
+        `Unsupported currency: ${currency} on network ${this.networkPassphrase}`,
+      );
     }
-
-    if (assetConfig.issuer === 'native') {
-      return Asset.native();
-    }
-
-    return new Asset(assetConfig.code, assetConfig.issuer);
   }
 
   private async releaseLedgerLock(lockId: string) {

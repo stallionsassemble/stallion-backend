@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { getTokenAddress } from '../bounties/utils/supported-currencies';
+import { getTokenAddress } from '../common/utils/supported-currencies';
 import { EnvConfig } from '../config/env.config';
 import { Client, ProjectStatus } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';

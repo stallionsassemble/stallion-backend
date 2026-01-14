@@ -1,7 +1,7 @@
 import { BadRequestException, Logger } from '@nestjs/common';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { Transaction } from '@stellar/stellar-sdk';
-import { getCurrency } from '../../bounties/utils/supported-currencies';
+import { getCurrency } from '../../common/utils/supported-currencies';
 import { StellarWalletService } from '../stellar-wallet.service';
 import { WalletSigningService } from '../wallet-signing.service';
 

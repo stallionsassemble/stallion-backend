@@ -24,12 +24,12 @@ export class WalletSigningService {
     private readonly stellarWallet: StellarWalletService,
     private readonly config: ConfigService,
   ) {
-    const rpcUrl = this.config.getOrThrow<string>(
+    const horizonUrl = this.config.getOrThrow<string>(
       EnvConfig.SOROBAN_HORIZON_URL,
     );
     const network = this.config.getOrThrow<string>(EnvConfig.SOROBAN_NETWORK);
 
-    this.server = new Horizon.Server(rpcUrl, {
+    this.server = new Horizon.Server(horizonUrl, {
       allowHttp: network === 'testnet',
     });
 

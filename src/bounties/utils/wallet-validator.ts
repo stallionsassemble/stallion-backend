@@ -1,6 +1,9 @@
 import { BadRequestException } from '@nestjs/common';
 import * as StellarSDK from '@stellar/stellar-sdk';
-import { getCurrency, getTokenAddress } from './supported-currencies';
+import {
+  getCurrency,
+  getTokenAddress,
+} from '../../common/utils/supported-currencies';
 
 /**
  * Estimated transaction fee in stroops (0.00001 XLM = 100 stroops per operation)

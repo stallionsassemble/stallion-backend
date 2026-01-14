@@ -10,12 +10,12 @@ import { Prisma, TxState, TxType } from '@prisma/client';
 import * as StellarSdk from '@stellar/stellar-sdk';
 import { Horizon } from '@stellar/stellar-sdk';
 import { Queue } from 'bullmq';
+import { PrismaService } from '../common/prisma/prisma.service';
+import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import {
   getSupportedCurrencies,
   type SupportedCurrency,
-} from '../bounties/utils/supported-currencies';
-import { PrismaService } from '../common/prisma/prisma.service';
-import { generateIdempotencyKey } from '../common/utils/idempotency.util';
+} from '../common/utils/supported-currencies';
 import { EnvConfig } from '../config/env.config';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from './stellar-wallet.service';
