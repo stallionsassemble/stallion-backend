@@ -195,6 +195,7 @@ export class WalletController {
     return this.walletService.setupTrustlineForCurrency(
       wallet.id,
       dto.currencyCode,
+      userId,
     );
   }
 

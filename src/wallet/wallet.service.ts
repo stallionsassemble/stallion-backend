@@ -20,7 +20,7 @@ import {
 import { EnvConfig } from '../config/env.config';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from './stellar-wallet.service';
-import { hasTrustline, setupTrustline } from './utils/trustline.util';
+import { ensureTrustline, hasTrustline } from './utils/trustline.util';
 import { WalletSigningService } from './wallet-signing.service';
 
 @Injectable()
@@ -695,10 +695,13 @@ export class WalletService {
   async setupTrustlineForCurrency(
     walletId: string,
     currencyCode: string,
+    userId: string,
   ): Promise<{
     success: boolean;
     txHash?: string;
     message: string;
+    funded?: boolean;
+    fundingTxHash?: string;
   }> {
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
@@ -708,21 +711,47 @@ export class WalletService {
       throw new NotFoundException('Wallet not found');
     }
 
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
     const networkPassphrase = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
     );
 
+    // Determine if we should automatically fund the wallet
+    let fundingWalletId: string | undefined;
+
+    // Only contributors get automatic funding
+    if (user.role === 'CONTRIBUTOR') {
+      try {
+        fundingWalletId = this.configService.getOrThrow<string>(
+          EnvConfig.FUNDING_WALLET_ID,
+        );
+      } catch (e) {
+        this.logger.warn(
+          'FUNDING_WALLET_ID not configured, contributor wallet will not be auto-funded',
+        );
+      }
+    }
+
     try {
-      const result = await setupTrustline(
+      const result = await ensureTrustline(
         walletId,
         wallet.publicKey,
         currencyCode,
         networkPassphrase,
         this.stellarAccount.getServer(),
         this.walletSigning,
+        this.stellarWallet,
+        fundingWalletId,
       );
 
-      if (result === 'exists') {
+      if (result.exists) {
         return {
           success: true,
           message: `Trustline for ${currencyCode} already exists`,
@@ -731,14 +760,29 @@ export class WalletService {
 
       return {
         success: true,
-        txHash: result,
+        txHash: result.txHash,
         message: `Trustline for ${currencyCode} established successfully`,
+        funded: result.funded,
+        fundingTxHash: result.fundingTxHash,
       };
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(
         `Failed to setup trustline for wallet ${walletId} and currency ${currencyCode}`,
         error,
       );
+
+      // If error is about funding and user is not a contributor (or funding failed), provide helpful message
+      if (
+        error instanceof BadRequestException &&
+        error.message.includes('needs') &&
+        error.message.includes('XLM to create trustline')
+      ) {
+        // This comes from ensureTrustline when funding is required but not provided
+        throw new BadRequestException(
+          `Your wallet requires additional XLM (approx. 2.5 XLM) to activate and establish this trustline. Please deposit XLM to your wallet address: ${wallet.publicKey}`,
+        );
+      }
+
       throw error;
     }
   }
