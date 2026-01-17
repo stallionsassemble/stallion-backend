@@ -45,6 +45,13 @@ const NETWORK_CURRENCIES: Record<string, NetworkCurrencies> = {
       issuer: 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN',
       decimals: 7,
     },
+    USDGLO: {
+      code: 'USDGLO',
+      name: 'Global Dollar',
+      tokenAddress: 'CB226ZOEYXTBPD3QEGABTJYSKZVBP2PASEISLG3SBMTN5CE4QZUVZ3CE',
+      issuer: 'GBBS25EGYQPGEZCGCFBKG4OAGFXU6DSOQBGTHELLJT3HZXZJ34HWS6XV',
+      decimals: 7,
+    },
     XLM: {
       code: 'XLM',
       name: 'Stellar Lumens',
