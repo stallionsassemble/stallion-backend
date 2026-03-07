@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
+import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionUtil } from '../utils/encryption.util';
@@ -90,7 +90,7 @@ export class TwoFactorVerificationService {
     }
 
     for (let i = 0; i < user.backupCodes.length; i++) {
-      const isMatch = await bcrypt.compare(code, user.backupCodes[i]);
+      const isMatch = await argon2.verify(user.backupCodes[i], code);
       if (isMatch) {
         // Remove used backup code
         const updatedCodes = [...user.backupCodes];
