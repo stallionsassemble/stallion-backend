@@ -1,13 +1,14 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Role, User } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
+import { Role, SocialProvider, User, UserStatus } from '@prisma/client';
+import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
@@ -22,8 +23,10 @@ import { CompleteContributorProfileDto } from './dto/complete-contributor-profil
 import { CompleteOwnerProfileDto } from './dto/complete-owner-profile.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestVerificationDto } from './dto/request-verification.dto';
+import { SocialAuthDto } from './dto/social-auth.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
+import { SocialTokenVerifierService } from './social-token-verifier.service';
 import { VerificationCodeStorageService } from './verification-code-storage.service';
 
 @Injectable()
@@ -40,6 +43,7 @@ export class AuthService {
     private verificationCodeStorage: VerificationCodeStorageService,
     private walletService: WalletService,
     private configService: ConfigService,
+    private socialTokenVerifier: SocialTokenVerifierService,
   ) {
     this.refreshTokenSecret = this.configService.getOrThrow<string>(
       EnvConfig.REFRESH_TOKEN_SECRET,
@@ -62,6 +66,8 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+
+    await this.ensureAccountCanAuthenticate(user);
 
     const sanitizedUser = sanitizeUser(user);
     return sanitizedUser;
@@ -92,10 +98,13 @@ export class AuthService {
     });
 
     // Hash and store refresh token
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    const hashedRefreshToken = await argon2.hash(refreshToken);
     await this.prisma.user.update({
       where: { id: user.id },
-      data: { refreshToken: hashedRefreshToken },
+      data: {
+        refreshToken: hashedRefreshToken,
+        lastActiveAt: new Date(),
+      },
     });
 
     const fullName =
@@ -137,10 +146,12 @@ export class AuthService {
         throw new UnauthorizedException('Invalid refresh token');
       }
 
+      await this.ensureAccountCanAuthenticate(user);
+
       // Verify the refresh token matches the stored hash
-      const isValidRefreshToken = await bcrypt.compare(
-        refreshTokenDto.refreshToken,
+      const isValidRefreshToken = await argon2.verify(
         user.refreshToken,
+        refreshTokenDto.refreshToken,
       );
 
       if (!isValidRefreshToken) {
@@ -186,6 +197,7 @@ export class AuthService {
     );
 
     if (existingUser) {
+      await this.ensureAccountCanAuthenticate(existingUser);
       // Update existing user's role if changed
       await this.prisma.user.update({
         where: { email: dto.email },
@@ -255,6 +267,97 @@ export class AuthService {
   }
 
   /**
+   * Authenticate with social ID token (Google or Apple)
+   */
+  async socialAuth(dto: SocialAuthDto): Promise<
+    Awaited<ReturnType<typeof this.generateTokens>> & {
+      message: string;
+      provider: SocialProvider;
+      isNewUser: boolean;
+    }
+  > {
+    const verifiedToken = await this.socialTokenVerifier.verifyIdToken(
+      dto.provider,
+      dto.idToken,
+    );
+
+    const linkedSocialAccount = await this.prisma.socialAccount.findUnique({
+      where: {
+        provider_providerSubject: {
+          provider: verifiedToken.provider,
+          providerSubject: verifiedToken.subject,
+        },
+      },
+      include: {
+        user: true,
+      },
+    });
+
+    let isNewUser = false;
+    let user: User | null = linkedSocialAccount?.user ?? null;
+
+    if (!user && verifiedToken.email) {
+      user = await this.prisma.user.findUnique({
+        where: { email: verifiedToken.email.toLowerCase() },
+      });
+    }
+
+    if (!user) {
+      if (!dto.role) {
+        throw new BadRequestException(
+          'Role is required for first-time social signup',
+        );
+      }
+
+      if (!verifiedToken.email) {
+        throw new BadRequestException(
+          'Email is required from social provider for first-time signup',
+        );
+      }
+
+      user = await this.prisma.user.create({
+        data: {
+          email: verifiedToken.email.toLowerCase(),
+          role: dto.role,
+          emailVerified: true,
+          profileCompleted: false,
+          status: UserStatus.ACTIVE,
+          lastActiveAt: new Date(),
+        },
+      });
+      isNewUser = true;
+    }
+
+    await this.ensureAccountCanAuthenticate(user);
+
+    if (!linkedSocialAccount) {
+      await this.prisma.socialAccount.create({
+        data: {
+          provider: verifiedToken.provider,
+          providerSubject: verifiedToken.subject,
+          email: (verifiedToken.email || user.email).toLowerCase(),
+          userId: user.id,
+        },
+      });
+    }
+
+    // Ensure social-authenticated users are treated as verified.
+    if (!user.emailVerified) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: true, lastActiveAt: new Date() },
+      });
+    }
+
+    return {
+      ...(await this.generateTokens(user)),
+      message: 'Social authentication successful.',
+      provider: dto.provider,
+      isNewUser,
+    };
+  }
+
+  /**
    * Verify email code for login (with optional TOTP for MFA users)
    */
   async verifyLoginCode(
@@ -273,6 +376,8 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid email or code');
     }
+
+    await this.ensureAccountCanAuthenticate(user);
 
     if (!user.emailVerified) {
       throw new UnauthorizedException('Email not verified');
@@ -332,6 +437,8 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
+    await this.ensureAccountCanAuthenticate(user);
+
     if (!user.emailVerified) {
       throw new UnauthorizedException('Email not verified');
     }
@@ -381,6 +488,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    await this.ensureAccountCanAuthenticate(user);
+
     // Decrypt and verify TOTP
     const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
     const isValid = authenticator.verify({
@@ -395,7 +504,7 @@ export class AuthService {
     // Generate backup codes
     const backupCodes = this.generateBackupCodes();
     const hashedBackupCodes = await Promise.all(
-      backupCodes.map((code) => bcrypt.hash(code, 10)),
+      backupCodes.map((code) => argon2.hash(code)),
     );
 
     // Enable TOTP
@@ -463,6 +572,7 @@ export class AuthService {
         skills: dto.skills,
         profilePicture: dto.profilePicture,
         socials: dto.socials,
+        gender: dto.gender,
         emailNotifications: dto.emailNotifications,
         profileCompleted: true,
         walletId,
@@ -535,6 +645,7 @@ export class AuthService {
         industry: dto.industry,
         companyBio: dto.companyBio,
         companyLogo: dto.companyLogo,
+        gender: dto.gender,
         emailNotifications: dto.emailNotifications,
         profileCompleted: true,
         walletId,
@@ -579,6 +690,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    await this.ensureAccountCanAuthenticate(user);
+
     if (!user.emailVerified) {
       throw new UnauthorizedException('Email not verified');
     }
@@ -592,6 +705,32 @@ export class AuthService {
       message: 'Verification code sent to your email',
       mfaEnabled: user.mfaEnabled,
     };
+  }
+
+  private async ensureAccountCanAuthenticate(user: {
+    id: string;
+    status: UserStatus;
+    suspendedUntil: Date | null;
+  }): Promise<void> {
+    if (user.status === UserStatus.BANNED) {
+      throw new ForbiddenException('This account has been banned');
+    }
+
+    if (user.status === UserStatus.SUSPENDED) {
+      if (user.suspendedUntil && user.suspendedUntil <= new Date()) {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            status: UserStatus.ACTIVE,
+            suspendedUntil: null,
+            suspensionReason: null,
+          },
+        });
+        return;
+      }
+
+      throw new ForbiddenException('This account is currently suspended');
+    }
   }
 
   private generateBackupCodes(count: number = 10): string[] {
@@ -615,7 +754,7 @@ export class AuthService {
     }
 
     for (let i = 0; i < user.backupCodes.length; i++) {
-      const isMatch = await bcrypt.compare(code, user.backupCodes[i]);
+      const isMatch = await argon2.verify(user.backupCodes[i], code);
       if (isMatch) {
         // Remove used backup code
         const updatedCodes = [...user.backupCodes];

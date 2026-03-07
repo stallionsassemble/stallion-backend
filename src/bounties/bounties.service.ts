@@ -22,6 +22,7 @@ import { EnvConfig } from 'src/config/env.config';
 import { ReputationService } from 'src/reputation/reputation.service';
 import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { ActivitiesService } from '../activities/activities.service';
+import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { BountyActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { getTokenAddress } from '../common/utils/supported-currencies';
@@ -71,6 +72,7 @@ export class BountiesService {
     private stellarAccount: StellarAccountService,
     private stellarWallet: StellarWalletService,
     private activitiesService: ActivitiesService,
+    private platformSettingsService: PlatformSettingsService,
     private notificationsService: NotificationsService,
     @InjectQueue('bounty-winner') private bountyWinnerQueue: Queue,
   ) {
@@ -1316,6 +1318,9 @@ export class BountiesService {
       for (const winner of winnerUsers) {
         if (!winner.wallet) continue;
 
+        const fundingWalletId =
+          await this.platformSettingsService.resolveFundingWalletId();
+
         try {
           const result = await ensureTrustline(
             winner.wallet.id,
@@ -1325,7 +1330,7 @@ export class BountiesService {
             this.stellarAccount.getServer(),
             this.walletSigning,
             this.stellarWallet,
-            this.configService.get<string>(EnvConfig.FUNDING_WALLET_ID), // Optional funding wallet for account activation
+            fundingWalletId, // Optional funding wallet for account activation
           );
 
           if (result.exists) {

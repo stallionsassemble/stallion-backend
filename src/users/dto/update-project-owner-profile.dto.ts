@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, IsUrl } from 'class-validator';
+import { Gender } from '@prisma/client';
+import { IsArray, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class UpdateProjectOwnerProfileDto {
   @ApiPropertyOptional({
@@ -126,4 +127,13 @@ export class UpdateProjectOwnerProfileDto {
     website?: string;
     [key: string]: string | undefined;
   };
+
+  @ApiPropertyOptional({
+    description: 'Gender',
+    enum: Gender,
+    example: Gender.UNSPECIFIED,
+  })
+  @IsEnum(Gender)
+  @IsOptional()
+  gender?: Gender;
 }

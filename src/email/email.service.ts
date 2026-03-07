@@ -105,6 +105,38 @@ export class EmailService {
   }
 
   /**
+   * Send admin-created account invite
+   */
+  async sendAdminInviteEmail(
+    email: string,
+    role: 'CONTRIBUTOR' | 'PROJECT_OWNER' | 'ADMIN',
+    loginUrl: string,
+  ): Promise<void> {
+    const appName =
+      this.configService.get<string>(EnvConfig.APP_NAME) || 'Stallion';
+    const appUrl =
+      this.configService.get<string>(EnvConfig.FRONTEND_URL) ||
+      'http://localhost:3000';
+
+    await this.emailQueue.add(
+      'send-email',
+      {
+        to: email,
+        subject: `Your ${appName} account is ready`,
+        template: 'admin-invite',
+        context: { appName, appUrl, role, loginUrl, email },
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 3000,
+        },
+      },
+    );
+  }
+
+  /**
    * Send bounty notification email (queued)
    */
   async sendBountyNotification(
@@ -219,6 +251,14 @@ export class EmailService {
             context.name,
             appName,
             appUrl,
+          );
+          break;
+        case 'admin-invite':
+          html = this.getAdminInviteEmailTemplate(
+            context.email,
+            context.role,
+            context.loginUrl,
+            appName,
           );
           break;
         case 'notification':
@@ -595,6 +635,35 @@ export class EmailService {
               <a href="${appUrl}" style="color: #667eea; text-decoration: none;">Visit our website</a>
             </p>
           </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private getAdminInviteEmailTemplate(
+    email: string,
+    role: string,
+    loginUrl: string,
+    appName: string,
+  ): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Account Invitation</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="margin-top: 0;">Your ${appName} account has been created</h2>
+          <p>An administrator created an account for <strong>${email}</strong> with role <strong>${role}</strong>.</p>
+          <p>Use the link below to sign in and complete your profile setup.</p>
+          <p>
+            <a href="${loginUrl}" style="display: inline-block; padding: 10px 18px; background: #2f6fed; color: #fff; text-decoration: none; border-radius: 6px;">
+              Continue to login
+            </a>
+          </p>
+          <p style="color: #666; font-size: 13px;">If you did not expect this invite, please contact support.</p>
         </body>
       </html>
     `;

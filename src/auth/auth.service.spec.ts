@@ -1,13 +1,13 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Test, TestingModule } from '@nestjs/testing';
-import * as bcrypt from 'bcrypt';
+import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { AuthService } from './auth.service';
 
-jest.mock('bcrypt');
+jest.mock('argon2');
 jest.mock('otplib');
 jest.mock('qrcode');
 
@@ -94,7 +94,7 @@ describe('AuthService', () => {
       const qrCode = 'data:image/png;base64,mockqrcode';
 
       mockUsersService.findByEmail.mockResolvedValue(null);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+      (argon2.hash as jest.Mock).mockResolvedValue('hashed-password');
       (authenticator.generateSecret as jest.Mock).mockReturnValue(totpSecret);
 
       const QRCode = require('qrcode');
@@ -122,7 +122,7 @@ describe('AuthService', () => {
       expect(mockUsersService.findByEmail).toHaveBeenCalledWith(
         registerDto.email,
       );
-      expect(bcrypt.hash).toHaveBeenCalledWith(registerDto.password, 10);
+      expect(argon2.hash).toHaveBeenCalledWith(registerDto.password);
       expect(mockPrismaService.user.create).toHaveBeenCalled();
     });
 
@@ -148,7 +148,7 @@ describe('AuthService', () => {
       const qrCode = 'data:image/png;base64,mockqrcode';
 
       mockUsersService.findByEmail.mockResolvedValue(null);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-password');
+      (argon2.hash as jest.Mock).mockResolvedValue('hashed-password');
       (authenticator.generateSecret as jest.Mock).mockReturnValue(totpSecret);
 
       const QRCode = require('qrcode');
@@ -188,7 +188,7 @@ describe('AuthService', () => {
       });
 
       (authenticator.verify as jest.Mock).mockReturnValue(true);
-      (bcrypt.hash as jest.Mock).mockResolvedValue('hashed-backup-code');
+      (argon2.hash as jest.Mock).mockResolvedValue('hashed-backup-code');
 
       mockPrismaService.user.update.mockResolvedValue({
         ...mockUser,
@@ -262,7 +262,7 @@ describe('AuthService', () => {
 
     it('should login successfully with valid credentials and TOTP', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
       (authenticator.verify as jest.Mock).mockReturnValue(true);
       mockJwtService.sign.mockReturnValue('jwt-token');
 
@@ -283,7 +283,7 @@ describe('AuthService', () => {
       const loginWithBackup = { ...loginDto, totpCode: 'BACKUP123' };
 
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock)
+      (argon2.verify as jest.Mock)
         .mockResolvedValueOnce(true) // password
         .mockResolvedValueOnce(false) // first backup code
         .mockResolvedValueOnce(true); // second backup code matches
@@ -311,7 +311,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if password is invalid', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+      (argon2.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException,
@@ -322,7 +322,7 @@ describe('AuthService', () => {
       const loginWithoutTotp = { ...loginDto, totpCode: undefined };
 
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
 
       await expect(service.login(loginWithoutTotp)).rejects.toThrow(
         UnauthorizedException,
@@ -334,7 +334,7 @@ describe('AuthService', () => {
 
     it('should throw UnauthorizedException if TOTP code is invalid', async () => {
       mockUsersService.findByEmail.mockResolvedValue(mockUser);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
       (authenticator.verify as jest.Mock).mockReturnValue(false);
 
       // Mock verifyBackupCode to also return false

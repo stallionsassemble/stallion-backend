@@ -11,6 +11,7 @@ import * as StellarSdk from '@stellar/stellar-sdk';
 import { Horizon } from '@stellar/stellar-sdk';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { generateIdempotencyKey } from '../common/utils/idempotency.util';
 import {
   getIssuerAddress,
@@ -33,6 +34,7 @@ export class WalletService {
     private stellarWallet: StellarWalletService,
     private walletSigning: WalletSigningService,
     private configService: ConfigService,
+    private platformSettingsService: PlatformSettingsService,
     @InjectQueue('withdrawal') private withdrawalQueue: Queue,
   ) {}
 
@@ -728,11 +730,9 @@ export class WalletService {
 
     // Only contributors get automatic funding
     if (user.role === 'CONTRIBUTOR') {
-      try {
-        fundingWalletId = this.configService.getOrThrow<string>(
-          EnvConfig.FUNDING_WALLET_ID,
-        );
-      } catch (e) {
+      fundingWalletId =
+        await this.platformSettingsService.resolveFundingWalletId();
+      if (!fundingWalletId) {
         this.logger.warn(
           'FUNDING_WALLET_ID not configured, contributor wallet will not be auto-funded',
         );

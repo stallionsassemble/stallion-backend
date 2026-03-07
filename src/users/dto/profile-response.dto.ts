@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
+import { Gender, Role, UserStatus } from '@prisma/client';
 
 export class ProfileResponseDto {
   @ApiProperty({
@@ -74,6 +74,20 @@ export class ProfileResponseDto {
   })
   role: Role;
 
+  @ApiProperty({
+    description: 'User account status',
+    enum: UserStatus,
+    example: UserStatus.ACTIVE,
+  })
+  status: UserStatus;
+
+  @ApiProperty({
+    description: 'Gender',
+    enum: Gender,
+    example: Gender.UNSPECIFIED,
+  })
+  gender: Gender;
+
   @ApiPropertyOptional({
     description: 'Company name (project owners only)',
     example: 'Acme Corp',
@@ -145,4 +159,10 @@ export class ProfileResponseDto {
     example: '2024-01-15T00:00:00.000Z',
   })
   updatedAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'Last active timestamp',
+    example: '2024-01-15T00:00:00.000Z',
+  })
+  lastActiveAt?: Date;
 }

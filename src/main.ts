@@ -38,9 +38,22 @@ async function bootstrap() {
     )
     .setVersion('2.0')
     .addTag('Authentication', 'User authentication and authorization')
+    .addTag(
+      'Dashboard',
+      'Main user dashboard endpoints (contributor and project owner views)',
+    )
+    .addTag(
+      'Discussions',
+      'Bounty and project discussions with replies/reactions',
+    )
+    .addTag('Health', 'Service health and status endpoints')
     .addTag('Users', 'User management and profiles')
     .addTag('Bounties', 'Bounty creation and management')
     .addTag('Projects', 'Project creation and management')
+    .addTag(
+      'Admin',
+      'Admin dashboards, moderation, platform settings, and operational actions',
+    )
     .addTag('Hackathons', 'Hackathon creation, management, and submissions')
     .addTag('Chat', 'Real-time messaging and conversations')
     .addTag('Forum', 'Community forum threads and discussions')

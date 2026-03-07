@@ -131,6 +131,7 @@ export class UsersService {
         skills: dto.skills,
         profilePicture: dto.profilePicture,
         socials: dto.socials,
+        gender: dto.gender,
       },
     });
 
@@ -175,6 +176,7 @@ export class UsersService {
         skills: dto.skills,
         profilePicture: dto.profilePicture,
         socials: dto.socials,
+        gender: dto.gender,
       },
     });
 

@@ -5,7 +5,13 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { MilestoneStatus, ProjectStatus } from '@prisma/client';
+import {
+  MilestoneStatus,
+  PayoutSourceType,
+  PayoutStatus,
+  Prisma,
+  ProjectStatus,
+} from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { ProjectActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -110,6 +116,47 @@ export class ProjectMilestonesService {
       },
       include: {
         milestone: true,
+      },
+    });
+
+    await this.prisma.payout.upsert({
+      where: {
+        sourceType_sourceId: {
+          sourceType: PayoutSourceType.PROJECT_MILESTONE,
+          sourceId: updatedUserMilestone.id,
+        },
+      },
+      create: {
+        sourceType: PayoutSourceType.PROJECT_MILESTONE,
+        sourceId: updatedUserMilestone.id,
+        token: userMilestone.milestone.project.currency,
+        amount: userMilestone.milestone.amount,
+        status: PayoutStatus.PENDING_APPROVAL,
+        requestedAt: new Date(),
+        contributorId,
+        projectId: userMilestone.milestone.projectId,
+        userMilestoneId: updatedUserMilestone.id,
+        metadata: {
+          milestoneId: userMilestone.milestoneId,
+          applicationId: userMilestone.applicationId,
+        } as Prisma.InputJsonValue,
+      },
+      update: {
+        token: userMilestone.milestone.project.currency,
+        amount: userMilestone.milestone.amount,
+        status: PayoutStatus.PENDING_APPROVAL,
+        requestedAt: new Date(),
+        failedAt: null,
+        completedAt: null,
+        txHash: null,
+        errorMessage: null,
+        contributorId,
+        projectId: userMilestone.milestone.projectId,
+        userMilestoneId: updatedUserMilestone.id,
+        metadata: {
+          milestoneId: userMilestone.milestoneId,
+          applicationId: userMilestone.applicationId,
+        } as Prisma.InputJsonValue,
       },
     });
 
@@ -221,23 +268,100 @@ export class ProjectMilestonesService {
         throw new BadRequestException('Project owner does not have a wallet');
       }
 
-      const paymentResult = await this.contractService.releaseMilestonePayment({
-        projectId: userMilestone.milestone.project.contractProjectId!,
-        milestoneOrder: userMilestone.milestone.order,
-        contributorPublicKey: userMilestone.contributor.wallet.publicKey,
-        amount: userMilestone.milestone.amount,
-        ownerId,
-        ownerPublicKey: userMilestone.milestone.project.owner.wallet.publicKey,
-        walletId: userMilestone.milestone.project.owner.wallet.id,
+      await this.prisma.payout.upsert({
+        where: {
+          sourceType_sourceId: {
+            sourceType: PayoutSourceType.PROJECT_MILESTONE,
+            sourceId: userMilestone.id,
+          },
+        },
+        create: {
+          sourceType: PayoutSourceType.PROJECT_MILESTONE,
+          sourceId: userMilestone.id,
+          token: userMilestone.milestone.project.currency,
+          amount: userMilestone.milestone.amount,
+          status: PayoutStatus.PROCESSING,
+          requestedAt: userMilestone.submittedAt || new Date(),
+          contributorId: userMilestone.contributorId,
+          projectId: userMilestone.milestone.projectId,
+          userMilestoneId: userMilestone.id,
+          metadata: {
+            milestoneId: userMilestone.milestoneId,
+            applicationId: userMilestone.applicationId,
+          } as Prisma.InputJsonValue,
+        },
+        update: {
+          status: PayoutStatus.PROCESSING,
+          failedAt: null,
+          errorMessage: null,
+          contributorId: userMilestone.contributorId,
+          projectId: userMilestone.milestone.projectId,
+          userMilestoneId: userMilestone.id,
+        },
       });
 
-      txHash = paymentResult.txHash;
+      try {
+        const paymentResult =
+          await this.contractService.releaseMilestonePayment({
+            projectId: userMilestone.milestone.project.contractProjectId!,
+            milestoneOrder: userMilestone.milestone.order,
+            contributorPublicKey: userMilestone.contributor.wallet.publicKey,
+            amount: userMilestone.milestone.amount,
+            ownerId,
+            ownerPublicKey:
+              userMilestone.milestone.project.owner.wallet.publicKey,
+            walletId: userMilestone.milestone.project.owner.wallet.id,
+          });
 
-      // Calculate USD value at time of payment
-      usdValue = await calculateUsdValue(
-        userMilestone.milestone.amount,
-        userMilestone.milestone.project.currency,
-      );
+        txHash = paymentResult.txHash;
+
+        // Calculate USD value at time of payment
+        usdValue = await calculateUsdValue(
+          userMilestone.milestone.amount,
+          userMilestone.milestone.project.currency,
+        );
+      } catch (error) {
+        await this.prisma.payout.upsert({
+          where: {
+            sourceType_sourceId: {
+              sourceType: PayoutSourceType.PROJECT_MILESTONE,
+              sourceId: userMilestone.id,
+            },
+          },
+          create: {
+            sourceType: PayoutSourceType.PROJECT_MILESTONE,
+            sourceId: userMilestone.id,
+            token: userMilestone.milestone.project.currency,
+            amount: userMilestone.milestone.amount,
+            status: PayoutStatus.FAILED,
+            requestedAt: userMilestone.submittedAt || new Date(),
+            failedAt: new Date(),
+            errorMessage:
+              error instanceof Error
+                ? error.message
+                : 'Milestone payout failed',
+            contributorId: userMilestone.contributorId,
+            projectId: userMilestone.milestone.projectId,
+            userMilestoneId: userMilestone.id,
+            metadata: {
+              milestoneId: userMilestone.milestoneId,
+              applicationId: userMilestone.applicationId,
+            } as Prisma.InputJsonValue,
+          },
+          update: {
+            status: PayoutStatus.FAILED,
+            failedAt: new Date(),
+            errorMessage:
+              error instanceof Error
+                ? error.message
+                : 'Milestone payout failed',
+          },
+        });
+
+        throw new BadRequestException(
+          `Failed to release milestone payment: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
     }
 
     const updatedUserMilestone = await this.prisma.userMilestone.update({
@@ -257,6 +381,88 @@ export class ProjectMilestonesService {
         milestone: true,
       },
     });
+
+    if (approve) {
+      await this.prisma.payout.upsert({
+        where: {
+          sourceType_sourceId: {
+            sourceType: PayoutSourceType.PROJECT_MILESTONE,
+            sourceId: userMilestone.id,
+          },
+        },
+        create: {
+          sourceType: PayoutSourceType.PROJECT_MILESTONE,
+          sourceId: userMilestone.id,
+          token: userMilestone.milestone.project.currency,
+          amount: userMilestone.milestone.amount,
+          usdAmount: usdValue,
+          status: PayoutStatus.COMPLETED,
+          requestedAt: userMilestone.submittedAt || new Date(),
+          completedAt: new Date(),
+          txHash,
+          contributorId: userMilestone.contributorId,
+          projectId: userMilestone.milestone.projectId,
+          userMilestoneId: userMilestone.id,
+          metadata: {
+            milestoneId: userMilestone.milestoneId,
+            applicationId: userMilestone.applicationId,
+          } as Prisma.InputJsonValue,
+        },
+        update: {
+          status: PayoutStatus.COMPLETED,
+          usdAmount: usdValue,
+          completedAt: new Date(),
+          txHash,
+          failedAt: null,
+          errorMessage: null,
+          token: userMilestone.milestone.project.currency,
+          amount: userMilestone.milestone.amount,
+          contributorId: userMilestone.contributorId,
+          projectId: userMilestone.milestone.projectId,
+          userMilestoneId: userMilestone.id,
+        },
+      });
+    } else {
+      await this.prisma.payout.upsert({
+        where: {
+          sourceType_sourceId: {
+            sourceType: PayoutSourceType.PROJECT_MILESTONE,
+            sourceId: userMilestone.id,
+          },
+        },
+        create: {
+          sourceType: PayoutSourceType.PROJECT_MILESTONE,
+          sourceId: userMilestone.id,
+          token: userMilestone.milestone.project.currency,
+          amount: userMilestone.milestone.amount,
+          status: PayoutStatus.PENDING_APPROVAL,
+          requestedAt: userMilestone.submittedAt || new Date(),
+          contributorId: userMilestone.contributorId,
+          projectId: userMilestone.milestone.projectId,
+          userMilestoneId: userMilestone.id,
+          metadata: {
+            milestoneId: userMilestone.milestoneId,
+            applicationId: userMilestone.applicationId,
+            revisionRequested: true,
+          } as Prisma.InputJsonValue,
+        },
+        update: {
+          status: PayoutStatus.PENDING_APPROVAL,
+          failedAt: null,
+          errorMessage: null,
+          completedAt: null,
+          txHash: null,
+          contributorId: userMilestone.contributorId,
+          projectId: userMilestone.milestone.projectId,
+          userMilestoneId: userMilestone.id,
+          metadata: {
+            milestoneId: userMilestone.milestoneId,
+            applicationId: userMilestone.applicationId,
+            revisionRequested: true,
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
 
     if (approve) {
       await this.activitiesService.recordActivity(

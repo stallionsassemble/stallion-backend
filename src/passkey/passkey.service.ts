@@ -159,6 +159,64 @@ export class PasskeyService {
     return options;
   }
 
+  async generateStepUpAuthenticationOptions(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { passkeys: true },
+    });
+
+    if (!user || !user.passkeys.length) {
+      throw new BadRequestException('No passkeys found for this user');
+    }
+
+    const options = await generateAuthenticationOptions({
+      rpID: this.rpID,
+      allowCredentials: user.passkeys.map((passkey) => ({
+        id: passkey.credentialId,
+        transports: passkey.transports as AuthenticatorTransport[],
+      })),
+      userVerification: 'preferred',
+    });
+
+    await this.challengeStorage.setChallenge(
+      `step-up:${user.id}`,
+      options.challenge,
+      300,
+    );
+
+    return options;
+  }
+
+  async verifyStepUpAuthentication(
+    userId: string,
+    response: AuthenticationResponseJSON,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { passkeys: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    const expectedChallenge = await this.challengeStorage.getAndDeleteChallenge(
+      `step-up:${user.id}`,
+    );
+    if (!expectedChallenge) {
+      throw new UnauthorizedException(
+        'Challenge not found or expired. Please try again.',
+      );
+    }
+
+    await this.verifyAuthenticationForUser(
+      user.passkeys,
+      expectedChallenge,
+      response,
+    );
+    return { message: 'Step-up authentication successful' };
+  }
+
   async verifyAuthentication(
     email: string,
     response: AuthenticationResponseJSON,
@@ -180,50 +238,12 @@ export class PasskeyService {
       );
     }
 
-    // Find the passkey that was used
-    const passkey = user.passkeys.find(
-      (p) => p.credentialId === response.rawId,
+    await this.verifyAuthenticationForUser(
+      user.passkeys,
+      expectedChallenge,
+      response,
     );
-
-    if (!passkey) {
-      throw new UnauthorizedException('Passkey not found');
-    }
-
-    try {
-      const verification = await verifyAuthenticationResponse({
-        response,
-        expectedChallenge,
-        expectedOrigin: this.origin,
-        expectedRPID: this.rpID,
-        credential: {
-          id: passkey.credentialId,
-          publicKey: Buffer.from(passkey.publicKey, 'base64'),
-          counter: Number(passkey.counter),
-        },
-      });
-
-      if (!verification.verified) {
-        throw new UnauthorizedException('Passkey verification failed');
-      }
-
-      // Update counter and last used
-      await this.prisma.passkey.update({
-        where: { id: passkey.id },
-        data: {
-          counter: BigInt(verification.authenticationInfo.newCounter),
-          lastUsedAt: new Date(),
-        },
-      });
-
-      // Challenge already deleted by getAndDeleteChallenge
-
-      // Return success message
-      return { message: 'Passkey authenticated successfully' };
-    } catch (error) {
-      throw new UnauthorizedException(
-        `Failed to verify passkey authentication: ${error.message}`,
-      );
-    }
+    return { message: 'Passkey authenticated successfully' };
   }
 
   async getUserPasskeys(userId: string) {
@@ -296,5 +316,64 @@ export class PasskeyService {
     });
 
     return { message: 'Passkey deleted successfully' };
+  }
+
+  private async verifyAuthenticationForUser(
+    passkeys: Array<{
+      id: string;
+      credentialId: string;
+      publicKey: string;
+      counter: bigint;
+    }>,
+    expectedChallenge: string,
+    response: AuthenticationResponseJSON,
+  ): Promise<void> {
+    const normalizedRawId = this.normalizeCredentialId(response.rawId);
+    const passkey = passkeys.find((p) => {
+      const normalizedStored = this.normalizeCredentialId(p.credentialId);
+      return normalizedStored === normalizedRawId;
+    });
+
+    if (!passkey) {
+      throw new UnauthorizedException('Passkey not found');
+    }
+
+    try {
+      const verification = await verifyAuthenticationResponse({
+        response,
+        expectedChallenge,
+        expectedOrigin: this.origin,
+        expectedRPID: this.rpID,
+        credential: {
+          id: passkey.credentialId,
+          publicKey: Buffer.from(passkey.publicKey, 'base64'),
+          counter: Number(passkey.counter),
+        },
+      });
+
+      if (!verification.verified) {
+        throw new UnauthorizedException('Passkey verification failed');
+      }
+
+      await this.prisma.passkey.update({
+        where: { id: passkey.id },
+        data: {
+          counter: BigInt(verification.authenticationInfo.newCounter),
+          lastUsedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      throw new UnauthorizedException(
+        `Failed to verify passkey authentication: ${error.message}`,
+      );
+    }
+  }
+
+  private normalizeCredentialId(credentialId: string): string {
+    try {
+      return Buffer.from(credentialId, 'base64url').toString('base64');
+    } catch {
+      return credentialId;
+    }
   }
 }

@@ -21,6 +21,7 @@ import { ProjectsService } from './projects.service';
     ProjectsService,
     ProjectApplicationsService,
     ProjectMilestonesService,
+    ProjectContractService,
   ],
 })
 export class ProjectsModule {}

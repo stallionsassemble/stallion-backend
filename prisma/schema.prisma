@@ -37,6 +37,15 @@ model User {
   // Profile completion status
   profileCompleted Boolean @default(false) @map("profile_completed")
 
+  // Account status and demographics
+  status           UserStatus @default(ACTIVE)
+  suspendedUntil   DateTime?  @map("suspended_until")
+  suspensionReason String?    @map("suspension_reason")
+  bannedAt         DateTime?  @map("banned_at")
+  banReason        String?    @map("ban_reason")
+  lastActiveAt     DateTime?  @map("last_active_at")
+  gender           Gender     @default(UNSPECIFIED)
+
   // MFA fields
   totpSecret  String?  @map("totp_secret")
   mfaEnabled  Boolean  @default(false) @map("mfa_enabled")
@@ -61,6 +70,9 @@ model User {
   bounties    Bounty[]
   passkeys    Passkey[]
   payoutMethods PayoutMethod[]
+  socialAccounts SocialAccount[]
+  payouts        Payout[]          @relation("PayoutContributor")
+  fundingWalletUpdates PlatformSetting[] @relation("FundingWalletUpdatedBy")
 
   // Forum relations
   forumCategories   ForumCategory[]     @relation("ForumCategoryCreator")
@@ -107,6 +119,9 @@ model User {
   @@index([createdAt])
   @@index([username])
   @@index([emailVerified])
+  @@index([status])
+  @@index([lastActiveAt])
+  @@index([gender])
   @@map("users")
 }
 
@@ -230,6 +245,7 @@ model Bounty {
   attachments        Json? // Array of attachment objects: [{filename, url, size, mimetype}]
   skills             String[]     @default([])
   status             BountyStatus @default(ACTIVE)
+  isFeatured         Boolean      @default(false) @map("is_featured")
   contractBountyId   Int          @unique @map("contract_bounty_id") // ID from Soroban contract
   txHash             String       @map("tx_hash") // Transaction hash from Soroban
   submissionDeadline DateTime     @map("submission_deadline")
@@ -245,6 +261,7 @@ model Bounty {
   winners     BountyWinner[]
   activities  Activity[]
   discussions BountyDiscussion[]
+  payouts     Payout[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([ownerId])
@@ -286,6 +303,7 @@ model BountyWinner {
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   bountyId String @map("bounty_id")
   bounty   Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  payout   Payout?
 
   @@unique([bountyId, userId])
   @@index([userId])
@@ -385,6 +403,20 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  PREFER_NOT_TO_SAY
+  UNSPECIFIED
+}
+
 enum TxType {
   DEPOSIT
   WITHDRAWAL
@@ -397,6 +429,24 @@ enum TxState {
   PENDING
   COMPLETED
   FAILED
+}
+
+enum SocialProvider {
+  GOOGLE
+  APPLE
+}
+
+enum PayoutSourceType {
+  BOUNTY_WIN
+  PROJECT_MILESTONE
+}
+
+enum PayoutStatus {
+  PENDING_APPROVAL
+  PROCESSING
+  COMPLETED
+  FAILED
+  DISPUTED
 }
 
 enum SubmissionStatus {
@@ -967,6 +1017,36 @@ model HackathonWinner {
   @@map("hackathon_winners")
 }
 
+model SocialAccount {
+  id              String         @id @default(cuid())
+  provider        SocialProvider
+  providerSubject String         @map("provider_subject")
+  email           String
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@index([email])
+  @@map("social_accounts")
+}
+
+model PlatformSetting {
+  id              String   @id @default("global")
+  fundingWalletId String?  @map("funding_wallet_id")
+  updatedByUserId String?  @map("updated_by_user_id")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  updatedByUser User? @relation("FundingWalletUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([updatedByUserId])
+  @@map("platform_settings")
+}
+
 // ============================================
 // HACKATHON ENUMS
 // ============================================
@@ -1024,6 +1104,7 @@ model Project {
   currency         String
   deadline         DateTime
   status           ProjectStatus @default(OPEN)
+  isFeatured       Boolean       @default(false) @map("is_featured")
   type             ProjectType
   peopleNeeded     Int         @default(1) @map("people_needed") // Number of positions available
 
@@ -1045,6 +1126,7 @@ model Project {
   milestones   ProjectMilestone[]
   activities Activity[]
   discussions  ProjectDiscussion[]
+  payouts      Payout[]
 
   @@index([status, createdAt(sort: Desc)])
   @@index([type, status])
@@ -1136,6 +1218,7 @@ model UserMilestone {
 
   contributorId String @map("contributor_id")
   contributor   User   @relation("UserMilestones", fields: [contributorId], references: [id], onDelete: Cascade)
+  payout        Payout?
 
   @@unique([milestoneId, applicationId])
   @@index([milestoneId])
@@ -1143,6 +1226,49 @@ model UserMilestone {
   @@index([contributorId])
   @@index([status])
   @@map("user_milestones")
+}
+
+model Payout {
+  id           String           @id @default(cuid())
+  sourceType   PayoutSourceType @map("source_type")
+  sourceId     String           @map("source_id")
+  token        String
+  amount       Decimal          @db.Decimal(20, 7)
+  usdAmount    Decimal?         @map("usd_amount") @db.Decimal(20, 7)
+  status       PayoutStatus     @default(PENDING_APPROVAL)
+  requestedAt  DateTime         @default(now()) @map("requested_at")
+  completedAt  DateTime?        @map("completed_at")
+  failedAt     DateTime?        @map("failed_at")
+  txHash       String?          @map("tx_hash")
+  errorMessage String?          @map("error_message")
+  retryCount   Int              @default(0) @map("retry_count")
+  lastRetryAt  DateTime?        @map("last_retry_at")
+  metadata     Json?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  contributorId String @map("contributor_id")
+  contributor   User   @relation("PayoutContributor", fields: [contributorId], references: [id], onDelete: Cascade)
+
+  bountyId String? @map("bounty_id")
+  bounty   Bounty? @relation(fields: [bountyId], references: [id], onDelete: SetNull)
+
+  projectId String?  @map("project_id")
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  bountyWinnerId String?       @unique @map("bounty_winner_id")
+  bountyWinner   BountyWinner? @relation(fields: [bountyWinnerId], references: [id], onDelete: SetNull)
+
+  userMilestoneId String?        @unique @map("user_milestone_id")
+  userMilestone   UserMilestone? @relation(fields: [userMilestoneId], references: [id], onDelete: SetNull)
+
+  @@unique([sourceType, sourceId])
+  @@index([status, requestedAt(sort: Desc)])
+  @@index([token])
+  @@index([contributorId])
+  @@index([bountyId])
+  @@index([projectId])
+  @@map("payouts")
 }
 
 model Activity {

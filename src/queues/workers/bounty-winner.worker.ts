@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
+import { PayoutSourceType, PayoutStatus, Prisma } from '@prisma/client';
 import { Job } from 'bullmq';
 import { ActivitiesService } from '../../activities/activities.service';
 import { BountyActivities } from '../../activities/helpers/activity-helper';
@@ -57,14 +58,69 @@ export class BountyWinnerWorker extends WorkerHost {
           currency,
         );
 
-        // Create winner record
-        await this.prisma.bountyWinner.create({
-          data: {
+        const awardedAt = new Date();
+
+        // Create winner record (idempotent for retries)
+        const winnerRecord = await this.prisma.bountyWinner.upsert({
+          where: {
+            bountyId_userId: {
+              bountyId,
+              userId: winner.userId,
+            },
+          },
+          create: {
             bountyId,
             userId: winner.userId,
             position: winner.position,
-            awardedAt: new Date(),
+            awardedAt,
             usdValueAtCompletion: usdValue,
+          },
+          update: {
+            position: winner.position,
+            awardedAt,
+            usdValueAtCompletion: usdValue,
+          },
+        });
+
+        await this.prisma.payout.upsert({
+          where: {
+            sourceType_sourceId: {
+              sourceType: PayoutSourceType.BOUNTY_WIN,
+              sourceId: winnerRecord.id,
+            },
+          },
+          create: {
+            sourceType: PayoutSourceType.BOUNTY_WIN,
+            sourceId: winnerRecord.id,
+            token: currency,
+            amount: winner.payoutAmount,
+            usdAmount: usdValue,
+            status: PayoutStatus.COMPLETED,
+            requestedAt: awardedAt,
+            completedAt: awardedAt,
+            contributorId: winner.userId,
+            bountyId,
+            bountyWinnerId: winnerRecord.id,
+            metadata: {
+              position: winner.position,
+              source: 'winner-worker',
+            } as Prisma.InputJsonValue,
+          },
+          update: {
+            token: currency,
+            amount: winner.payoutAmount,
+            usdAmount: usdValue,
+            status: PayoutStatus.COMPLETED,
+            completedAt: awardedAt,
+            failedAt: null,
+            errorMessage: null,
+            contributorId: winner.userId,
+            bountyId,
+            bountyWinnerId: winnerRecord.id,
+            metadata: {
+              position: winner.position,
+              source: 'winner-worker',
+            } as Prisma.InputJsonValue,
           },
         });
 

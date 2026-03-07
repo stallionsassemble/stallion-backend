@@ -5,6 +5,7 @@ import { QueueModule } from '../queues/queue.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { DepositReconciliationCron } from './deposit-reconciliation.cron';
 import { KeyRotationCron } from './key-rotation.cron';
+import { UserSuspensionCron } from './user-suspension.cron';
 import { WithdrawalProcessingCron } from './withdrawal-processing.cron';
 
 @Module({
@@ -12,6 +13,7 @@ import { WithdrawalProcessingCron } from './withdrawal-processing.cron';
   providers: [
     DepositReconciliationCron,
     KeyRotationCron,
+    UserSuspensionCron,
     WithdrawalProcessingCron,
   ],
 })

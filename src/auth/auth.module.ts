@@ -9,6 +9,7 @@ import { UsersModule } from '../users/users.module';
 import { WalletModule } from '../wallet/wallet.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { SocialTokenVerifierService } from './social-token-verifier.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { VerificationCodeStorageService } from './verification-code-storage.service';
 
@@ -33,7 +34,12 @@ import { VerificationCodeStorageService } from './verification-code-storage.serv
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, VerificationCodeStorageService, JwtStrategy],
+  providers: [
+    AuthService,
+    VerificationCodeStorageService,
+    JwtStrategy,
+    SocialTokenVerifierService,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

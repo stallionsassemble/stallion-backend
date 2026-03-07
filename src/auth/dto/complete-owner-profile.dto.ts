@@ -1,8 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Gender } from '@prisma/client';
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsObject,
+  IsOptional,
   IsString,
   IsUrl,
   Matches,
@@ -91,4 +94,13 @@ export class CompleteOwnerProfileDto {
   @IsBoolean()
   @ApiProperty({ example: true })
   emailNotifications: boolean;
+
+  @IsOptional()
+  @IsEnum(Gender)
+  @ApiProperty({
+    required: false,
+    enum: Gender,
+    example: Gender.UNSPECIFIED,
+  })
+  gender?: Gender;
 }

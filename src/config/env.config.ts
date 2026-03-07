@@ -52,6 +52,13 @@ export class EnvConfig {
   static readonly RP_ID = 'RP_ID';
   static readonly ORIGIN = 'ORIGIN';
 
+  // Social auth
+  static readonly GOOGLE_CLIENT_ID = 'GOOGLE_CLIENT_ID';
+  static readonly APPLE_CLIENT_ID = 'APPLE_CLIENT_ID';
+
   // Funding Wallet
   static readonly FUNDING_WALLET_ID = 'FUNDING_WALLET_ID';
+
+  // Admin security
+  static readonly ADMIN_STEP_UP_TTL_SECONDS = 'ADMIN_STEP_UP_TTL_SECONDS';
 }

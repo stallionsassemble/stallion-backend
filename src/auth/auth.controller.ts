@@ -27,6 +27,8 @@ import {
 } from './dto/passkey.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { RequestVerificationDto } from './dto/request-verification.dto';
+import { SocialAuthDto } from './dto/social-auth.dto';
+import { SocialAuthResponseDto } from './dto/social-auth-response.dto';
 import { UsernameParamDto } from './dto/username-param.dto';
 import { VerifyCodeDto } from './dto/verify-code.dto';
 import { VerifyLoginCodeDto } from './dto/verify-login-code.dto';
@@ -135,6 +137,30 @@ export class AuthController {
   })
   async verifySignupCode(@Body() dto: VerifyCodeDto) {
     return this.authService.verifySignupCode(dto);
+  }
+
+  @Post('social')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Sign in/up with social provider',
+    description:
+      'Authenticate with Google or Apple ID token. If the user does not exist, role is required and profile completion remains pending.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Social authentication successful',
+    type: SocialAuthResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Role is required for first-time social signup',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid social provider token',
+  })
+  async socialAuth(@Body() dto: SocialAuthDto) {
+    return this.authService.socialAuth(dto);
   }
 
   @Post('signup/complete-profile/contributor')

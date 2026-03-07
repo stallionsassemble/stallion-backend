@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ActivitiesModule } from '../activities/activities.module';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { QueueModule } from '../queues/queue.module';
 import { ReputationModule } from '../reputation/reputation.module';
@@ -24,7 +25,12 @@ import { BountyContractService } from './bounty-contract.service';
     NotificationsModule,
   ],
   controllers: [BountyController],
-  providers: [BountiesService, AdminService, BountyContractService],
+  providers: [
+    BountiesService,
+    AdminService,
+    BountyContractService,
+    PlatformSettingsService,
+  ],
   exports: [BountiesService, AdminService],
 })
 export class BountiesModule {}

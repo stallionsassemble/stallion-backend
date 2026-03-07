@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../common/prisma/prisma.module';
+import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { TwoFactorVerificationService } from '../common/services/two-factor-verification.service';
 import { SorobanModule } from '../soroban/soroban.module';
 import { PayoutMethodsController } from './payout-methods.controller';
@@ -27,6 +28,7 @@ import { WalletService } from './wallet.service';
     WalletEncryptionService,
     StellarWalletService,
     WalletSigningService,
+    PlatformSettingsService,
     PayoutMethodsService,
     TwoFactorVerificationService,
   ],
@@ -35,6 +37,7 @@ import { WalletService } from './wallet.service';
     StellarWalletService,
     WalletSigningService,
     PayoutMethodsService,
+    TwoFactorVerificationService,
   ],
 })
 export class WalletModule {}
