@@ -4,7 +4,7 @@ providers = ["node"]
 nixPkgs = ["nodejs_20", "pnpm"]
 
 [phases.install]
-cmds = ["pnpm install --frozen-lockfile"]
+cmds = ["pnpm install --frozen-lockfile", "pnpm run prisma:generate"]
 
 [phases.build]
 cmds = ["pnpm run build"]
