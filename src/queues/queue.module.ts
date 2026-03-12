@@ -30,6 +30,9 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
         connection: {
           host: configService.get<string>(EnvConfig.REDIS_HOST) || 'localhost',
           port: configService.get<number>(EnvConfig.REDIS_PORT) || 6379,
+          password: configService.get<string>(EnvConfig.REDIS_PASSWORD),
+          username: configService.get<string>(EnvConfig.REDIS_USERNAME),
+          db: configService.get<number>(EnvConfig.REDIS_DB) || 0,
         },
       }),
       inject: [ConfigService],

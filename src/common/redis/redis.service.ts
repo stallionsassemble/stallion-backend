@@ -23,8 +23,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const redisPassword = this.configService.get<string>(
       EnvConfig.REDIS_PASSWORD,
     );
-    const redisUsername =
-      this.configService.get<string>(EnvConfig.REDIS_USERNAME) || 'default';
+    const redisUsername = this.configService.get<string>(
+      EnvConfig.REDIS_USERNAME,
+    );
     const redisDb = this.configService.get<number>(EnvConfig.REDIS_DB) || 0;
 
     this.client = new Redis({
