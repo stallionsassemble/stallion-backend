@@ -23,6 +23,7 @@ export class EnvConfig {
   static readonly REDIS_HOST = 'REDIS_HOST';
   static readonly REDIS_PORT = 'REDIS_PORT';
   static readonly REDIS_PASSWORD = 'REDIS_PASSWORD';
+  static readonly REDIS_USERNAME = 'REDIS_USERNAME';
   static readonly REDIS_DB = 'REDIS_DB';
 
   // SMTP

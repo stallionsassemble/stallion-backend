@@ -1,7 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import Redis from 'ioredis';
-import { EnvConfig } from 'src/config/env.config';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { RedisService } from 'src/common/redis/redis.service';
 import type {
   PendingMessage,
   UserOnlineStatus,
@@ -12,68 +10,31 @@ import type {
  * Handles user sockets, pending messages, and online status
  */
 @Injectable()
-export class ChatStateService {
+export class ChatStateService implements OnModuleDestroy {
   private readonly logger = new Logger(ChatStateService.name);
-  private redis: Redis;
   private readonly MESSAGE_TTL = 365 * 24 * 60 * 60; // 1 year in seconds
   private readonly MAX_PENDING_MESSAGES = 100;
 
-  constructor(private configService: ConfigService) {
-    const redisHost = this.configService.get<string>(EnvConfig.REDIS_HOST);
-    const redisPort = this.configService.get<number>(EnvConfig.REDIS_PORT);
-    const redisPassword = this.configService.get<string>(
-      EnvConfig.REDIS_PASSWORD,
-    );
-
-    if (redisHost && redisPort) {
-      this.redis = new Redis({
-        host: redisHost,
-        port: redisPort,
-        password: redisPassword || undefined,
-        maxRetriesPerRequest: 3,
-        enableReadyCheck: true,
-        retryStrategy: (times) => {
-          const delay = Math.min(times * 50, 2000);
-          return delay;
-        },
-      });
-
-      this.redis.on('error', (err) => {
-        this.logger.error(`Redis error: ${err.message}`);
-      });
-
-      this.redis.on('connect', () => {
-        this.logger.log('Connected to Redis');
-      });
-    } else {
-      this.logger.warn(
-        'Redis not configured (REDIS_HOST/REDIS_PORT missing), using in-memory fallback',
-      );
-    }
-  }
+  constructor(private redisService: RedisService) {}
 
   /**
    * Add a socket for a user
    */
   async addUserSocket(userId: string, socketId: string): Promise<void> {
-    if (!this.redis) return;
-
     const key = `chat:sockets:${userId}`;
-    await this.redis.sadd(key, socketId);
-    await this.redis.expire(key, 24 * 60 * 60); // 24 hours
+    await this.redisService.sadd(key, socketId);
+    await this.redisService.expire(key, 24 * 60 * 60); // 24 hours
   }
 
   /**
    * Remove a socket for a user
    */
   async removeUserSocket(userId: string, socketId: string): Promise<boolean> {
-    if (!this.redis) return false;
-
     const key = `chat:sockets:${userId}`;
-    await this.redis.srem(key, socketId);
+    await this.redisService.srem(key, socketId);
 
     // Check if user has any remaining sockets
-    const count = await this.redis.scard(key);
+    const count = await this.redisService.scard(key);
     return count === 0;
   }
 
@@ -81,10 +42,8 @@ export class ChatStateService {
    * Check if user is online
    */
   async isUserOnline(userId: string): Promise<boolean> {
-    if (!this.redis) return false;
-
     const key = `chat:sockets:${userId}`;
-    const count = await this.redis.scard(key);
+    const count = await this.redisService.scard(key);
     return count > 0;
   }
 
@@ -92,10 +51,8 @@ export class ChatStateService {
    * Get all socket IDs for a user
    */
   async getUserSockets(userId: string): Promise<string[]> {
-    if (!this.redis) return [];
-
     const key = `chat:sockets:${userId}`;
-    return await this.redis.smembers(key);
+    return await this.redisService.smembers(key);
   }
 
   /**
@@ -106,8 +63,6 @@ export class ChatStateService {
     event: string,
     data: any,
   ): Promise<void> {
-    if (!this.redis) return;
-
     const key = `chat:pending:${userId}`;
     const message: PendingMessage = {
       userId,
@@ -117,28 +72,26 @@ export class ChatStateService {
     };
 
     // Add message to list
-    await this.redis.lpush(key, JSON.stringify(message));
+    await this.redisService.lpush(key, JSON.stringify(message));
 
     // Trim to max size
-    await this.redis.ltrim(key, 0, this.MAX_PENDING_MESSAGES - 1);
+    await this.redisService.ltrim(key, 0, this.MAX_PENDING_MESSAGES - 1);
 
     // Set TTL
-    await this.redis.expire(key, this.MESSAGE_TTL);
+    await this.redisService.expire(key, this.MESSAGE_TTL);
   }
 
   /**
    * Get and clear pending messages for a user
    */
   async getPendingMessages(userId: string): Promise<PendingMessage[]> {
-    if (!this.redis) return [];
-
     const key = `chat:pending:${userId}`;
 
     // Get all messages
-    const messages = await this.redis.lrange(key, 0, -1);
+    const messages = await this.redisService.lrange(key, 0, -1);
 
     // Delete the key
-    await this.redis.del(key);
+    await this.redisService.delete(key);
 
     // Parse and return
     return messages
@@ -159,23 +112,18 @@ export class ChatStateService {
    * Get count of pending messages
    */
   async getPendingMessageCount(userId: string): Promise<number> {
-    if (!this.redis) return 0;
-
     const key = `chat:pending:${userId}`;
-    return await this.redis.llen(key);
+    return await this.redisService.llen(key);
   }
 
   /**
    * Set user's last seen timestamp
    */
   async setLastSeen(userId: string): Promise<void> {
-    if (!this.redis) return;
-
     const key = `chat:lastseen:${userId}`;
-    await this.redis.set(
+    await this.redisService.set(
       key,
       new Date().toISOString(),
-      'EX',
       30 * 24 * 60 * 60,
     ); // 30 days
   }
@@ -184,10 +132,8 @@ export class ChatStateService {
    * Get user's last seen timestamp
    */
   async getLastSeen(userId: string): Promise<Date | null> {
-    if (!this.redis) return null;
-
     const key = `chat:lastseen:${userId}`;
-    const timestamp = await this.redis.get(key);
+    const timestamp = await this.redisService.get(key);
 
     return timestamp ? new Date(timestamp) : null;
   }
@@ -222,10 +168,8 @@ export class ChatStateService {
    * Get all user IDs that have active sockets
    */
   async getAllConnectedUserIds(): Promise<string[]> {
-    if (!this.redis) return [];
-
     const pattern = 'chat:sockets:*';
-    const keys = await this.redis.keys(pattern);
+    const keys = await this.redisService.keys(pattern);
 
     // Extract user IDs from keys (format: chat:sockets:userId)
     return keys.map((key) => key.replace('chat:sockets:', ''));
@@ -235,25 +179,21 @@ export class ChatStateService {
    * Clear all socket connections for a user
    */
   async clearUserSockets(userId: string): Promise<void> {
-    if (!this.redis) return;
-
     const key = `chat:sockets:${userId}`;
-    await this.redis.del(key);
+    await this.redisService.delete(key);
   }
 
   /**
    * Clear all socket connections (for graceful shutdown)
    */
   async clearAllSockets(): Promise<void> {
-    if (!this.redis) return;
-
     this.logger.log('Clearing all socket connections from Redis...');
 
     const pattern = 'chat:sockets:*';
-    const keys = await this.redis.keys(pattern);
+    const keys = await this.redisService.keys(pattern);
 
     if (keys.length > 0) {
-      await this.redis.del(...keys);
+      await this.redisService.deleteMany(keys);
       this.logger.log(`Cleared ${keys.length} socket connection sets`);
     }
   }
@@ -262,23 +202,18 @@ export class ChatStateService {
    * Cleanup expired data (run periodically)
    */
   async cleanup(): Promise<void> {
-    if (!this.redis) return;
-
     this.logger.log('Running chat state cleanup...');
 
     // Redis TTL handles most cleanup automatically
     // This is just for logging/monitoring
     const pattern = 'chat:pending:*';
-    const keys = await this.redis.keys(pattern);
+    const keys = await this.redisService.keys(pattern);
 
     this.logger.log(`Found ${keys.length} pending message queues`);
   }
 
   async onModuleDestroy() {
-    if (this.redis) {
-      // Clear all socket connections before shutting down
-      await this.clearAllSockets();
-      await this.redis.quit();
-    }
+    // Clear all socket connections before shutting down
+    await this.clearAllSockets();
   }
 }

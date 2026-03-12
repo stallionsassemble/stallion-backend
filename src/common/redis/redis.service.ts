@@ -23,12 +23,15 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     const redisPassword = this.configService.get<string>(
       EnvConfig.REDIS_PASSWORD,
     );
+    const redisUsername =
+      this.configService.get<string>(EnvConfig.REDIS_USERNAME) || 'default';
     const redisDb = this.configService.get<number>(EnvConfig.REDIS_DB) || 0;
 
     this.client = new Redis({
       host: redisHost,
       port: redisPort,
       password: redisPassword,
+      username: redisUsername,
       db: redisDb,
       retryStrategy: (times) => {
         const delay = Math.min(times * 50, 2000);
@@ -212,6 +215,14 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return await this.client.lrange(key, start, stop);
   }
 
+  async ltrim(key: string, start: number, stop: number): Promise<string> {
+    return await this.client.ltrim(key, start, stop);
+  }
+
+  async llen(key: string): Promise<number> {
+    return await this.client.llen(key);
+  }
+
   /**
    * Set operations
    */
@@ -221,6 +232,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   async srem(key: string, ...members: string[]): Promise<number> {
     return await this.client.srem(key, ...members);
+  }
+
+  async scard(key: string): Promise<number> {
+    return await this.client.scard(key);
   }
 
   async smembers(key: string): Promise<string[]> {
