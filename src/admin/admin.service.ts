@@ -1008,11 +1008,7 @@ export class AdminService {
         this.prisma.hackathon.count({
           where: {
             status: {
-              in: [
-                HackathonStatus.PUBLISHED,
-                HackathonStatus.ONGOING,
-                HackathonStatus.JUDGING,
-              ],
+              in: [HackathonStatus.PUBLISHED, HackathonStatus.JUDGING],
             },
           },
         }),
@@ -1025,7 +1021,7 @@ export class AdminService {
 
     const allHackathons = await this.prisma.hackathon.findMany({
       select: {
-        totalReward: true,
+        totalBudget: true,
         currency: true,
       },
     });
@@ -1033,7 +1029,7 @@ export class AdminService {
     let totalPrizePoolUsd = 0;
     for (const hackathon of allHackathons) {
       totalPrizePoolUsd += await calculateUsdValue(
-        hackathon.totalReward.toString(),
+        hackathon.totalBudget.toString(),
         hackathon.currency,
       );
     }
@@ -1053,7 +1049,7 @@ export class AdminService {
 
     const where: Prisma.HackathonWhereInput = {};
     if (query.status) where.status = query.status;
-    if (query.ownerId) where.ownerId = query.ownerId;
+    if (query.ownerId) where.companyId = query.ownerId;
     if (query.search) {
       where.OR = [
         { title: { contains: query.search, mode: 'insensitive' } },
@@ -1068,7 +1064,7 @@ export class AdminService {
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          owner: {
+          company: {
             select: {
               id: true,
               email: true,
@@ -1102,17 +1098,17 @@ export class AdminService {
 
     const data = hackathons.map((hackathon) => ({
       id: hackathon.id,
-      host: hackathon.owner,
+      host: hackathon.company,
       title: hackathon.title,
       description: hackathon.description,
       status: hackathon.status,
       duration: {
-        startDate: hackathon.startDate,
-        endDate: hackathon.endDate,
+        startDate: hackathon.createdAt,
+        endDate: hackathon.deadline,
       },
       numParticipants: participantsByHackathon.get(hackathon.id)?.size || 0,
       prizePool: {
-        amount: hackathon.totalReward,
+        amount: hackathon.totalBudget,
         currency: hackathon.currency,
       },
       totalSubmissions: hackathon._count.submissions,
@@ -1132,14 +1128,14 @@ export class AdminService {
   async updateHackathon(hackathonId: string, payload: Record<string, any>) {
     const hackathon = await this.prisma.hackathon.findUnique({
       where: { id: hackathonId },
-      select: { ownerId: true },
+      select: { createdById: true },
     });
     if (!hackathon) {
       throw new NotFoundException('Hackathon not found');
     }
     return this.hackathonsService.updateHackathon(
       hackathonId,
-      hackathon.ownerId,
+      hackathon.createdById,
       payload as UpdateHackathonDto,
     );
   }
@@ -1147,14 +1143,14 @@ export class AdminService {
   async deleteHackathon(hackathonId: string) {
     const hackathon = await this.prisma.hackathon.findUnique({
       where: { id: hackathonId },
-      select: { ownerId: true },
+      select: { createdById: true },
     });
     if (!hackathon) {
       throw new NotFoundException('Hackathon not found');
     }
-    return this.hackathonsService.deleteHackathon(
+    return this.hackathonsService.cancelHackathon(
       hackathonId,
-      hackathon.ownerId,
+      hackathon.createdById,
     );
   }
 

@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -9,270 +8,225 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBearerAuth,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
-import { CurrentUser } from 'src/common/decorators/current-user.decorator';
-import { IdParamDto } from 'src/common/dto/id-param.dto';
-import { MFAGuard } from 'src/common/guards/mfa.guard';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+
+import { Role } from '@prisma/client';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
+import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { OwnerGuard } from '../common/guards/owner.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
+import { CreateTeamDto } from './dto/create-team.dto';
 import { GetHackathonsQueryDto } from './dto/get-hackathons-query.dto';
 import { GetSubmissionsQueryDto } from './dto/get-submissions-query.dto';
-import { HackathonIdParamDto } from './dto/hackathon-id-param.dto';
 import { HackathonIdentifierParamDto } from './dto/identifier-param.dto';
-import { JudgeSubmissionDto } from './dto/judge-submission.dto';
-import { HackathonSelectWinnersDto } from './dto/select-winners.dto';
+import { SelectWinnerDto } from './dto/select-winner.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
-import { UpdateSubmissionDto } from './dto/update-submission.dto';
+
 import { HackathonsService } from './hackathons.service';
+import { HackathonJudgingService } from './services/hackathon-judging.service';
+import { HackathonSubmissionsService } from './services/hackathon-submissions.service';
+import { HackathonTeamsService } from './services/hackathon-teams.service';
 
 @ApiTags('Hackathons')
 @Controller('hackathons')
 export class HackathonsController {
-  constructor(private readonly hackathonsService: HackathonsService) {}
+  constructor(
+    private readonly hackathonsService: HackathonsService,
+    private readonly submissionsService: HackathonSubmissionsService,
+    private readonly judgingService: HackathonJudgingService,
+    private readonly teamsService: HackathonTeamsService,
+  ) {}
 
+  // --- Admin Endpoints ---
   @Post()
-  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Create hackathon',
-    description: 'Create a new hackathon (requires project owner role)',
-  })
-  @ApiResponse({ status: 201, description: 'Hackathon created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - requires owner role' })
+  @ApiOperation({ summary: 'Create hackathon (Admin only)' })
   createHackathon(
-    @CurrentUser('id') userId: string,
+    @CurrentUser('id') adminId: string,
     @Body() dto: CreateHackathonDto,
   ) {
-    return this.hackathonsService.createHackathon(userId, dto);
-  }
-
-  @Get()
-  @ApiOperation({
-    summary: 'Get hackathons',
-    description: 'Retrieve hackathons with optional filters',
-  })
-  @ApiResponse({ status: 200, description: 'List of hackathons' })
-  getHackathons(@Query() query: GetHackathonsQueryDto) {
-    return this.hackathonsService.getHackathons({
-      status: query.status,
-      ownerId: query.ownerId,
-    });
-  }
-
-  @Get(':identifier')
-  @ApiOperation({
-    summary: 'Get hackathon',
-    description: 'Retrieve hackathon by ID or slug',
-  })
-  @ApiParam({ name: 'identifier', description: 'Hackathon ID or slug' })
-  @ApiResponse({ status: 200, description: 'Hackathon details' })
-  @ApiResponse({ status: 404, description: 'Hackathon not found' })
-  getHackathon(@Param() params: HackathonIdentifierParamDto) {
-    return this.hackathonsService.getHackathon(params.identifier);
+    return this.hackathonsService.createHackathon(adminId, dto);
   }
 
   @Patch(':id')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Update hackathon',
-    description: 'Update hackathon details (only by owner)',
-  })
-  @ApiParam({ name: 'id', description: 'Hackathon ID' })
-  @ApiResponse({ status: 200, description: 'Hackathon updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiResponse({ status: 404, description: 'Hackathon not found' })
+  @ApiOperation({ summary: 'Update hackathon (Admin only)' })
   updateHackathon(
     @Param() params: IdParamDto,
-    @CurrentUser('id') userId: string,
+    @CurrentUser('id') adminId: string,
     @Body() dto: UpdateHackathonDto,
   ) {
-    return this.hackathonsService.updateHackathon(params.id, userId, dto);
+    return this.hackathonsService.updateHackathon(params.id, adminId, dto);
   }
 
-  @Post(':id/publish')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @Post(':id/cancel')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Publish hackathon',
-    description: 'Publish a draft hackathon to make it active',
-  })
-  @ApiParam({ name: 'id', description: 'Hackathon ID' })
-  @ApiResponse({ status: 200, description: 'Hackathon published successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  publishHackathon(
+  @ApiOperation({ summary: 'Cancel hackathon (Admin only)' })
+  cancelHackathon(
+    @Param() params: IdParamDto,
+    @CurrentUser('id') adminId: string,
+  ) {
+    return this.hackathonsService.cancelHackathon(params.id, adminId);
+  }
+
+  // --- Public Endpoints ---
+
+  @Get()
+  @ApiOperation({ summary: 'Get hackathons list' })
+  getHackathons(@Query() query: GetHackathonsQueryDto) {
+    return this.hackathonsService.getHackathons(query);
+  }
+
+  @Get(':identifier')
+  @ApiOperation({ summary: 'Get hackathon details' })
+  getHackathon(@Param() params: HackathonIdentifierParamDto) {
+    return this.hackathonsService.getHackathonByIdentifier(params.identifier);
+  }
+
+  @Get(':id/submissions')
+  @ApiOperation({ summary: 'Get submissions for a hackathon' })
+  getSubmissions(
+    @Param() params: IdParamDto,
+    @Query() query: GetSubmissionsQueryDto,
+  ) {
+    return this.submissionsService.getSubmissions(params.id, query);
+  }
+
+  // --- Participant Endpoints ---
+
+  @Post(':id/participate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Join hackathon as participant' })
+  participate(@Param() params: IdParamDto, @CurrentUser('id') userId: string) {
+    return this.submissionsService.participate(userId, params.id);
+  }
+
+  @Post(':id/teams')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create a team for a team-based hackathon' })
+  createTeam(
     @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
+    @Body() dto: CreateTeamDto,
   ) {
-    return this.hackathonsService.publishHackathon(params.id, userId);
+    return this.teamsService.createTeam(userId, params.id, dto.name);
   }
 
-  @Delete(':id')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
+  @Post(':id/teams/:teamId/join')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Delete hackathon',
-    description: 'Delete a hackathon (only by owner)',
-  })
-  @ApiParam({ name: 'id', description: 'Hackathon ID' })
-  @ApiResponse({ status: 204, description: 'Hackathon deleted successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  deleteHackathon(
-    @Param() params: IdParamDto,
+  @ApiOperation({ summary: 'Join an existing team' })
+  joinTeam(
+    @Param('id') hackathonId: string,
+    @Param('teamId') teamId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.hackathonsService.deleteHackathon(params.id, userId);
+    return this.teamsService.joinTeam(userId, hackathonId, teamId);
   }
 
-  @Post('submissions')
-  @UseGuards(JwtAuthGuard, MFAGuard)
+  @Post(':id/teams/leave')
+  @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Create submission',
-    description: 'Submit a project to a hackathon (requires MFA)',
-  })
-  @ApiResponse({ status: 201, description: 'Submission created successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'MFA required' })
-  createSubmission(
+  @ApiOperation({ summary: 'Leave your current team' })
+  leaveTeam(
+    @Param('id') hackathonId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.leaveTeam(userId, hackathonId);
+  }
+
+  @Post(':id/submissions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Submit a project' })
+  submitProject(
+    @Param() params: IdParamDto,
     @CurrentUser('id') userId: string,
     @Body() dto: CreateSubmissionDto,
   ) {
-    return this.hackathonsService.createSubmission(userId, dto);
+    return this.submissionsService.createSubmission(userId, {
+      ...dto,
+      hackathonId: params.id,
+    });
   }
 
-  @Get(':hackathonId/submissions')
-  @ApiOperation({
-    summary: 'Get hackathon submissions',
-    description: 'Retrieve all submissions for a hackathon',
-  })
-  @ApiParam({ name: 'hackathonId', description: 'Hackathon ID' })
-  @ApiResponse({ status: 200, description: 'List of submissions' })
-  getSubmissions(
-    @Param() params: HackathonIdParamDto,
-    @Query() query: GetSubmissionsQueryDto,
+  // --- Display / Judging (Project Owner) Endpoints ---
+
+  @Post(':id/manage/submissions/:sid/review')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PROJECT_OWNER)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Set submission status to IN_REVIEW' })
+  reviewSubmission(
+    @Param('id') hackathonId: string,
+    @Param('sid') submissionId: string,
+    @CurrentUser('id') companyId: string,
   ) {
-    return this.hackathonsService.getSubmissions(
-      params.hackathonId,
-      query.trackId,
+    return this.judgingService.setInReview(
+      hackathonId,
+      companyId,
+      submissionId,
     );
   }
 
-  @Get('submissions')
-  @UseGuards(JwtAuthGuard)
+  @Post(':id/manage/submissions/:sid/select-winner')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Get my submissions',
-    description: 'Retrieve submissions created by the authenticated user',
-  })
-  @ApiResponse({ status: 200, description: 'List of user submissions' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getMySubmissions(
-    @CurrentUser('id') userId: string,
-    @Query() query: GetSubmissionsQueryDto,
+  @ApiOperation({ summary: 'Select submission as winner' })
+  selectWinner(
+    @Param('id') hackathonId: string,
+    @Param('sid') submissionId: string,
+    @CurrentUser('id') companyId: string,
+    @Body() dto: SelectWinnerDto,
   ) {
-    return this.hackathonsService.getUserSubmissions(userId, query.trackId);
+    return this.judgingService.selectWinner(
+      hackathonId,
+      companyId,
+      submissionId,
+      dto.position,
+      dto.feedback,
+    );
   }
 
-  @Patch('submissions/:id')
-  @UseGuards(JwtAuthGuard)
+  @Post(':id/manage/submissions/:sid/remove-winner')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Update submission',
-    description: 'Update a hackathon submission (only by submitter)',
-  })
-  @ApiParam({ name: 'id', description: 'Submission ID' })
-  @ApiResponse({ status: 200, description: 'Submission updated successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Submission not found' })
-  updateSubmission(
-    @Param() params: IdParamDto,
-    @CurrentUser('id') userId: string,
-    @Body() dto: UpdateSubmissionDto,
+  @ApiOperation({ summary: 'Remove winner status' })
+  removeWinner(
+    @Param('id') hackathonId: string,
+    @Param('sid') submissionId: string,
+    @CurrentUser('id') companyId: string,
   ) {
-    return this.hackathonsService.updateSubmission(params.id, userId, dto);
+    return this.judgingService.removeWinner(
+      hackathonId,
+      companyId,
+      submissionId,
+    );
   }
 
-  @Delete('submissions/:id')
-  @UseGuards(JwtAuthGuard)
+  @Post(':id/manage/publish-results')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.PROJECT_OWNER)
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Delete submission',
-    description: 'Delete a hackathon submission (only by submitter)',
-  })
-  @ApiParam({ name: 'id', description: 'Submission ID' })
-  @ApiResponse({ status: 204, description: 'Submission deleted successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 404, description: 'Submission not found' })
-  deleteSubmission(
-    @Param() params: IdParamDto,
-    @CurrentUser('id') userId: string,
+  @ApiOperation({ summary: 'Publish results and trigger prize distribution' })
+  publishResults(
+    @Param('id') hackathonId: string,
+    @CurrentUser('id') companyId: string,
   ) {
-    return this.hackathonsService.deleteSubmission(params.id, userId);
-  }
-
-  @Post('submissions/:id/judge')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Judge submission',
-    description:
-      'Score and provide feedback on a submission (only by hackathon owner)',
-  })
-  @ApiParam({ name: 'id', description: 'Submission ID' })
-  @ApiResponse({ status: 200, description: 'Submission judged successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  judgeSubmission(
-    @Param() params: IdParamDto,
-    @CurrentUser('id') userId: string,
-    @Body() dto: JudgeSubmissionDto,
-  ) {
-    return this.hackathonsService.judgeSubmission(params.id, userId, dto);
-  }
-
-  @Post(':id/winners')
-  @UseGuards(JwtAuthGuard, OwnerGuard)
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({
-    summary: 'Select winners',
-    description: 'Select and announce hackathon winners (only by owner)',
-  })
-  @ApiParam({ name: 'id', description: 'Hackathon ID' })
-  @ApiResponse({ status: 200, description: 'Winners selected successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
-  selectWinners(
-    @Param() params: IdParamDto,
-    @CurrentUser('id') userId: string,
-    @Body() dto: HackathonSelectWinnersDto,
-  ) {
-    return this.hackathonsService.selectWinners(params.id, userId, dto);
-  }
-
-  @Get(':hackathonId/winners')
-  @ApiOperation({
-    summary: 'Get winners',
-    description: 'Retrieve hackathon winners',
-  })
-  @ApiParam({ name: 'hackathonId', description: 'Hackathon ID' })
-  @ApiResponse({ status: 200, description: 'List of winners' })
-  getWinners(
-    @Param() params: HackathonIdParamDto,
-    @Query() query: GetSubmissionsQueryDto,
-  ) {
-    return this.hackathonsService.getWinners(params.hackathonId, query.trackId);
+    return this.judgingService.publishResults(hackathonId, companyId);
   }
 }

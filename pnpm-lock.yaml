@@ -80,6 +80,9 @@ importers:
       contract:
         specifier: link:@stellar/stellar-sdk/contract
         version: link:@stellar/stellar-sdk/contract
+      cron:
+        specifier: ^4.4.0
+        version: 4.4.0
       firebase-admin:
         specifier: ^13.6.0
         version: 13.6.0
@@ -2576,6 +2579,10 @@ packages:
 
   cron@4.3.5:
     resolution: {integrity: sha512-hKPP7fq1+OfyCqoePkKfVq7tNAdFwiQORr4lZUHwrf0tebC65fYEeWgOrXOL6prn1/fegGOdTfrM6e34PJfksg==}
+    engines: {node: '>=18.x'}
+
+  cron@4.4.0:
+    resolution: {integrity: sha512-fkdfq+b+AHI4cKdhZlppHveI/mgz2qpiYxcm+t5E5TsxX7QrLS1VE0+7GENEk9z0EeGPcpSciGv6ez24duWhwQ==}
     engines: {node: '>=18.x'}
 
   cross-env@10.1.0:
@@ -8248,6 +8255,11 @@ snapshots:
       luxon: 3.7.2
 
   cron@4.3.5:
+    dependencies:
+      '@types/luxon': 3.7.1
+      luxon: 3.7.2
+
+  cron@4.4.0:
     dependencies:
       '@types/luxon': 3.7.1
       luxon: 3.7.2

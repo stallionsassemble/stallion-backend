@@ -1,10 +1,13 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { HackathonType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsInt,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -12,104 +15,102 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-class TrackFieldDefinition {
-  @IsString()
-  name: string;
-
-  @IsString()
-  type: string; // 'text', 'url', 'file', 'textarea', etc.
-
-  @IsString()
-  label: string;
-
-  @IsOptional()
-  @IsBoolean()
-  required?: boolean;
-
-  @IsOptional()
-  @IsString()
-  placeholder?: string;
-
-  @IsOptional()
-  @IsString()
-  description?: string;
-}
-
-class CreateTrackDto {
-  @IsString()
-  name: string;
-
-  @IsString()
-  description: string;
-
-  @IsNumber()
-  @Min(0)
-  prizePool: number;
-
-  @IsArray()
-  @IsNumber({}, { each: true })
-  @ArrayMinSize(1)
-  rewardDistribution: number[]; // Percentages for each position
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => TrackFieldDefinition)
-  submissionFields?: TrackFieldDefinition[];
-
-  @IsOptional()
+export class HackathonPrizeDto {
+  @ApiProperty()
   @IsInt()
   @Min(1)
-  maxSubmissions?: number;
+  position: number;
 
-  @IsOptional()
-  @IsBoolean()
-  isMainTrack?: boolean;
+  @ApiProperty()
+  @IsNumber()
+  @Min(0)
+  amount: number;
 }
 
 export class CreateHackathonDto {
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   title: string;
 
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   slug: string;
 
+  @ApiProperty({ enum: HackathonType })
+  @IsEnum(HackathonType)
+  type: HackathonType;
+
+  @ApiProperty()
   @IsString()
+  @IsNotEmpty()
   description: string;
 
-  @IsDateString()
-  startDate: string;
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  deliverables: string[];
 
-  @IsDateString()
-  endDate: string;
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @IsString({ each: true })
+  tags: string[];
 
-  @IsOptional()
+  @ApiProperty()
+  @IsDateString()
+  deadline: string;
+
+  @ApiProperty()
+  @IsDateString()
+  announcementDate: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @Min(0)
+  totalBudget: number;
+
+  @ApiProperty({ description: 'Token contract address for the prize pool' })
   @IsString()
-  currency?: string;
+  @IsNotEmpty()
+  token: string;
 
+  @ApiProperty({ description: 'Asset identifier (e.g. XLM or USDC)' })
+  @IsString()
+  @IsNotEmpty()
+  asset: string;
+
+  @ApiProperty({ type: [HackathonPrizeDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HackathonPrizeDto)
+  prizePool: HackathonPrizeDto[];
+
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description: 'Map of title to link',
+    example: { title: 'link' },
+  })
   @IsOptional()
-  @IsBoolean()
-  allowMultipleTrackSubmissions?: boolean;
+  documents?: Record<string, string>;
 
+  @ApiProperty({ required: false, type: Object, example: { title: 'link' } })
+  @IsOptional()
+  attachments?: any;
+
+  @ApiProperty()
+  @IsBoolean()
+  teamBased: boolean;
+
+  @ApiProperty({ required: false })
   @IsOptional()
   @IsInt()
   @Min(1)
-  maxSubmissionsPerUser?: number;
+  maxTeamSize?: number;
 
-  @IsOptional()
+  @ApiProperty({ description: 'ID of the Project Owner who will act as judge' })
   @IsString()
-  coverImage?: string;
-
-  @IsOptional()
-  @IsString()
-  rules?: string;
-
-  @IsOptional()
-  prizes?: any;
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateTrackDto)
-  @ArrayMinSize(1)
-  tracks: CreateTrackDto[];
+  @IsNotEmpty()
+  companyId: string;
 }

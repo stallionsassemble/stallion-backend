@@ -95,9 +95,12 @@ model User {
   fcmTokens            FcmToken[]
 
   // Hackathon relations
-  hackathons           Hackathon[]
-  hackathonSubmissions HackathonSubmission[]
-  hackathonWinners     HackathonWinner[]
+  createdHackathons       Hackathon[]            @relation("HackathonCreator")
+  judgedHackathons        Hackathon[]            @relation("HackathonCompany")
+  hackathonSubmissions    HackathonSubmission[]
+  hackathonWinners        HackathonWinner[]
+  hackathonTeams          HackathonTeam[]        @relation("TeamLeader")
+  hackathonParticipations HackathonParticipant[]
 
   // Project relations
   ownedProjects       Project[]            @relation("ProjectOwner")
@@ -439,6 +442,7 @@ enum SocialProvider {
 enum PayoutSourceType {
   BOUNTY_WIN
   PROJECT_MILESTONE
+  HACKATHON_WIN
 }
 
 enum PayoutStatus {
@@ -874,61 +878,62 @@ enum NotificationType {
 // ============================================
 
 model Hackathon {
-  id          String @id @default(cuid())
+  id          String   @id @default(cuid())
   title       String
-  slug        String @unique
-  description String @db.Text
+  slug        String   @unique
+  description String   @db.Text
+  type        HackathonType
+  deliverables String[] @default([])
+  tags         String[] @default([])
 
-  startDate DateTime @map("start_date")
-  endDate   DateTime @map("end_date")
+  deadline         DateTime
+  announcementDate DateTime @map("announcement_date")
 
-  totalReward Decimal @map("total_reward") @db.Decimal(20, 7)
+  totalBudget Decimal @map("total_budget") @db.Decimal(20, 7)
+  token       String
+  asset       String
   currency    String  @default("XLM")
+  prizePool   Json    @map("prize_pool")
 
-  // Settings
-  allowMultipleTrackSubmissions Boolean @default(false) @map("allow_multiple_track_submissions")
-  maxSubmissionsPerUser         Int     @default(1) @map("max_submissions_per_user")
+  documents   Json?
+  attachments Json?
 
-  // Metadata
-  coverImage String? @map("cover_image")
-  rules      String? @db.Text
-  prizes     Json? // Additional prize information
+  teamBased   Boolean @default(false) @map("team_based")
+  maxTeamSize Int?    @map("max_team_size")
 
-  status HackathonStatus @default(DRAFT)
+  status           HackathonStatus @default(DRAFT)
+  resultsPublished Boolean         @default(false) @map("results_published")
+
+  // Smart contract fields
+  contractHackathonId Int?    @unique @map("contract_hackathon_id")
+  txHash              String? @map("tx_hash")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  ownerId String @map("owner_id")
-  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  // Relations
+  createdById String @map("created_by_id")
+  createdBy   User   @relation("HackathonCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
-  tracks      HackathonTrack[]
-  submissions HackathonSubmission[]
-  winners     HackathonWinner[]
-  activities  Activity[]
+  companyId String @map("company_id")
+  company   User   @relation("HackathonCompany", fields: [companyId], references: [id], onDelete: Restrict)
 
-  @@index([ownerId])
-  @@index([status, startDate])
+  submissions  HackathonSubmission[]
+  winners      HackathonWinner[]
+  teams        HackathonTeam[]
+  participants HackathonParticipant[]
+  activities   Activity[]
+
+  @@index([createdById])
+  @@index([companyId])
+  @@index([status, deadline])
   @@index([slug])
   @@map("hackathons")
 }
 
-model HackathonTrack {
-  id          String @id @default(cuid())
-  name        String
-  description String @db.Text
-
-  prizePool Decimal @map("prize_pool") @db.Decimal(20, 7)
-
-  // Reward distribution (e.g., [50, 30, 20] for 1st, 2nd, 3rd place percentages)
-  rewardDistribution Json @map("reward_distribution")
-
-  // Submission requirements
-  submissionFields Json @map("submission_fields") // Array of field definitions
-
-  // Track settings
-  maxSubmissions Int?    @map("max_submissions") // Max submissions for this track
-  isMainTrack    Boolean @default(false) @map("is_main_track")
+model HackathonTeam {
+  id   String @id @default(cuid())
+  name String
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -936,26 +941,53 @@ model HackathonTrack {
   hackathonId String    @map("hackathon_id")
   hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
 
-  submissions HackathonSubmission[]
-  winners     HackathonWinner[]
+  leaderId    String    @map("leader_id")
+  leader      User      @relation("TeamLeader", fields: [leaderId], references: [id], onDelete: Restrict)
 
+  participants HackathonParticipant[]
+  submissions  HackathonSubmission[]
+
+  @@unique([hackathonId, name])
   @@index([hackathonId])
-  @@index([hackathonId, isMainTrack])
-  @@map("hackathon_tracks")
+  @@index([leaderId])
+  @@map("hackathon_teams")
+}
+
+model HackathonParticipant {
+  id String @id @default(cuid())
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  hackathonId String    @map("hackathon_id")
+  hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
+
+  teamId String?        @map("team_id")
+  team   HackathonTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, hackathonId])
+  @@index([userId])
+  @@index([hackathonId])
+  @@index([teamId])
+  @@map("hackathon_participants")
 }
 
 model HackathonSubmission {
   id String @id @default(cuid())
 
-  // Submission data based on track's submissionFields
-  submissionData Json @map("submission_data")
-
-  // Additional metadata
-  projectName   String? @map("project_name")
-  projectUrl    String? @map("project_url")
-  repositoryUrl String? @map("repository_url")
-  videoUrl      String? @map("video_url")
-  description   String? @db.Text
+  title          String
+  submissionLink String @map("submission_link")
+  description    String? @db.Text
+  
+  // Custom submission data if needed
+  submissionData Json?   @map("submission_data")
+  projectName    String? @map("project_name")
+  projectUrl     String? @map("project_url")
+  repositoryUrl  String? @map("repository_url")
+  videoUrl       String? @map("video_url")
 
   status HackathonSubmissionStatus @default(PENDING)
 
@@ -973,15 +1005,14 @@ model HackathonSubmission {
   hackathonId String    @map("hackathon_id")
   hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Cascade)
 
-  trackId String         @map("track_id")
-  track   HackathonTrack @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  teamId String?        @map("team_id")
+  team   HackathonTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
   winner HackathonWinner?
 
-  @@unique([userId, hackathonId, trackId])
   @@index([userId])
   @@index([hackathonId, status])
-  @@index([trackId, status])
+  @@index([teamId])
   @@map("hackathon_submissions")
 }
 
@@ -990,6 +1021,7 @@ model HackathonWinner {
 
   position    Int // 1st, 2nd, 3rd, etc.
   prizeAmount Decimal @map("prize_amount") @db.Decimal(20, 7)
+  feedback    String? @db.Text
 
   // Payout tracking
   isPaid Boolean   @default(false) @map("is_paid")
@@ -1004,16 +1036,12 @@ model HackathonWinner {
   hackathonId String    @map("hackathon_id")
   hackathon   Hackathon @relation(fields: [hackathonId], references: [id], onDelete: Restrict)
 
-  trackId String         @map("track_id")
-  track   HackathonTrack @relation(fields: [trackId], references: [id], onDelete: Restrict)
-
   submissionId String              @unique @map("submission_id")
   submission   HackathonSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
 
-  @@unique([hackathonId, trackId, position])
+  @@unique([hackathonId, position])
   @@index([userId])
   @@index([hackathonId])
-  @@index([trackId])
   @@map("hackathon_winners")
 }
 
@@ -1051,10 +1079,14 @@ model PlatformSetting {
 // HACKATHON ENUMS
 // ============================================
 
+enum HackathonType {
+  VIRTUAL
+  PHYSICAL
+}
+
 enum HackathonStatus {
   DRAFT
   PUBLISHED
-  ONGOING
   JUDGING
   COMPLETED
   CANCELLED
@@ -1062,7 +1094,8 @@ enum HackathonStatus {
 
 enum HackathonSubmissionStatus {
   PENDING
-  APPROVED
+  IN_REVIEW
+  WINNER
   REJECTED
   DISQUALIFIED
 }

@@ -53,6 +53,13 @@ export const Errors = {
   26: { message: 'InvalidAmount' },
   27: { message: 'DeadlinePassed' },
   28: { message: 'InternalError' },
+  29: { message: 'HackathonNotFound' },
+  30: { message: 'HackathonNotActive' },
+  31: { message: 'HackathonDeadlinePassed' },
+  32: { message: 'InvalidPrizePool' },
+  33: { message: 'HackathonNotCompleted' },
+  34: { message: 'InvalidPosition' },
+  35: { message: 'AllPositionsNotFilled' },
 };
 
 export interface Bounty {
@@ -85,6 +92,17 @@ export interface Project {
   total_reward: i128;
 }
 
+export interface Hackathon {
+  admin: string;
+  deadline: u64;
+  prize_pool: Array<HackathonPrize>;
+  remaining_escrow: i128;
+  status: HackathonStatus;
+  token: string;
+  total_budget: i128;
+  winners: Map<u32, string>;
+}
+
 export type ProjectType =
   | { tag: 'Gig'; values: void }
   | { tag: 'Job'; values: void };
@@ -101,6 +119,16 @@ export interface MilestoneInfo {
 }
 
 export type ProjectStatus =
+  | { tag: 'Active'; values: void }
+  | { tag: 'Completed'; values: void }
+  | { tag: 'Cancelled'; values: void };
+
+export interface HackathonPrize {
+  amount: i128;
+  position: u32;
+}
+
+export type HackathonStatus =
   | { tag: 'Active'; values: void }
   | { tag: 'Completed'; values: void }
   | { tag: 'Cancelled'; values: void };
@@ -193,6 +221,14 @@ export interface Client {
   ) => Promise<AssembledTransaction<Result<void>>>;
 
   /**
+   * Construct and simulate a get_hackathon transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_hackathon: (
+    { hackathon_id }: { hackathon_id: u32 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<Hackathon>>>;
+
+  /**
    * Construct and simulate a update_bounty transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   update_bounty: (
@@ -211,6 +247,13 @@ export interface Client {
     },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
+
+  /**
+   * Construct and simulate a get_hackathons transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_hackathons: (
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
    * Construct and simulate a get_submission transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
@@ -241,6 +284,52 @@ export interface Client {
       bounty_id,
       submission_link,
     }: { applicant: string; bounty_id: u32; submission_link: string },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
+
+  /**
+   * Construct and simulate a cancel_hackathon transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  cancel_hackathon: (
+    { admin, hackathon_id }: { admin: string; hackathon_id: u32 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<i128>>>;
+
+  /**
+   * Construct and simulate a create_hackathon transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  create_hackathon: (
+    {
+      admin,
+      token,
+      total_budget,
+      prize_pool,
+      deadline,
+    }: {
+      admin: string;
+      token: string;
+      total_budget: i128;
+      prize_pool: Array<HackathonPrize>;
+      deadline: u64;
+    },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<u32>>>;
+
+  /**
+   * Construct and simulate a update_hackathon transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  update_hackathon: (
+    {
+      admin,
+      hackathon_id,
+      new_deadline,
+      new_prize_pool,
+    }: {
+      admin: string;
+      hackathon_id: u32;
+      new_deadline: Option<u64>;
+      new_prize_pool: Option<Array<HackathonPrize>>;
+    },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
 
@@ -390,6 +479,21 @@ export interface Client {
   ) => Promise<AssembledTransaction<Array<u32>>>;
 
   /**
+   * Construct and simulate a get_hackathons_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_hackathons_count: (
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<u32>>;
+
+  /**
+   * Construct and simulate a get_hackathon_status transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_hackathon_status: (
+    { hackathon_id }: { hackathon_id: u32 },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<HackathonStatus>>>;
+
+  /**
    * Construct and simulate a get_bounties_by_token transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_bounties_by_token: (
@@ -438,6 +542,14 @@ export interface Client {
   ) => Promise<AssembledTransaction<u32>>;
 
   /**
+   * Construct and simulate a get_hackathons_by_status transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  get_hackathons_by_status: (
+    { status }: { status: HackathonStatus },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Array<u32>>>;
+
+  /**
    * Construct and simulate a get_owner_bounties_count transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
    */
   get_owner_bounties_count: (
@@ -461,6 +573,22 @@ export interface Client {
       milestone_order: u32;
       contributor: string;
       amount: i128;
+    },
+    options?: MethodOptions,
+  ) => Promise<AssembledTransaction<Result<void>>>;
+
+  /**
+   * Construct and simulate a distribute_hackathon_prizes transaction. Returns an `AssembledTransaction` object which will have a `result` field containing the result of the simulation. If this transaction changes contract state, you will need to call `signAndSend()` on the returned object.
+   */
+  distribute_hackathon_prizes: (
+    {
+      admin,
+      hackathon_id,
+      winners,
+    }: {
+      admin: string;
+      hackathon_id: u32;
+      winners: Array<readonly [u32, string]>;
     },
     options?: MethodOptions,
   ) => Promise<AssembledTransaction<Result<void>>>;
@@ -510,11 +638,16 @@ export class Client extends ContractClient {
         'AAAAAAAAAAAAAAANY2hlY2tfanVkZ2luZwAAAAAAAAEAAAAAAAAACWJvdW50eV9pZAAAAAAAAAQAAAABAAAD6QAAA+0AAAAAAAAAAw==',
         'AAAAAAAAAAAAAAANY3JlYXRlX2JvdW50eQAAAAAAAAcAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAAAAAAZyZXdhcmQAAAAAAAsAAAAAAAAADGRpc3RyaWJ1dGlvbgAAA+oAAAPtAAAAAgAAAAQAAAAEAAAAAAAAABNzdWJtaXNzaW9uX2RlYWRsaW5lAAAAAAYAAAAAAAAAEGp1ZGdpbmdfZGVhZGxpbmUAAAAGAAAAAAAAAAV0aXRsZQAAAAAAABAAAAABAAAD6QAAAAQAAAAD',
         'AAAAAAAAAAAAAAANZGVsZXRlX2JvdW50eQAAAAAAAAIAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD7QAAAAAAAAAD',
+        'AAAAAAAAAAAAAAANZ2V0X2hhY2thdGhvbgAAAAAAAAEAAAAAAAAADGhhY2thdGhvbl9pZAAAAAQAAAABAAAD6QAAB9AAAAAJSGFja2F0aG9uAAAAAAAAAw==',
         'AAAAAAAAAAAAAAANdXBkYXRlX2JvdW50eQAAAAAAAAUAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAAAAAAJbmV3X3RpdGxlAAAAAAAD6AAAABAAAAAAAAAAEG5ld19kaXN0cmlidXRpb24AAAPqAAAD7QAAAAIAAAAEAAAABAAAAAAAAAAXbmV3X3N1Ym1pc3Npb25fZGVhZGxpbmUAAAAD6AAAAAYAAAABAAAD6QAAA+0AAAAAAAAAAw==',
         'AAAAAAAAAAAAAAANX19jb25zdHJ1Y3RvcgAAAAAAAAIAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAALZmVlX2FjY291bnQAAAAAEwAAAAA=',
+        'AAAAAAAAAAAAAAAOZ2V0X2hhY2thdGhvbnMAAAAAAAAAAAABAAAD6gAAAAQ=',
         'AAAAAAAAAAAAAAAOZ2V0X3N1Ym1pc3Npb24AAAAAAAIAAAAAAAAACWJvdW50eV9pZAAAAAAAAAQAAAAAAAAABHVzZXIAAAATAAAAAQAAA+kAAAAQAAAAAw==',
         'AAAAAAAAAAAAAAAOc2VsZWN0X3dpbm5lcnMAAAAAAAMAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAAAAAAHd2lubmVycwAAAAPqAAAAEwAAAAEAAAPpAAAD7QAAAAAAAAAD',
         'AAAAAAAAAAAAAAAPYXBwbHlfdG9fYm91bnR5AAAAAAMAAAAAAAAACWFwcGxpY2FudAAAAAAAABMAAAAAAAAACWJvdW50eV9pZAAAAAAAAAQAAAAAAAAAD3N1Ym1pc3Npb25fbGluawAAAAAQAAAAAQAAA+kAAAPtAAAAAAAAAAM=',
+        'AAAAAAAAAAAAAAAQY2FuY2VsX2hhY2thdGhvbgAAAAIAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAMaGFja2F0aG9uX2lkAAAABAAAAAEAAAPpAAAACwAAAAM=',
+        'AAAAAAAAAAAAAAAQY3JlYXRlX2hhY2thdGhvbgAAAAUAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAAAAAAx0b3RhbF9idWRnZXQAAAALAAAAAAAAAApwcml6ZV9wb29sAAAAAAPqAAAH0AAAAA5IYWNrYXRob25Qcml6ZQAAAAAAAAAAAAhkZWFkbGluZQAAAAYAAAABAAAD6QAAAAQAAAAD',
+        'AAAAAAAAAAAAAAAQdXBkYXRlX2hhY2thdGhvbgAAAAQAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAMaGFja2F0aG9uX2lkAAAABAAAAAAAAAAMbmV3X2RlYWRsaW5lAAAD6AAAAAYAAAAAAAAADm5ld19wcml6ZV9wb29sAAAAAAPoAAAD6gAAB9AAAAAOSGFja2F0aG9uUHJpemUAAAAAAAEAAAPpAAAD7QAAAAAAAAAD',
         'AAAAAAAAAAAAAAARZ2V0X2JvdW50eV9zdGF0dXMAAAAAAAABAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAQAAA+kAAAfQAAAABlN0YXR1cwAAAAAAAw==',
         'AAAAAAAAAAAAAAARZ2V0X3VzZXJfYm91bnRpZXMAAAAAAAABAAAAAAAAAAR1c2VyAAAAEwAAAAEAAAPqAAAABA==',
         'AAAAAAAAAAAAAAARdXBkYXRlX3N1Ym1pc3Npb24AAAAAAAADAAAAAAAAAAlhcHBsaWNhbnQAAAAAAAATAAAAAAAAAAlib3VudHlfaWQAAAAAAAAEAAAAAAAAABNuZXdfc3VibWlzc2lvbl9saW5rAAAAABAAAAABAAAD6QAAA+0AAAAAAAAAAw==',
@@ -529,24 +662,31 @@ export class Client extends ContractClient {
         'AAAAAAAAAAAAAAASdXBkYXRlX3Byb2plY3RfZ2lnAAAAAAAEAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACnByb2plY3RfaWQAAAAAAAQAAAAAAAAADm5ld19taWxlc3RvbmVzAAAAAAPoAAAD6gAAB9AAAAANTWlsZXN0b25lRGF0YQAAAAAAAAAAAAAMbmV3X2RlYWRsaW5lAAAD6AAAAAYAAAABAAAD6QAAA+0AAAAAAAAAAw==',
         'AAAAAAAAAAAAAAASdXBkYXRlX3Byb2plY3Rfam9iAAAAAAADAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAACnByb2plY3RfaWQAAAAAAAQAAAAAAAAADG5ld19kZWFkbGluZQAAA+gAAAAGAAAAAQAAA+kAAAPtAAAAAAAAAAM=',
         'AAAAAAAAAAAAAAATZ2V0X2FjdGl2ZV9ib3VudGllcwAAAAAAAAAAAQAAA+oAAAAE',
+        'AAAAAAAAAAAAAAAUZ2V0X2hhY2thdGhvbnNfY291bnQAAAAAAAAAAQAAAAQ=',
+        'AAAAAAAAAAAAAAAUZ2V0X2hhY2thdGhvbl9zdGF0dXMAAAABAAAAAAAAAAxoYWNrYXRob25faWQAAAAEAAAAAQAAA+kAAAfQAAAAD0hhY2thdGhvblN0YXR1cwAAAAAD',
         'AAAAAAAAAAAAAAAVZ2V0X2JvdW50aWVzX2J5X3Rva2VuAAAAAAAAAQAAAAAAAAAFdG9rZW4AAAAAAAATAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAVZ2V0X2JvdW50eV9hcHBsaWNhbnRzAAAAAAAAAQAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD6gAAABMAAAAD',
         'AAAAAAAAAAAAAAAWZ2V0X2JvdW50aWVzX2J5X3N0YXR1cwAAAAAAAQAAAAAAAAAGc3RhdHVzAAAAAAfQAAAABlN0YXR1cwAAAAAAAQAAA+oAAAAE',
         'AAAAAAAAAAAAAAAWZ2V0X2JvdW50eV9zdWJtaXNzaW9ucwAAAAAAAQAAAAAAAAAJYm91bnR5X2lkAAAAAAAABAAAAAEAAAPpAAAD7AAAABMAAAAQAAAAAw==',
         'AAAAAAAAAAAAAAAWZ2V0X3Byb2plY3RzX2J5X3N0YXR1cwAAAAAAAQAAAAAAAAAGc3RhdHVzAAAAAAfQAAAADVByb2plY3RTdGF0dXMAAAAAAAABAAAD6gAAAAQ=',
         'AAAAAAAAAAAAAAAXZ2V0X3VzZXJfYm91bnRpZXNfY291bnQAAAAAAQAAAAAAAAAEdXNlcgAAABMAAAABAAAABA==',
+        'AAAAAAAAAAAAAAAYZ2V0X2hhY2thdGhvbnNfYnlfc3RhdHVzAAAAAQAAAAAAAAAGc3RhdHVzAAAAAAfQAAAAD0hhY2thdGhvblN0YXR1cwAAAAABAAAD6gAAAAQ=',
         'AAAAAAAAAAAAAAAYZ2V0X293bmVyX2JvdW50aWVzX2NvdW50AAAAAQAAAAAAAAAFb3duZXIAAAAAAAATAAAAAQAAAAQ=',
         'AAAAAAAAAAAAAAAZcmVsZWFzZV9taWxlc3RvbmVfcGF5bWVudAAAAAAAAAUAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAKcHJvamVjdF9pZAAAAAAABAAAAAAAAAAPbWlsZXN0b25lX29yZGVyAAAAAAQAAAAAAAAAC2NvbnRyaWJ1dG9yAAAAABMAAAAAAAAABmFtb3VudAAAAAAACwAAAAEAAAPpAAAD7QAAAAAAAAAD',
+        'AAAAAAAAAAAAAAAbZGlzdHJpYnV0ZV9oYWNrYXRob25fcHJpemVzAAAAAAMAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAMaGFja2F0aG9uX2lkAAAABAAAAAAAAAAHd2lubmVycwAAAAPqAAAD7QAAAAIAAAAEAAAAEwAAAAEAAAPpAAAD7QAAAAAAAAAD',
         'AAAAAAAAAAAAAAAbZ2V0X2JvdW50aWVzX2J5X3Rva2VuX2NvdW50AAAAAAEAAAAAAAAABXRva2VuAAAAAAAAEwAAAAEAAAAE',
         'AAAAAAAAAAAAAAAcZ2V0X2JvdW50aWVzX2J5X3N0YXR1c19jb3VudAAAAAEAAAAAAAAABnN0YXR1cwAAAAAH0AAAAAZTdGF0dXMAAAAAAAEAAAAE',
-        'AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAHAAAAAAAAAAITm90QWRtaW4AAAABAAAAAAAAABFBZG1pbkNhbm5vdEJlWmVybwAAAAAAAAIAAAAAAAAAFkZlZUFjY291bnRDYW5ub3RCZVplcm8AAAAAAAMAAAAAAAAADlNhbWVGZWVBY2NvdW50AAAAAAAEAAAAAAAAAAlPbmx5T3duZXIAAAAAAAAFAAAAAAAAAAxVbmF1dGhvcml6ZWQAAAAGAAAAAAAAAA5Cb3VudHlOb3RGb3VuZAAAAAAABwAAAAAAAAAOSW5hY3RpdmVCb3VudHkAAAAAAAgAAAAAAAAAFEJvdW50eURlYWRsaW5lUGFzc2VkAAAACQAAAAAAAAAVSnVkZ2luZ0RlYWRsaW5lUGFzc2VkAAAAAAAACgAAAAAAAAAUQm91bnR5SGFzU3VibWlzc2lvbnMAAAALAAAAAAAAACtDYW5ub3RTZWxlY3RXaW5uZXJzQmVmb3JlU3VibWlzc2lvbkRlYWRsaW5lAAAAAAwAAAAAAAAALEp1ZGdpbmdEZWFkbGluZU11c3RCZUFmdGVyU3VibWlzc2lvbkRlYWRsaW5lAAAADQAAAAAAAAAQTm90RW5vdWdoV2lubmVycwAAAA4AAAAAAAAAGERpc3RyaWJ1dGlvbk11c3RTdW1UbzEwMAAAAA8AAAAAAAAAFUludmFsaWREZWFkbGluZVVwZGF0ZQAAAAAAABAAAAAAAAAAElN1Ym1pc3Npb25Ob3RGb3VuZAAAAAAAEQAAAAAAAAAPUHJvamVjdE5vdEZvdW5kAAAAABIAAAAAAAAAEkludmFsaWRQcm9qZWN0VHlwZQAAAAAAEwAAAAAAAAAQUHJvamVjdE5vdEFjdGl2ZQAAABQAAAAAAAAAEUludmFsaWRNaWxlc3RvbmVzAAAAAAAAFQAAAAAAAAARTWlsZXN0b25lTm90Rm91bmQAAAAAAAAWAAAAAAAAABRNaWxlc3RvbmVBbHJlYWR5UGFpZAAAABcAAAAAAAAAEkluc3VmZmljaWVudEVzY3JvdwAAAAAAGAAAAAAAAAANSW52YWxpZFJld2FyZAAAAAAAABkAAAAAAAAADUludmFsaWRBbW91bnQAAAAAAAAaAAAAAAAAAA5EZWFkbGluZVBhc3NlZAAAAAAAGwAAAAAAAAANSW50ZXJuYWxFcnJvcgAAAAAAABw=',
+        'AAAABAAAAAAAAAAAAAAABUVycm9yAAAAAAAAIwAAAAAAAAAITm90QWRtaW4AAAABAAAAAAAAABFBZG1pbkNhbm5vdEJlWmVybwAAAAAAAAIAAAAAAAAAFkZlZUFjY291bnRDYW5ub3RCZVplcm8AAAAAAAMAAAAAAAAADlNhbWVGZWVBY2NvdW50AAAAAAAEAAAAAAAAAAlPbmx5T3duZXIAAAAAAAAFAAAAAAAAAAxVbmF1dGhvcml6ZWQAAAAGAAAAAAAAAA5Cb3VudHlOb3RGb3VuZAAAAAAABwAAAAAAAAAOSW5hY3RpdmVCb3VudHkAAAAAAAgAAAAAAAAAFEJvdW50eURlYWRsaW5lUGFzc2VkAAAACQAAAAAAAAAVSnVkZ2luZ0RlYWRsaW5lUGFzc2VkAAAAAAAACgAAAAAAAAAUQm91bnR5SGFzU3VibWlzc2lvbnMAAAALAAAAAAAAACtDYW5ub3RTZWxlY3RXaW5uZXJzQmVmb3JlU3VibWlzc2lvbkRlYWRsaW5lAAAAAAwAAAAAAAAALEp1ZGdpbmdEZWFkbGluZU11c3RCZUFmdGVyU3VibWlzc2lvbkRlYWRsaW5lAAAADQAAAAAAAAAQTm90RW5vdWdoV2lubmVycwAAAA4AAAAAAAAAGERpc3RyaWJ1dGlvbk11c3RTdW1UbzEwMAAAAA8AAAAAAAAAFUludmFsaWREZWFkbGluZVVwZGF0ZQAAAAAAABAAAAAAAAAAElN1Ym1pc3Npb25Ob3RGb3VuZAAAAAAAEQAAAAAAAAAPUHJvamVjdE5vdEZvdW5kAAAAABIAAAAAAAAAEkludmFsaWRQcm9qZWN0VHlwZQAAAAAAEwAAAAAAAAAQUHJvamVjdE5vdEFjdGl2ZQAAABQAAAAAAAAAEUludmFsaWRNaWxlc3RvbmVzAAAAAAAAFQAAAAAAAAARTWlsZXN0b25lTm90Rm91bmQAAAAAAAAWAAAAAAAAABRNaWxlc3RvbmVBbHJlYWR5UGFpZAAAABcAAAAAAAAAEkluc3VmZmljaWVudEVzY3JvdwAAAAAAGAAAAAAAAAANSW52YWxpZFJld2FyZAAAAAAAABkAAAAAAAAADUludmFsaWRBbW91bnQAAAAAAAAaAAAAAAAAAA5EZWFkbGluZVBhc3NlZAAAAAAAGwAAAAAAAAANSW50ZXJuYWxFcnJvcgAAAAAAABwAAAAAAAAAEUhhY2thdGhvbk5vdEZvdW5kAAAAAAAAHQAAAAAAAAASSGFja2F0aG9uTm90QWN0aXZlAAAAAAAeAAAAAAAAABdIYWNrYXRob25EZWFkbGluZVBhc3NlZAAAAAAfAAAAAAAAABBJbnZhbGlkUHJpemVQb29sAAAAIAAAAAAAAAAVSGFja2F0aG9uTm90Q29tcGxldGVkAAAAAAAAIQAAAAAAAAAPSW52YWxpZFBvc2l0aW9uAAAAACIAAAAAAAAAFUFsbFBvc2l0aW9uc05vdEZpbGxlZAAAAAAAACM=',
         'AAAAAQAAAAAAAAAAAAAABkJvdW50eQAAAAAACwAAAAAAAAAKYXBwbGljYW50cwAAAAAD6gAAABMAAAAAAAAADGRpc3RyaWJ1dGlvbgAAA+wAAAAEAAAABAAAAAAAAAAQanVkZ2luZ19kZWFkbGluZQAAAAYAAAAAAAAABW93bmVyAAAAAAAAEwAAAAAAAAAGcmV3YXJkAAAAAAALAAAAAAAAAAZzdGF0dXMAAAAAB9AAAAAGU3RhdHVzAAAAAAAAAAAAE3N1Ym1pc3Npb25fZGVhZGxpbmUAAAAABgAAAAAAAAALc3VibWlzc2lvbnMAAAAD7AAAABMAAAAQAAAAAAAAAAV0aXRsZQAAAAAAABAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAHd2lubmVycwAAAAPqAAAAEw==',
         'AAAAAgAAAAAAAAAAAAAABlN0YXR1cwAAAAAAAwAAAAAAAAAAAAAABkFjdGl2ZQAAAAAAAAAAAAAAAAAJQ29tcGxldGVkAAAAAAAAAAAAAAAAAAAGQ2xvc2VkAAA=',
         'AAAAAQAAAAAAAAAAAAAAB1Byb2plY3QAAAAACAAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAAAAAAptaWxlc3RvbmVzAAAAAAPqAAAH0AAAAA1NaWxlc3RvbmVJbmZvAAAAAAAAAAAAAAVvd25lcgAAAAAAABMAAAAAAAAADHByb2plY3RfdHlwZQAAB9AAAAALUHJvamVjdFR5cGUAAAAAAAAAABByZW1haW5pbmdfZXNjcm93AAAACwAAAAAAAAAGc3RhdHVzAAAAAAfQAAAADVByb2plY3RTdGF0dXMAAAAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfcmV3YXJkAAAACw==',
+        'AAAAAQAAAAAAAAAAAAAACUhhY2thdGhvbgAAAAAAAAgAAAAAAAAABWFkbWluAAAAAAAAEwAAAAAAAAAIZGVhZGxpbmUAAAAGAAAAAAAAAApwcml6ZV9wb29sAAAAAAPqAAAH0AAAAA5IYWNrYXRob25Qcml6ZQAAAAAAAAAAABByZW1haW5pbmdfZXNjcm93AAAACwAAAAAAAAAGc3RhdHVzAAAAAAfQAAAAD0hhY2thdGhvblN0YXR1cwAAAAAAAAAABXRva2VuAAAAAAAAEwAAAAAAAAAMdG90YWxfYnVkZ2V0AAAACwAAAAAAAAAHd2lubmVycwAAAAPsAAAABAAAABM=',
         'AAAAAgAAAAAAAAAAAAAAC1Byb2plY3RUeXBlAAAAAAIAAAAAAAAAAAAAAANHaWcAAAAAAAAAAAAAAAADSm9iAA==',
         'AAAAAQAAAAAAAAAAAAAADU1pbGVzdG9uZURhdGEAAAAAAAACAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAAAAAABW9yZGVyAAAAAAAABA==',
         'AAAAAQAAAAAAAAAAAAAADU1pbGVzdG9uZUluZm8AAAAAAAADAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAAAAAAB2lzX3BhaWQAAAAAAQAAAAAAAAAFb3JkZXIAAAAAAAAE',
         'AAAAAgAAAAAAAAAAAAAADVByb2plY3RTdGF0dXMAAAAAAAADAAAAAAAAAAAAAAAGQWN0aXZlAAAAAAAAAAAAAAAAAAlDb21wbGV0ZWQAAAAAAAAAAAAAAAAAAAlDYW5jZWxsZWQAAAA=',
+        'AAAAAQAAAAAAAAAAAAAADkhhY2thdGhvblByaXplAAAAAAACAAAAAAAAAAZhbW91bnQAAAAAAAsAAAAAAAAACHBvc2l0aW9uAAAABA==',
+        'AAAAAgAAAAAAAAAAAAAAD0hhY2thdGhvblN0YXR1cwAAAAADAAAAAAAAAAAAAAAGQWN0aXZlAAAAAAAAAAAAAAAAAAlDb21wbGV0ZWQAAAAAAAAAAAAAAAAAAAlDYW5jZWxsZWQAAAA=',
       ]),
       options,
     );
@@ -561,10 +701,15 @@ export class Client extends ContractClient {
     check_judging: this.txFromJSON<Result<void>>,
     create_bounty: this.txFromJSON<Result<u32>>,
     delete_bounty: this.txFromJSON<Result<void>>,
+    get_hackathon: this.txFromJSON<Result<Hackathon>>,
     update_bounty: this.txFromJSON<Result<void>>,
+    get_hackathons: this.txFromJSON<Array<u32>>,
     get_submission: this.txFromJSON<Result<string>>,
     select_winners: this.txFromJSON<Result<void>>,
     apply_to_bounty: this.txFromJSON<Result<void>>,
+    cancel_hackathon: this.txFromJSON<Result<i128>>,
+    create_hackathon: this.txFromJSON<Result<u32>>,
+    update_hackathon: this.txFromJSON<Result<void>>,
     get_bounty_status: this.txFromJSON<Result<Status>>,
     get_user_bounties: this.txFromJSON<Array<u32>>,
     update_submission: this.txFromJSON<Result<void>>,
@@ -579,14 +724,18 @@ export class Client extends ContractClient {
     update_project_gig: this.txFromJSON<Result<void>>,
     update_project_job: this.txFromJSON<Result<void>>,
     get_active_bounties: this.txFromJSON<Array<u32>>,
+    get_hackathons_count: this.txFromJSON<u32>,
+    get_hackathon_status: this.txFromJSON<Result<HackathonStatus>>,
     get_bounties_by_token: this.txFromJSON<Array<u32>>,
     get_bounty_applicants: this.txFromJSON<Result<Array<string>>>,
     get_bounties_by_status: this.txFromJSON<Array<u32>>,
     get_bounty_submissions: this.txFromJSON<Result<Map<string, string>>>,
     get_projects_by_status: this.txFromJSON<Array<u32>>,
     get_user_bounties_count: this.txFromJSON<u32>,
+    get_hackathons_by_status: this.txFromJSON<Array<u32>>,
     get_owner_bounties_count: this.txFromJSON<u32>,
     release_milestone_payment: this.txFromJSON<Result<void>>,
+    distribute_hackathon_prizes: this.txFromJSON<Result<void>>,
     get_bounties_by_token_count: this.txFromJSON<u32>,
     get_bounties_by_status_count: this.txFromJSON<u32>,
   };

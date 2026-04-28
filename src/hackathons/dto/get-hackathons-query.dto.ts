@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { HackathonStatus } from '@prisma/client';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { HackathonStatus, HackathonType } from '@prisma/client';
+import { Type } from 'class-transformer';
+import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 export class GetHackathonsQueryDto {
   @ApiPropertyOptional({
@@ -11,10 +12,40 @@ export class GetHackathonsQueryDto {
   @IsEnum(HackathonStatus)
   status?: HackathonStatus;
 
-  @ApiPropertyOptional({
-    description: 'Filter by owner ID',
-  })
+  @ApiPropertyOptional({ description: 'Search term for title or description' })
   @IsOptional()
   @IsString()
-  ownerId?: string;
+  search?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter by hackathon type',
+    enum: HackathonType,
+  })
+  @IsOptional()
+  @IsEnum(HackathonType)
+  type?: HackathonType;
+
+  @ApiPropertyOptional({ description: 'Filter by specific tag' })
+  @IsOptional()
+  @IsString()
+  tag?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by company ID' })
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @ApiPropertyOptional({ description: 'Page number' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @ApiPropertyOptional({ description: 'Items per page' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number = 10;
 }
