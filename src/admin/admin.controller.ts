@@ -159,12 +159,34 @@ export class AdminController {
     description: 'Paginated users list',
     schema: {
       example: {
-        data: [],
+        data: [
+          {
+            id: 'user-uuid-123',
+            email: 'contact@company.com',
+            username: 'company_alpha',
+            firstName: 'Alice',
+            lastName: 'Smith',
+            role: 'PROJECT_OWNER',
+            status: 'ACTIVE',
+            gender: 'UNSPECIFIED',
+            reputation: {
+              score: 450,
+              level: 'EXPERT',
+            },
+            reputationRating: 4.9,
+            totalReviews: 25,
+            bountiesParticipated: 0,
+            projectsParticipated: 8,
+            earningsUsd: 0,
+            lastActiveAt: '2026-05-09T20:10:38Z',
+            createdAt: '2026-01-15T09:30:00Z',
+          },
+        ],
         meta: {
-          total: 0,
+          total: 1,
           page: 1,
           limit: 10,
-          totalPages: 0,
+          totalPages: 1,
           hasNextPage: false,
           hasPreviousPage: false,
         },
