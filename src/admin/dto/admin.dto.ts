@@ -262,11 +262,19 @@ export class AdminCreateHackathonDto {
     example: {
       title: 'Stallion Hack Week',
       description: 'Build and submit your best product ideas',
-      startDate: '2026-04-01T00:00:00.000Z',
-      endDate: '2026-04-30T23:59:59.000Z',
-      totalReward: 10000,
-      currency: 'USDC',
-      tracks: [],
+      deadline: '2026-04-30T23:59:59.000Z',
+      announcementDate: '2026-04-01T00:00:00.000Z',
+      totalBudget: 10000,
+      asset: 'USDC',
+      prizePool: [
+        { position: 1, amount: 5000 },
+        { position: 2, amount: 3000 },
+        { position: 3, amount: 2000 },
+      ],
+      deliverables: ['GitHub Link'],
+      tags: ['Innovation'],
+      teamBased: true,
+      maxTeamSize: 4,
     },
   })
   @IsObject()

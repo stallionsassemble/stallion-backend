@@ -5,8 +5,14 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { HackathonStatus, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
+import {
+  getTokenAddress,
+  isCurrencySupported,
+} from '../common/utils/supported-currencies';
+import { EnvConfig } from '../config/env.config';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { GetHackathonsQueryDto } from './dto/get-hackathons-query.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
@@ -19,6 +25,7 @@ export class HackathonsService {
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly contractService: HackathonContractService,
     private readonly schedulingService: HackathonSchedulingService,
   ) {}
@@ -48,18 +55,29 @@ export class HackathonsService {
       );
     }
 
+    // Validate currency and get token address
+    const networkPassphrase =
+      this.configService.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
+      'Test SDF Network ; September 2015';
+
+    if (!isCurrencySupported(dto.asset, networkPassphrase)) {
+      throw new BadRequestException(`Unsupported currency: ${dto.asset}`);
+    }
+
+    const tokenAddress = getTokenAddress(dto.asset, networkPassphrase);
+
     // Validate dates
     const deadline = new Date(dto.deadline);
-    const announcementDate = new Date(dto.announcementDate);
+    const announcementDate = dto.announcementDate
+      ? new Date(dto.announcementDate)
+      : new Date();
+
+    const isImmediate = announcementDate <= new Date();
 
     if (announcementDate >= deadline) {
       throw new BadRequestException(
         'Announcement date must be before deadline',
       );
-    }
-
-    if (announcementDate < new Date()) {
-      throw new BadRequestException('Announcement date cannot be in the past');
     }
 
     // Validate prize pool
@@ -82,7 +100,7 @@ export class HackathonsService {
     const contractResult = await this.contractService.createHackathon({
       adminPublicKey: adminUser.wallet.publicKey,
       adminWalletId: adminUser.wallet.id,
-      token: dto.token,
+      token: tokenAddress,
       totalBudget: dto.totalBudget.toString(),
       prizePool: dto.prizePool.map((p) => ({
         position: p.position,
@@ -103,7 +121,7 @@ export class HackathonsService {
         deadline,
         announcementDate,
         totalBudget: new Prisma.Decimal(dto.totalBudget),
-        token: dto.token,
+        token: tokenAddress,
         asset: dto.asset,
         prizePool: dto.prizePool as any,
         documents: dto.documents || {},
@@ -112,14 +130,19 @@ export class HackathonsService {
         maxTeamSize: dto.teamBased ? dto.maxTeamSize : null,
         createdById: adminId,
         companyId: dto.companyId,
-        status: HackathonStatus.DRAFT,
+        status: isImmediate ? HackathonStatus.PUBLISHED : HackathonStatus.DRAFT,
         contractHackathonId: contractResult.contractHackathonId,
         txHash: contractResult.txHash,
       },
     });
 
     // Schedule Jobs
-    this.schedulingService.scheduleAnnouncement(hackathon.id, announcementDate);
+    if (!isImmediate) {
+      this.schedulingService.scheduleAnnouncement(
+        hackathon.id,
+        announcementDate,
+      );
+    }
     this.schedulingService.scheduleDeadline(hackathon.id, deadline);
 
     this.logger.log(`Hackathon created: ${hackathon.id} by Admin ${adminId}`);
@@ -196,9 +219,22 @@ export class HackathonsService {
       });
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { deadline, announcementDate, totalBudget, prizePool, ...restDto } =
-      dto;
+    const {
+      deadline,
+      announcementDate,
+      totalBudget,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      prizePool,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      asset,
+      ...restDto
+    } = dto;
+
+    if (dto.asset && dto.asset !== hackathon.asset) {
+      throw new BadRequestException(
+        'Currency cannot be changed after creation',
+      );
+    }
 
     const dataToUpdate: Prisma.HackathonUpdateInput = {
       ...restDto,

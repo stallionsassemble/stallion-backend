@@ -61,21 +61,24 @@ export class CreateHackathonDto {
   @IsDateString()
   deadline: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    required: false,
+    description:
+      'Date when the hackathon will be published. If not specified, it will be published immediately.',
+  })
+  @IsOptional()
   @IsDateString()
-  announcementDate: string;
+  announcementDate?: string;
 
   @ApiProperty()
   @IsNumber()
   @Min(0)
   totalBudget: number;
 
-  @ApiProperty({ description: 'Token contract address for the prize pool' })
-  @IsString()
-  @IsNotEmpty()
-  token: string;
-
-  @ApiProperty({ description: 'Asset identifier (e.g. XLM or USDC)' })
+  @ApiProperty({
+    description: 'Supported currency code (e.g. XLM, USDC, EURC)',
+    example: 'USDC',
+  })
   @IsString()
   @IsNotEmpty()
   asset: string;
