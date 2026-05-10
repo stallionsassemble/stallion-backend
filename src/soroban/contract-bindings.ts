@@ -17,13 +17,6 @@ if (typeof window !== 'undefined') {
   window.Buffer = window.Buffer || Buffer;
 }
 
-export const networks = {
-  testnet: {
-    networkPassphrase: 'Test SDF Network ; September 2015',
-    contractId: 'CAKPQ3VYEHMRLIH4TTWL5MN4YZ4W5GZTKXZQGJ3GPQD2ZRUFQ474JKOS',
-  },
-} as const;
-
 export const Errors = {
   1: { message: 'NotAdmin' },
   2: { message: 'AdminCannotBeZero' },
