@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HackathonStatus, Prisma, Role } from '@prisma/client';
+import { HackathonStatus, HackathonType, Prisma, Role } from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
   getTokenAddress,
@@ -55,7 +55,14 @@ export class HackathonsService {
       );
     }
 
-    // Validate currency and get token address
+    // 1. Validate Hackathon Type (Enum check)
+    if (!Object.values(HackathonType).includes(dto.type)) {
+      throw new BadRequestException(
+        `Invalid hackathon type: ${dto.type}. Expected one of: ${Object.values(HackathonType).join(', ')}`,
+      );
+    }
+
+    // 2. Validate currency and get token address
     const networkPassphrase =
       this.configService.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
       'Test SDF Network ; September 2015';
@@ -66,13 +73,20 @@ export class HackathonsService {
 
     const tokenAddress = getTokenAddress(dto.asset, networkPassphrase);
 
-    // Validate dates
+    // 3. Validate dates
+    const now = new Date();
     const deadline = new Date(dto.deadline);
     const announcementDate = dto.announcementDate
       ? new Date(dto.announcementDate)
-      : new Date();
+      : now;
 
-    const isImmediate = announcementDate <= new Date();
+    if (deadline <= now) {
+      throw new BadRequestException('Deadline must be in the future');
+    }
+
+    if (dto.announcementDate && announcementDate <= now) {
+      throw new BadRequestException('Announcement date must be in the future');
+    }
 
     if (announcementDate >= deadline) {
       throw new BadRequestException(
@@ -80,12 +94,26 @@ export class HackathonsService {
       );
     }
 
-    // Validate prize pool
+    const isImmediate = announcementDate <= now;
+
+    // 4. Validate prize pool
+    if (dto.totalBudget <= 0) {
+      throw new BadRequestException('Total budget must be greater than 0');
+    }
+
     const prizeSum = dto.prizePool.reduce((sum, p) => sum + p.amount, 0);
-    if (prizeSum !== dto.totalBudget) {
+    if (Math.abs(prizeSum - dto.totalBudget) > 0.0000001) {
+      // Handle potential floating point issues
       throw new BadRequestException(
-        'Prize pool amounts must sum exactly to the total budget',
+        `Prize pool amounts (${prizeSum}) must sum exactly to the total budget (${dto.totalBudget})`,
       );
+    }
+
+    // 5. Validate prize pool positions
+    const positions = dto.prizePool.map((p) => p.position);
+    const uniquePositions = new Set(positions);
+    if (uniquePositions.size !== positions.length) {
+      throw new BadRequestException('Duplicate prize pool positions found');
     }
 
     // Check slug uniqueness
@@ -123,6 +151,7 @@ export class HackathonsService {
         totalBudget: new Prisma.Decimal(dto.totalBudget),
         token: tokenAddress,
         asset: dto.asset,
+        currency: dto.asset,
         prizePool: dto.prizePool as any,
         documents: dto.documents || {},
         attachments: dto.attachments || {},
@@ -180,6 +209,12 @@ export class HackathonsService {
       );
     }
 
+    if (dto.type && !Object.values(HackathonType).includes(dto.type)) {
+      throw new BadRequestException(
+        `Invalid hackathon type: ${dto.type}. Expected one of: ${Object.values(HackathonType).join(', ')}`,
+      );
+    }
+
     let contractUpdateRequired = false;
     let newDeadline: Date | undefined = undefined;
 
@@ -197,11 +232,18 @@ export class HackathonsService {
     if (dto.prizePool) {
       const prizeSum = dto.prizePool.reduce((sum, p) => sum + p.amount, 0);
       const totalBudget = dto.totalBudget || hackathon.totalBudget.toNumber();
-      if (prizeSum !== totalBudget) {
+      if (Math.abs(prizeSum - totalBudget) > 0.0000001) {
         throw new BadRequestException(
-          'Prize pool amounts must sum exactly to the total budget',
+          `Prize pool amounts (${prizeSum}) must sum exactly to the total budget (${totalBudget})`,
         );
       }
+
+      // Check for duplicate positions
+      const positions = dto.prizePool.map((p) => p.position);
+      if (new Set(positions).size !== positions.length) {
+        throw new BadRequestException('Duplicate prize pool positions found');
+      }
+
       contractUpdateRequired = true;
       contractPrizePool = dto.prizePool.map((p) => ({
         position: p.position,

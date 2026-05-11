@@ -39,7 +39,9 @@ export class CreateHackathonDto {
   slug: string;
 
   @ApiProperty({ enum: HackathonType })
-  @IsEnum(HackathonType)
+  @IsEnum(HackathonType, {
+    message: `type must be one of: ${Object.values(HackathonType).join(', ')}`,
+  })
   type: HackathonType;
 
   @ApiProperty()
@@ -72,7 +74,7 @@ export class CreateHackathonDto {
 
   @ApiProperty()
   @IsNumber()
-  @Min(0)
+  @Min(1, { message: 'totalBudget must be at least 1' })
   totalBudget: number;
 
   @ApiProperty({

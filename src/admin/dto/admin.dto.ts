@@ -262,6 +262,7 @@ export class AdminCreateHackathonDto {
     example: {
       title: 'Stallion Hack Week',
       description: 'Build and submit your best product ideas',
+      type: 'VIRTUAL',
       deadline: '2026-04-30T23:59:59.000Z',
       announcementDate: '2026-04-01T00:00:00.000Z',
       totalBudget: 10000,
