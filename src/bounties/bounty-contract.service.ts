@@ -45,7 +45,7 @@ export class BountyContractService {
     submissionDeadline: Date;
     judgingDeadline: Date;
     title: string;
-  }): Promise<{ contractBountyId: number; txHash: string }> {
+  }): Promise<{ contractBountyId: bigint; txHash: string }> {
     this.logger.log(
       `Creating bounty for owner ${params.ownerPublicKey} with reward ${params.reward}`,
     );
@@ -100,7 +100,7 @@ export class BountyContractService {
       throw new BadRequestException('Transaction response not available');
     }
 
-    const bountyId = Number(result.result.unwrap().toString());
+    const bountyId = BigInt(result.result.unwrap().toString());
     const txHash = result.getTransactionResponse.txHash;
 
     this.logger.log(
@@ -119,7 +119,7 @@ export class BountyContractService {
   async updateBounty(params: {
     ownerPublicKey: string;
     walletId: string;
-    bountyId: number;
+    bountyId: bigint;
     title?: string;
     distribution?: Array<{ position: number; percentage: number }>;
     submissionDeadline?: Date;
@@ -185,7 +185,7 @@ export class BountyContractService {
   async applyToBounty(params: {
     applicantPublicKey: string;
     walletId: string;
-    bountyId: number;
+    bountyId: bigint;
     submissionLink: string;
   }): Promise<{ txHash: string }> {
     this.logger.log(
@@ -243,7 +243,7 @@ export class BountyContractService {
   async updateSubmission(params: {
     applicantPublicKey: string;
     walletId: string;
-    bountyId: number;
+    bountyId: bigint;
     newSubmissionLink: string;
   }): Promise<{ txHash: string }> {
     this.logger.log(
@@ -303,7 +303,7 @@ export class BountyContractService {
   async selectWinners(params: {
     ownerPublicKey: string;
     walletId: string;
-    bountyId: number;
+    bountyId: bigint;
     winners: string[];
   }): Promise<{ txHash: string }> {
     this.logger.log(`Selecting winners for bounty ${params.bountyId}`);
@@ -361,7 +361,7 @@ export class BountyContractService {
   async closeBounty(params: {
     ownerPublicKey: string;
     walletId: string;
-    bountyId: number;
+    bountyId: bigint;
   }): Promise<{ txHash: string }> {
     this.logger.log(`Closing bounty ${params.bountyId}`);
 
@@ -415,11 +415,11 @@ export class BountyContractService {
    * Get all bounties from contract
    * Returns array of contract bounty IDs
    */
-  async getBounties(): Promise<number[]> {
+  async getBounties(): Promise<bigint[]> {
     try {
       const assembled = await this.sorobanClient.get_bounties();
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error('Failed to get bounties from contract', error);
       throw error;
@@ -430,13 +430,13 @@ export class BountyContractService {
    * Get owner bounties from contract
    * Returns array of contract bounty IDs for a specific owner
    */
-  async getOwnerBounties(ownerPublicKey: string): Promise<number[]> {
+  async getOwnerBounties(ownerPublicKey: string): Promise<bigint[]> {
     try {
       const assembled = await this.sorobanClient.get_owner_bounties({
         owner: ownerPublicKey,
       });
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error('Failed to get owner bounties from contract', error);
       throw error;
@@ -447,11 +447,11 @@ export class BountyContractService {
    * Get active bounties from contract
    * Returns array of contract bounty IDs
    */
-  async getActiveBounties(): Promise<number[]> {
+  async getActiveBounties(): Promise<bigint[]> {
     try {
       const assembled = await this.sorobanClient.get_active_bounties();
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error('Failed to get active bounties from contract', error);
       throw error;
@@ -462,7 +462,7 @@ export class BountyContractService {
    * Get bounties by status from contract
    * Returns array of contract bounty IDs with specific status
    */
-  async getBountiesByStatus(status: string): Promise<number[]> {
+  async getBountiesByStatus(status: string): Promise<bigint[]> {
     try {
       // Map database status to contract status
       let contractStatus: any;
@@ -480,7 +480,7 @@ export class BountyContractService {
         status: contractStatus,
       });
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error(
         'Failed to get bounties by status from contract',

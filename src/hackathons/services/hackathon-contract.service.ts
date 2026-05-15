@@ -40,7 +40,7 @@ export class HackathonContractService {
     totalBudget: string;
     prizePool: Array<{ position: number; amount: string }>;
     deadline: Date;
-  }): Promise<{ contractHackathonId: number; txHash: string }> {
+  }): Promise<{ contractHackathonId: bigint; txHash: string }> {
     this.logger.log(`Creating hackathon for admin ${params.adminPublicKey}`);
 
     const totalBudget = BigInt(params.totalBudget);
@@ -89,7 +89,7 @@ export class HackathonContractService {
     }
 
     return {
-      contractHackathonId: Number(result.result.unwrap()),
+      contractHackathonId: BigInt(result.result.unwrap().toString()),
       txHash: result.getTransactionResponse.txHash,
     };
   }
@@ -97,7 +97,7 @@ export class HackathonContractService {
   async updateHackathon(params: {
     adminPublicKey: string;
     adminWalletId: string;
-    contractHackathonId: number;
+    contractHackathonId: bigint;
     newDeadline?: Date;
     newPrizePool?: Array<{ position: number; amount: string }>;
   }): Promise<{ txHash: string }> {
@@ -121,7 +121,7 @@ export class HackathonContractService {
 
       const tx = await this.sorobanClient.update_hackathon({
         owner: params.adminPublicKey,
-        hackathon_id: BigInt(params.contractHackathonId),
+        hackathon_id: params.contractHackathonId,
         new_deadline: deadlineArg,
         new_prize_pool: prizePoolArg,
       });
@@ -163,7 +163,7 @@ export class HackathonContractService {
   async cancelHackathon(params: {
     adminPublicKey: string;
     adminWalletId: string;
-    contractHackathonId: number;
+    contractHackathonId: bigint;
   }): Promise<{ refundedAmount: string; txHash: string }> {
     this.logger.log(`Canceling hackathon ${params.contractHackathonId}`);
 
@@ -172,7 +172,7 @@ export class HackathonContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.cancel_hackathon({
         owner: params.adminPublicKey,
-        hackathon_id: BigInt(params.contractHackathonId),
+        hackathon_id: params.contractHackathonId,
       });
 
       return await tx.signAndSend({
@@ -213,7 +213,7 @@ export class HackathonContractService {
   async distributePrizes(params: {
     adminPublicKey: string;
     adminWalletId: string;
-    contractHackathonId: number;
+    contractHackathonId: bigint;
     winners: Array<{ position: number; winnerAddress: string }>;
   }): Promise<{ txHash: string }> {
     this.logger.log(
@@ -229,7 +229,7 @@ export class HackathonContractService {
 
       const tx = await this.sorobanClient.distribute_hackathon_prizes({
         owner: params.adminPublicKey,
-        hackathon_id: BigInt(params.contractHackathonId),
+        hackathon_id: params.contractHackathonId,
         winners: winnersArg,
       });
 

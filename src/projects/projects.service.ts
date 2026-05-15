@@ -82,13 +82,8 @@ export class ProjectsService {
       // Verify project exists in contract
       const contractProjectId = project.contractProjectId;
 
-      // Make sure contractProjectId is valid u32
-      if (contractProjectId < 0 || contractProjectId > 4294967295) {
-        throw new NotFoundException('Project not found');
-      }
-
       const assembled = await this.contractService.sorobanClient.get_project({
-        project_id: BigInt(contractProjectId),
+        project_id: contractProjectId,
       });
       const simulated = await assembled.simulate();
 
@@ -246,7 +241,7 @@ export class ProjectsService {
   ) {
     try {
       // Fetch contract project IDs based on filters
-      let contractProjectIds: number[] = [];
+      let contractProjectIds: bigint[] = [];
 
       if (filters?.ownerId) {
         // Get projects for specific owner from contract
@@ -441,7 +436,7 @@ export class ProjectsService {
       throw new BadRequestException('Deadline must be in the future');
     }
 
-    let contractProjectId: number | undefined;
+    let contractProjectId: bigint | undefined;
     let txHash: string | undefined;
 
     if (dto.type === ProjectType.GIG) {

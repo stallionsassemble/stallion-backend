@@ -366,13 +366,8 @@ export class BountiesService {
 
       const contractBountyId = dbBounty.contractBountyId;
 
-      // Make sure contractBountyId is valid u32
-      if (contractBountyId < 0 || contractBountyId > 4294967295) {
-        throw new NotFoundException('Bounty not found');
-      }
-
       const assembled = await this.sorobanClient.get_bounty({
-        bounty_id: BigInt(contractBountyId),
+        bounty_id: contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -453,7 +448,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: BigInt(bounty.contractBountyId),
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -523,7 +518,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty_applicants({
-        bounty_id: BigInt(bounty.contractBountyId),
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -631,7 +626,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty_status({
-        bounty_id: BigInt(bounty.contractBountyId),
+        bounty_id: bounty.contractBountyId,
       });
       const simulated = await assembled.simulate();
 
@@ -917,7 +912,7 @@ export class BountiesService {
       const result = await ContractErrorHandler.wrapContractCall(async () => {
         const tx = await this.sorobanClient.delete_bounty({
           owner: user.wallet!.publicKey,
-          bounty_id: BigInt(contractBountyId),
+          bounty_id: contractBountyId,
         });
 
         // Sign and send transaction
@@ -1171,7 +1166,7 @@ export class BountiesService {
             async () => {
               const tx = await this.sorobanClient.update_submission({
                 applicant: user.wallet!.publicKey,
-                bounty_id: BigInt(contractBountyId),
+                bounty_id: contractBountyId,
                 new_submission_link: hashedLink,
               });
 
@@ -1511,7 +1506,7 @@ export class BountiesService {
 
       // Check if bounty has any submissions
       const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: BigInt(contractBountyId),
+        bounty_id: contractBountyId,
       });
       const simulated = await assembled.simulate();
 

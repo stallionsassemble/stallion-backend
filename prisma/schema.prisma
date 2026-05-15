@@ -249,7 +249,7 @@ model Bounty {
   skills             String[]     @default([])
   status             BountyStatus @default(ACTIVE)
   isFeatured         Boolean      @default(false) @map("is_featured")
-  contractBountyId   Int          @unique @map("contract_bounty_id") // ID from Soroban contract
+  contractBountyId   BigInt       @unique @map("contract_bounty_id") // ID from Soroban contract
   txHash             String       @map("tx_hash") // Transaction hash from Soroban
   submissionDeadline DateTime     @map("submission_deadline")
   judgingDeadline    DateTime     @map("judging_deadline")
@@ -905,7 +905,7 @@ model Hackathon {
   resultsPublished Boolean         @default(false) @map("results_published")
 
   // Smart contract fields
-  contractHackathonId Int?    @unique @map("contract_hackathon_id")
+  contractHackathonId BigInt? @unique @map("contract_hackathon_id")
   txHash              String? @map("tx_hash")
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -1142,7 +1142,7 @@ model Project {
   peopleNeeded     Int         @default(1) @map("people_needed") // Number of positions available
 
   // Smart contract fields (GIG only)
-  contractProjectId Int?      @unique @map("contract_project_id") // ID from Soroban contract
+  contractProjectId BigInt?   @unique @map("contract_project_id") // ID from Soroban contract
   txHash            String?   @map("tx_hash") // Transaction hash from Soroban
   escrowContractId  String?   @map("escrow_contract_id") // Escrow contract ID for GIG
 

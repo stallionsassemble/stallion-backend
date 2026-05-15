@@ -42,7 +42,7 @@ export class ProjectContractService {
     currency: string;
     milestones: Array<{ amount: string; order: number }>;
     deadline: Date;
-  }): Promise<{ contractProjectId: number; txHash: string }> {
+  }): Promise<{ contractProjectId: bigint; txHash: string }> {
     this.logger.log(
       `Creating GIG escrow for owner ${params.ownerId} with reward ${params.reward}`,
     );
@@ -101,7 +101,7 @@ export class ProjectContractService {
       throw new BadRequestException('Transaction response not available');
     }
 
-    const projectId = Number(result.result.unwrap().toString());
+    const projectId = BigInt(result.result.unwrap().toString());
     const txHash = result.getTransactionResponse.txHash;
 
     this.logger.log(
@@ -115,7 +115,7 @@ export class ProjectContractService {
   }
 
   async releaseMilestonePayment(params: {
-    projectId: number;
+    projectId: bigint;
     milestoneOrder: number;
     contributorPublicKey: string;
     amount: string;
@@ -188,7 +188,7 @@ export class ProjectContractService {
     rewardAmount: string;
     currency: string;
     deadline: Date;
-  }): Promise<{ contractProjectId: number; txHash: string }> {
+  }): Promise<{ contractProjectId: bigint; txHash: string }> {
     this.logger.log(
       `Creating JOB project for owner ${params.ownerId} with reward ${params.rewardAmount}`,
     );
@@ -241,7 +241,7 @@ export class ProjectContractService {
       throw new BadRequestException('Transaction response not available');
     }
 
-    const projectId = Number(result.result.unwrap().toString());
+    const projectId = BigInt(result.result.unwrap().toString());
     const txHash = result.getTransactionResponse.txHash;
 
     this.logger.log(
@@ -255,7 +255,7 @@ export class ProjectContractService {
   }
 
   async updateGigProject(params: {
-    projectId: number;
+    projectId: bigint;
     ownerId: string;
     ownerPublicKey: string;
     walletId: string;
@@ -322,7 +322,7 @@ export class ProjectContractService {
   }
 
   async updateJobProject(params: {
-    projectId: number;
+    projectId: bigint;
     ownerId: string;
     ownerPublicKey: string;
     walletId: string;
@@ -383,7 +383,7 @@ export class ProjectContractService {
   }
 
   async cancelGigProject(params: {
-    projectId: number;
+    projectId: bigint;
     ownerId: string;
     ownerPublicKey: string;
     walletId: string;
@@ -444,11 +444,11 @@ export class ProjectContractService {
    * Get all projects from contract
    * Returns array of contract project IDs
    */
-  async getProjects(): Promise<number[]> {
+  async getProjects(): Promise<bigint[]> {
     try {
       const assembled = await this.sorobanClient.get_projects();
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error('Failed to get projects from contract', error);
       throw error;
@@ -459,13 +459,13 @@ export class ProjectContractService {
    * Get owner projects from contract
    * Returns array of contract project IDs for a specific owner
    */
-  async getOwnerProjects(ownerPublicKey: string): Promise<number[]> {
+  async getOwnerProjects(ownerPublicKey: string): Promise<bigint[]> {
     try {
       const assembled = await this.sorobanClient.get_owner_projects({
         owner: ownerPublicKey,
       });
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error('Failed to get owner projects from contract', error);
       throw error;
@@ -476,7 +476,7 @@ export class ProjectContractService {
    * Get projects by status from contract
    * Returns array of contract project IDs with specific status
    */
-  async getProjectsByStatus(status: string): Promise<number[]> {
+  async getProjectsByStatus(status: string): Promise<bigint[]> {
     try {
       let contractStatus: ProjectStatus;
       if (status === 'OPEN' || status === 'IN_PROGRESS') {
@@ -494,7 +494,7 @@ export class ProjectContractService {
         status: contractStatus,
       });
       const simulated = await assembled.simulate();
-      return simulated.result.map(Number);
+      return simulated.result;
     } catch (error) {
       this.logger.error(
         'Failed to get projects by status from contract',
