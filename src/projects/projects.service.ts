@@ -88,7 +88,7 @@ export class ProjectsService {
       }
 
       const assembled = await this.contractService.sorobanClient.get_project({
-        project_id: contractProjectId,
+        project_id: BigInt(contractProjectId),
       });
       const simulated = await assembled.simulate();
 

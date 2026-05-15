@@ -1,0 +1,11 @@
+allowBuilds:
+  '@firebase/util': false
+  '@nestjs/core': false
+  '@prisma/engines': false
+  '@scarf/scarf': false
+  '@stellar/stellar-sdk': false
+  '@swc/core': false
+  argon2: false
+  msgpackr-extract: false
+  prisma: false
+  protobufjs: false

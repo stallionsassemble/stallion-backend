@@ -134,7 +134,7 @@ export class ProjectContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.release_milestone_payment({
         owner: params.ownerPublicKey,
-        project_id: params.projectId,
+        project_id: BigInt(params.projectId),
         milestone_order: params.milestoneOrder,
         contributor: params.contributorPublicKey,
         amount,
@@ -270,7 +270,7 @@ export class ProjectContractService {
 
     const updateParams = {
       owner: params.ownerPublicKey,
-      project_id: params.projectId,
+      project_id: BigInt(params.projectId),
       new_deadline: params.deadline
         ? BigInt(Math.floor(params.deadline.getTime() / 1000))
         : undefined,
@@ -338,7 +338,7 @@ export class ProjectContractService {
       typeof this.sorobanClient.update_project_job
     >[0] = {
       owner: params.ownerPublicKey,
-      project_id: params.projectId,
+      project_id: BigInt(params.projectId),
       new_deadline:
         params.deadline && BigInt(Math.floor(params.deadline.getTime() / 1000)),
     };
@@ -395,7 +395,7 @@ export class ProjectContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.cancel_project_gig({
         owner: params.ownerPublicKey,
-        project_id: params.projectId,
+        project_id: BigInt(params.projectId),
       });
 
       return await tx.signAndSend({

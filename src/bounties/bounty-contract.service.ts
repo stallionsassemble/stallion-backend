@@ -130,7 +130,7 @@ export class BountyContractService {
 
     const updateParams = {
       owner: params.ownerPublicKey,
-      bounty_id: params.bountyId,
+      bounty_id: BigInt(params.bountyId),
       new_title: params.title || undefined,
       new_distribution: params.distribution
         ? params.distribution.map((d) => [d.position, d.percentage] as const)
@@ -197,7 +197,7 @@ export class BountyContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.apply_to_bounty({
         applicant: params.applicantPublicKey,
-        bounty_id: params.bountyId,
+        bounty_id: BigInt(params.bountyId),
         submission_link: params.submissionLink,
       });
 
@@ -255,7 +255,7 @@ export class BountyContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.update_submission({
         applicant: params.applicantPublicKey,
-        bounty_id: params.bountyId,
+        bounty_id: BigInt(params.bountyId),
         new_submission_link: params.newSubmissionLink,
       });
 
@@ -313,7 +313,7 @@ export class BountyContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.select_winners({
         owner: params.ownerPublicKey,
-        bounty_id: params.bountyId,
+        bounty_id: BigInt(params.bountyId),
         winners: params.winners,
       });
 
@@ -370,7 +370,7 @@ export class BountyContractService {
     const result = await ContractErrorHandler.wrapContractCall(async () => {
       const tx = await this.sorobanClient.close_bounty({
         owner: params.ownerPublicKey,
-        bounty_id: params.bountyId,
+        bounty_id: BigInt(params.bountyId),
       });
 
       return await tx.signAndSend({

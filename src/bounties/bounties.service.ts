@@ -22,9 +22,9 @@ import { EnvConfig } from 'src/config/env.config';
 import { ReputationService } from 'src/reputation/reputation.service';
 import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { ActivitiesService } from '../activities/activities.service';
-import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { BountyActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
+import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { getTokenAddress } from '../common/utils/supported-currencies';
 import { BountyNotifications } from '../notifications/helpers/notification-helper';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -372,7 +372,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty({
-        bounty_id: contractBountyId,
+        bounty_id: BigInt(contractBountyId),
       });
       const simulated = await assembled.simulate();
 
@@ -453,7 +453,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: bounty.contractBountyId,
+        bounty_id: BigInt(bounty.contractBountyId),
       });
       const simulated = await assembled.simulate();
 
@@ -523,7 +523,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty_applicants({
-        bounty_id: bounty.contractBountyId,
+        bounty_id: BigInt(bounty.contractBountyId),
       });
       const simulated = await assembled.simulate();
 
@@ -631,7 +631,7 @@ export class BountiesService {
       }
 
       const assembled = await this.sorobanClient.get_bounty_status({
-        bounty_id: bounty.contractBountyId,
+        bounty_id: BigInt(bounty.contractBountyId),
       });
       const simulated = await assembled.simulate();
 
@@ -917,7 +917,7 @@ export class BountiesService {
       const result = await ContractErrorHandler.wrapContractCall(async () => {
         const tx = await this.sorobanClient.delete_bounty({
           owner: user.wallet!.publicKey,
-          bounty_id: contractBountyId,
+          bounty_id: BigInt(contractBountyId),
         });
 
         // Sign and send transaction
@@ -1171,7 +1171,7 @@ export class BountiesService {
             async () => {
               const tx = await this.sorobanClient.update_submission({
                 applicant: user.wallet!.publicKey,
-                bounty_id: contractBountyId,
+                bounty_id: BigInt(contractBountyId),
                 new_submission_link: hashedLink,
               });
 
@@ -1511,7 +1511,7 @@ export class BountiesService {
 
       // Check if bounty has any submissions
       const assembled = await this.sorobanClient.get_bounty_submissions({
-        bounty_id: contractBountyId,
+        bounty_id: BigInt(contractBountyId),
       });
       const simulated = await assembled.simulate();
 

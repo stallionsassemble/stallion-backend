@@ -335,7 +335,7 @@ export class AdminService {
       }
 
       const tx = await this.sorobanClient.check_judging({
-        bounty_id: bounty.contractBountyId,
+        bounty_id: BigInt(bounty.contractBountyId),
       });
 
       // Prepare, sign and send transaction
