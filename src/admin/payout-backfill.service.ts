@@ -16,6 +16,7 @@ export class PayoutBackfillService implements OnModuleInit {
   async onModuleInit() {
     await this.backfillBountyWinnerPayouts();
     await this.backfillMilestonePayouts();
+    await this.backfillHackathonWinnerPayouts();
   }
 
   private async backfillBountyWinnerPayouts(): Promise<void> {
@@ -182,6 +183,83 @@ export class PayoutBackfillService implements OnModuleInit {
 
     this.logger.log(
       `Backfilled ${milestonesWithoutPayout.length} milestone payouts`,
+    );
+  }
+
+  private async backfillHackathonWinnerPayouts(): Promise<void> {
+    const winnersWithoutPayout = await this.prisma.hackathonWinner.findMany({
+      where: {
+        payout: null,
+      },
+      include: {
+        hackathon: {
+          select: {
+            id: true,
+            currency: true,
+          },
+        },
+      },
+    });
+
+    if (winnersWithoutPayout.length === 0) {
+      return;
+    }
+
+    for (const winner of winnersWithoutPayout) {
+      const completed = winner.isPaid;
+      const requestedAt = winner.createdAt;
+
+      await this.prisma.payout.upsert({
+        where: {
+          sourceType_sourceId: {
+            sourceType: PayoutSourceType.HACKATHON_WIN,
+            sourceId: winner.id,
+          },
+        },
+        update: {
+          status: completed
+            ? PayoutStatus.COMPLETED
+            : PayoutStatus.PENDING_APPROVAL,
+          token: winner.hackathon.currency,
+          amount: winner.prizeAmount,
+          usdAmount: winner.usdValueAtCompletion || null,
+          completedAt: completed ? winner.paidAt : null,
+          txHash: completed ? winner.txHash : null,
+          contributorId: winner.userId,
+          hackathonId: winner.hackathonId,
+          hackathonWinnerId: winner.id,
+          metadata: {
+            position: winner.position,
+            submissionId: winner.submissionId,
+            source: 'backfill',
+          } as Prisma.InputJsonValue,
+        },
+        create: {
+          sourceType: PayoutSourceType.HACKATHON_WIN,
+          sourceId: winner.id,
+          status: completed
+            ? PayoutStatus.COMPLETED
+            : PayoutStatus.PENDING_APPROVAL,
+          token: winner.hackathon.currency,
+          amount: winner.prizeAmount,
+          usdAmount: winner.usdValueAtCompletion || null,
+          requestedAt,
+          completedAt: completed ? winner.paidAt : null,
+          txHash: completed ? winner.txHash : null,
+          contributorId: winner.userId,
+          hackathonId: winner.hackathonId,
+          hackathonWinnerId: winner.id,
+          metadata: {
+            position: winner.position,
+            submissionId: winner.submissionId,
+            source: 'backfill',
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }
+
+    this.logger.log(
+      `Backfilled ${winnersWithoutPayout.length} hackathon winner payouts`,
     );
   }
 }

@@ -5,8 +5,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { HackathonStatus, HackathonSubmissionStatus } from '@prisma/client';
+import {
+  HackathonStatus,
+  HackathonSubmissionStatus,
+  PayoutSourceType,
+  PayoutStatus,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { calculateUsdValue } from '../../common/utils/token-price.util';
 import { HackathonContractService } from './hackathon-contract.service';
 
 @Injectable()
@@ -209,6 +216,8 @@ export class HackathonJudgingService {
       );
     }
 
+    let distributeTxHash: string | undefined;
+
     if (hackathon.contractHackathonId !== null) {
       const contractWinners = winners.map((w) => ({
         position: w.position,
@@ -224,15 +233,82 @@ export class HackathonJudgingService {
         }
       }
 
-      await this.contractService.distributePrizes({
+      const distributeResult = await this.contractService.distributePrizes({
         adminPublicKey: adminWallet.publicKey,
         adminWalletId: adminWallet.id,
         contractHackathonId: hackathon.contractHackathonId,
         winners: contractWinners as any,
       });
+      distributeTxHash = distributeResult.txHash;
     }
 
     this.logger.log(`Results published for hackathon ${hackathonId}`);
+
+    // Create Payout records for each winner
+    const now = new Date();
+    await Promise.all(
+      winners.map(async (winner) => {
+        const usdValue = await calculateUsdValue(
+          winner.prizeAmount.toString(),
+          hackathon.currency,
+        );
+
+        await this.prisma.payout.upsert({
+          where: {
+            sourceType_sourceId: {
+              sourceType: PayoutSourceType.HACKATHON_WIN,
+              sourceId: winner.id,
+            },
+          },
+          create: {
+            sourceType: PayoutSourceType.HACKATHON_WIN,
+            sourceId: winner.id,
+            token: hackathon.currency,
+            amount: winner.prizeAmount,
+            usdAmount: usdValue,
+            status: PayoutStatus.COMPLETED,
+            requestedAt: winner.createdAt,
+            completedAt: now,
+            txHash: distributeTxHash,
+            contributorId: winner.userId,
+            hackathonId: hackathon.id,
+            hackathonWinnerId: winner.id,
+            metadata: {
+              position: winner.position,
+              submissionId: winner.submissionId,
+              source: 'hackathon-judging-service',
+            } as Prisma.InputJsonValue,
+          },
+          update: {
+            token: hackathon.currency,
+            amount: winner.prizeAmount,
+            usdAmount: usdValue,
+            status: PayoutStatus.COMPLETED,
+            completedAt: now,
+            txHash: distributeTxHash,
+            contributorId: winner.userId,
+            hackathonId: hackathon.id,
+            hackathonWinnerId: winner.id,
+            metadata: {
+              position: winner.position,
+              submissionId: winner.submissionId,
+              source: 'hackathon-judging-service',
+            } as Prisma.InputJsonValue,
+          },
+        });
+
+        // Also update the HackathonWinner record to keep it in sync
+        await this.prisma.hackathonWinner.update({
+          where: { id: winner.id },
+          data: {
+            isPaid: true,
+            paidAt: now,
+            txHash: distributeTxHash,
+          },
+        });
+      }),
+    );
+
     // Mark as completed and published
     return this.prisma.hackathon.update({
       where: { id: hackathonId },
