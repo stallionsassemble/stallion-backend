@@ -144,12 +144,12 @@ export class ProjectsService {
 
       if (acceptedApp && acceptedApp.userMilestones.length > 0) {
         released = acceptedApp.userMilestones
-          .filter((um) => um.status === 'PAID')
+          .filter((um) => um.status === 'APPROVED' || um.status === 'PAID')
           .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
           .toString();
 
         escrowed = acceptedApp.userMilestones
-          .filter((um) => um.status !== 'PAID')
+          .filter((um) => um.status !== 'APPROVED' && um.status !== 'PAID')
           .reduce((sum, um) => sum + Number(um.milestone.amount), 0)
           .toString();
       }
