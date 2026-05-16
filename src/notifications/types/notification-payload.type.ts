@@ -31,8 +31,9 @@ export enum NotificationCategory {
   BOUNTY = 'bounty',
   FORUM = 'forum',
   HACKATHON = 'hackathon',
-  SYSTEM = 'system',
   ACHIEVEMENT = 'achievement',
+  PROJECT = 'project',
+  SYSTEM = 'system',
 }
 
 export const NotificationTypeToCategory: Record<
@@ -74,6 +75,19 @@ export const NotificationTypeToCategory: Record<
   HACKATHON_STARTING_SOON: NotificationCategory.HACKATHON,
   HACKATHON_SUBMISSION_RECEIVED: NotificationCategory.HACKATHON,
   HACKATHON_WINNER_ANNOUNCED: NotificationCategory.HACKATHON,
+
+  // Project
+  PROJECT_CREATED: NotificationCategory.PROJECT,
+  PROJECT_UPDATED: NotificationCategory.PROJECT,
+  PROJECT_COMPLETED: NotificationCategory.PROJECT,
+  PROJECT_CANCELLED: NotificationCategory.PROJECT,
+  APPLICATION_RECEIVED: NotificationCategory.PROJECT,
+  APPLICATION_ACCEPTED: NotificationCategory.PROJECT,
+  APPLICATION_REJECTED: NotificationCategory.PROJECT,
+  MILESTONE_SUBMITTED: NotificationCategory.PROJECT,
+  MILESTONE_APPROVED: NotificationCategory.PROJECT,
+  MILESTONE_REVISION_REQUESTED: NotificationCategory.PROJECT,
+  MILESTONE_PAID: NotificationCategory.PROJECT,
 
   // System
   SYSTEM_ANNOUNCEMENT: NotificationCategory.SYSTEM,

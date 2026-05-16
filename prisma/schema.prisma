@@ -797,6 +797,18 @@ model NotificationSettings {
   bountyInApp Boolean @default(true) @map("bounty_in_app")
   bountyEmail Boolean @default(true) @map("bounty_email")
 
+  // Achievement notifications
+  achievementInApp Boolean @default(true) @map("achievement_in_app")
+  achievementEmail Boolean @default(true) @map("achievement_email")
+
+  // Project notifications
+  projectInApp Boolean @default(true) @map("project_in_app")
+  projectEmail Boolean @default(true) @map("project_email")
+
+  // Hackathon notifications
+  hackathonInApp Boolean @default(true) @map("hackathon_in_app")
+  hackathonEmail Boolean @default(true) @map("hackathon_email")
+
   // Forum notifications
   forumInApp Boolean @default(true) @map("forum_in_app")
   forumEmail Boolean @default(false) @map("forum_email")
@@ -871,6 +883,19 @@ enum NotificationType {
   HACKATHON_STARTING_SOON
   HACKATHON_SUBMISSION_RECEIVED
   HACKATHON_WINNER_ANNOUNCED
+
+  // Project notifications
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_CANCELLED
+  PROJECT_COMPLETED
+  APPLICATION_RECEIVED
+  APPLICATION_ACCEPTED
+  APPLICATION_REJECTED
+  MILESTONE_SUBMITTED
+  MILESTONE_APPROVED
+  MILESTONE_REVISION_REQUESTED
+  MILESTONE_PAID
 }
 
 // ============================================

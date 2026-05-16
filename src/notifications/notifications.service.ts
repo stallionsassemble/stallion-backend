@@ -214,6 +214,10 @@ export class NotificationsService {
         return settings.forumEmail;
       case NotificationCategory.SYSTEM:
         return settings.systemEmail;
+      case NotificationCategory.ACHIEVEMENT:
+        return settings.achievementEmail;
+      case NotificationCategory.PROJECT:
+        return settings.projectEmail;
       default:
         return false;
     }
@@ -254,6 +258,17 @@ export class NotificationsService {
       HACKATHON_STARTING_SOON: 'hackathon-starting-soon',
       HACKATHON_SUBMISSION_RECEIVED: 'hackathon-submission-received',
       HACKATHON_WINNER_ANNOUNCED: 'hackathon-winner-announced',
+      PROJECT_CREATED: 'project-created',
+      PROJECT_UPDATED: 'project-updated',
+      PROJECT_COMPLETED: 'project-completed',
+      PROJECT_CANCELLED: 'project-cancelled',
+      APPLICATION_RECEIVED: 'application-received',
+      APPLICATION_ACCEPTED: 'application-accepted',
+      APPLICATION_REJECTED: 'application-rejected',
+      MILESTONE_SUBMITTED: 'milestone-submitted',
+      MILESTONE_APPROVED: 'milestone-approved',
+      MILESTONE_REVISION_REQUESTED: 'milestone-revision-requested',
+      MILESTONE_PAID: 'milestone-paid',
       SYSTEM_ANNOUNCEMENT: 'system-announcement',
       ACCOUNT_UPDATE: 'account-update',
     };
