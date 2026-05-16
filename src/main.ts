@@ -7,6 +7,12 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { EnvConfig } from './config/env.config';
 
+// BigInt values from Prisma (contract IDs) exceed Number.MAX_SAFE_INTEGER,
+// so we serialize them as strings to avoid precision loss in JSON responses.
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
