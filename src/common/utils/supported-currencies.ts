@@ -69,10 +69,6 @@ const NETWORK_CURRENCIES: Record<string, NetworkCurrencies> = {
   },
 };
 
-// Deprecated: Use network-aware functions instead
-export const SUPPORTED_CURRENCIES: Record<string, SupportedCurrency> =
-  NETWORK_CURRENCIES[StellarSDK.Networks.TESTNET];
-
 /**
  * Get token address for a given currency code on a specific network
  * @param currencyCode - The currency code (e.g., 'USDC', 'XLM')
