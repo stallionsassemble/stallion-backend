@@ -93,13 +93,19 @@ export class DepositReconcilerWorker extends WorkerHost {
                 .transaction(paymentOp.transaction_hash)
                 .call();
 
-              const existingTx = await this.prisma.transaction.findFirst({
+              const existingTxs = await this.prisma.transaction.findMany({
                 where: {
                   externalTxId: txResponse.hash,
                 },
               });
 
-              if (existingTx) {
+              const isProcessed = existingTxs.some(
+                (tx) =>
+                  tx.idempotencyKey === payment.id ||
+                  (tx.idempotencyKey && tx.idempotencyKey.length === 32),
+              );
+
+              if (isProcessed) {
                 skippedCount++;
                 continue;
               }
@@ -112,6 +118,7 @@ export class DepositReconcilerWorker extends WorkerHost {
 
               await this.walletService.processDeposit(
                 txResponse.hash,
+                payment.id,
                 wallet.id,
                 amount,
                 currency,

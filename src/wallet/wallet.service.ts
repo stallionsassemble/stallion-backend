@@ -309,51 +309,62 @@ export class WalletService {
 
   async processDeposit(
     externalTxId: string,
+    operationId: string,
     walletId: string,
     amount: number,
     currency: string,
   ) {
-    return this.prisma.$transaction(async (tx) => {
-      // Check for duplicate using externalTxId
-      const existing = await tx.transaction.findFirst({
-        where: {
-          externalTxId,
-          type: TxType.DEPOSIT,
-        },
-      });
+    // Check for duplicate using operationId or legacy externalTxId
+    const existingTxs = await this.prisma.transaction.findMany({
+      where: {
+        externalTxId,
+        type: TxType.DEPOSIT,
+      },
+    });
 
-      if (existing) {
-        this.logger.warn(`Duplicate deposit detected: ${externalTxId}`);
-        return existing;
-      }
+    const isProcessed = existingTxs.some(
+      (tx) =>
+        tx.idempotencyKey === operationId ||
+        (tx.idempotencyKey && tx.idempotencyKey.length === 32),
+    );
 
-      // Create deposit transaction
-      const transaction = await tx.transaction.create({
+    if (isProcessed) {
+      this.logger.warn(
+        `Duplicate deposit detected for operation: ${operationId}`,
+      );
+      return existingTxs[0];
+    }
+
+    try {
+      // Create deposit transaction directly in COMPLETED state
+      const transaction = await this.prisma.transaction.create({
         data: {
           walletId,
           type: TxType.DEPOSIT,
           amount,
           currency,
-          state: TxState.PENDING,
-          externalTxId,
-          idempotencyKey: generateIdempotencyKey(),
-        },
-      });
-
-      // Mark transaction as completed (balance tracked on Stellar network)
-      await tx.transaction.update({
-        where: { id: transaction.id },
-        data: {
           state: TxState.COMPLETED,
+          externalTxId,
+          idempotencyKey: operationId,
         },
       });
 
       this.logger.log(
-        `Processed deposit ${externalTxId}: ${amount} ${currency} to wallet ${walletId}`,
+        `Processed deposit ${externalTxId} (op ${operationId}): ${amount} ${currency} to wallet ${walletId}`,
       );
 
       return transaction;
-    });
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        this.logger.warn(
+          `Race condition: Duplicate deposit rejected by unique constraint: ${operationId}`,
+        );
+        return this.prisma.transaction.findUnique({
+          where: { idempotencyKey: operationId },
+        });
+      }
+      throw error;
+    }
   }
 
   async cleanupExpiredLocks() {
@@ -574,17 +585,6 @@ export class WalletService {
       let syncedCount = 0;
 
       for (const txRecord of txRecords.records) {
-        // Check if transaction already exists in database
-        const existing = await this.prisma.transaction.findFirst({
-          where: {
-            externalTxId: txRecord.id,
-          },
-        });
-
-        if (existing) {
-          continue; // Skip already synced transactions
-        }
-
         // Load transaction details to get operations
         const tx = await this.stellarAccount
           .getServer()
@@ -593,8 +593,27 @@ export class WalletService {
           .call();
         const operations = await tx.operations();
 
+        // Check for legacy single-sync transactions to avoid duplicate parsing
+        const existingTxs = await this.prisma.transaction.findMany({
+          where: {
+            externalTxId: txRecord.id,
+          },
+          select: { idempotencyKey: true },
+        });
+
         // Process each operation
         for (const op of operations.records) {
+          // Verify idempotency per operation
+          const isProcessed = existingTxs.some(
+            (dbTx) =>
+              dbTx.idempotencyKey === op.id ||
+              (dbTx.idempotencyKey && dbTx.idempotencyKey.length === 32),
+          );
+
+          if (isProcessed) {
+            continue; // Skip already synced operations
+          }
+
           const opType = op.type;
           if (opType === Horizon.HorizonApi.OperationResponseType.payment) {
             // Handle payment operations
@@ -609,33 +628,43 @@ export class WalletService {
             }
 
             if (amount > 0) {
-              // Create transaction record
-              await this.prisma.transaction.create({
-                data: {
-                  walletId,
-                  type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
-                  amount: amount,
-                  currency,
-                  state: TxState.COMPLETED,
-                  externalTxId: txRecord.id,
-                  idempotencyKey: generateIdempotencyKey(),
-                  note: `Synced from blockchain - ${op.type}`,
-                  metadata: {
-                    syncedAt: new Date().toISOString(),
-                    operationType: op.type,
-                    txHash: txRecord.hash,
-                    asset_type: paymentOp.asset_type,
-                    asset_code: paymentOp.asset_code,
-                    asset_issuer: paymentOp.asset_issuer,
-                    created_at: paymentOp.created_at,
-                  } as Prisma.InputJsonValue,
-                },
-              });
+              try {
+                // Create transaction record
+                await this.prisma.transaction.create({
+                  data: {
+                    walletId,
+                    type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
+                    amount: amount,
+                    currency,
+                    state: TxState.COMPLETED,
+                    externalTxId: txRecord.id,
+                    idempotencyKey: op.id,
+                    note: `Synced from blockchain - ${op.type}`,
+                    metadata: {
+                      syncedAt: new Date().toISOString(),
+                      operationType: op.type,
+                      txHash: txRecord.hash,
+                      asset_type: paymentOp.asset_type,
+                      asset_code: paymentOp.asset_code,
+                      asset_issuer: paymentOp.asset_issuer,
+                      created_at: paymentOp.created_at,
+                    } as Prisma.InputJsonValue,
+                  },
+                });
 
-              syncedCount++;
-              this.logger.log(
-                `Synced ${op.type} transaction: ${amount} ${currency} (${isIncoming ? 'incoming' : 'outgoing'})`,
-              );
+                syncedCount++;
+                this.logger.log(
+                  `Synced ${op.type} transaction: ${amount} ${currency} (${isIncoming ? 'incoming' : 'outgoing'})`,
+                );
+              } catch (error: any) {
+                if (error.code === 'P2002') {
+                  this.logger.warn(
+                    `Race condition ignored during sync for operation: ${op.id}`,
+                  );
+                } else {
+                  throw error;
+                }
+              }
             }
           } else if (
             opType === Horizon.HorizonApi.OperationResponseType.createAccount
@@ -649,30 +678,40 @@ export class WalletService {
             const currency = 'XLM';
 
             if (amount > 0) {
-              // Create transaction record
-              await this.prisma.transaction.create({
-                data: {
-                  walletId,
-                  type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
-                  amount: amount,
-                  currency,
-                  state: TxState.COMPLETED,
-                  externalTxId: txRecord.id,
-                  idempotencyKey: generateIdempotencyKey(),
-                  note: `Synced from blockchain - ${op.type}`,
-                  metadata: {
-                    syncedAt: new Date().toISOString(),
-                    operationType: op.type,
-                    txHash: txRecord.hash,
-                    created_at: createAccountOp.created_at,
-                  } as Prisma.InputJsonValue,
-                },
-              });
+              try {
+                // Create transaction record
+                await this.prisma.transaction.create({
+                  data: {
+                    walletId,
+                    type: isIncoming ? TxType.DEPOSIT : TxType.WITHDRAWAL,
+                    amount: amount,
+                    currency,
+                    state: TxState.COMPLETED,
+                    externalTxId: txRecord.id,
+                    idempotencyKey: op.id,
+                    note: `Synced from blockchain - ${op.type}`,
+                    metadata: {
+                      syncedAt: new Date().toISOString(),
+                      operationType: op.type,
+                      txHash: txRecord.hash,
+                      created_at: createAccountOp.created_at,
+                    } as Prisma.InputJsonValue,
+                  },
+                });
 
-              syncedCount++;
-              this.logger.log(
-                `Synced ${op.type} transaction: ${amount} ${currency} (${isIncoming ? 'incoming' : 'outgoing'})`,
-              );
+                syncedCount++;
+                this.logger.log(
+                  `Synced ${op.type} transaction: ${amount} ${currency} (${isIncoming ? 'incoming' : 'outgoing'})`,
+                );
+              } catch (error: any) {
+                if (error.code === 'P2002') {
+                  this.logger.warn(
+                    `Race condition ignored during sync for operation: ${op.id}`,
+                  );
+                } else {
+                  throw error;
+                }
+              }
             }
           }
         }
