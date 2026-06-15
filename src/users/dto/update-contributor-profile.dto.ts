@@ -67,7 +67,7 @@ export class UpdateContributorProfileDto {
     example: {
       linkedin: 'https://linkedin.com/in/johndoe',
       github: 'https://github.com/johndoe',
-      twitter: 'https://twitter.com/johndoe',
+      twitter: 'https://x.com/johndoe',
     },
   })
   @IsOptional()

@@ -50,7 +50,7 @@ export class CompleteOwnerProfileDto {
   @ApiProperty({
     example: {
       linkedin: 'https://linkedin.com/company/acme',
-      twitter: 'https://twitter.com/acmecorp',
+      twitter: 'https://x.com/acmecorp',
       website: 'https://acme.com',
     },
   })

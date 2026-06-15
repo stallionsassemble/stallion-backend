@@ -115,7 +115,7 @@ export class UpdateProjectOwnerProfileDto {
     example: {
       linkedin: 'https://linkedin.com/company/acme',
       github: 'https://github.com/acme',
-      twitter: 'https://twitter.com/acme',
+      twitter: 'https://x.com/acme',
       website: 'https://acme.com',
     },
   })

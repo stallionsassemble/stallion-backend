@@ -51,7 +51,7 @@ export class CompleteContributorProfileDto {
     example: {
       linkedin: 'https://linkedin.com/in/johndoe',
       github: 'https://github.com/johndoe',
-      twitter: 'https://twitter.com/johndoe',
+      twitter: 'https://x.com/johndoe',
       website: 'https://johndoe.com',
     },
   })
