@@ -526,6 +526,47 @@ export class AuthService {
   }
 
   /**
+   * Disable MFA for a user (self-service).
+   * Requires the current TOTP code as confirmation to prevent accidental/malicious disablement.
+   */
+  async disableMfa(
+    userId: string,
+    totpCode: string,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.mfaEnabled || !user.totpSecret) {
+      throw new BadRequestException('MFA is not enabled for this account');
+    }
+
+    // Verify the TOTP code before disabling
+    const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
+    const isValid = authenticator.verify({
+      token: totpCode,
+      secret: decryptedSecret,
+    });
+
+    if (!isValid) {
+      throw new UnauthorizedException('Invalid TOTP code');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        mfaEnabled: false,
+        totpSecret: null,
+        backupCodes: [],
+      },
+    });
+
+    return { message: '2FA disabled successfully' };
+  }
+
+  /**
    * Complete contributor profile
    */
   async completeContributorProfile(

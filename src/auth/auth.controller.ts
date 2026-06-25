@@ -391,6 +391,36 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('disable-mfa')
+  @HttpCode(200)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Disable MFA (Authenticator App)',
+    description:
+      'Disable TOTP-based MFA for the authenticated user. Requires a valid TOTP code as confirmation.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'MFA disabled successfully',
+    schema: {
+      example: {
+        message: '2FA disabled successfully',
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'MFA is not enabled' })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid TOTP code or unauthorized',
+  })
+  async disableMfa(
+    @CurrentUser('id') userId: string,
+    @Body('totpCode') totpCode: string,
+  ) {
+    return this.authService.disableMfa(userId, totpCode);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post('passkey/register-options')
   @HttpCode(200)
   @ApiBearerAuth('JWT-auth')
