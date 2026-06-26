@@ -46,12 +46,15 @@ export class WalletController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get wallet',
-    description: 'Retrieve user wallet details and balance',
+    description:
+      'Retrieve user wallet details (no blockchain sync — use /sync or /balance for live data)',
   })
   @ApiResponse({ status: 200, description: 'Wallet details' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Wallet not found' })
   async getWallet(@CurrentUser('id') userId: string) {
+    const wallet = await this.walletService.getWalletByUserId(userId);
+    await this.walletService.syncWalletIfStale(wallet.id);
     return this.walletService.getWalletByUserId(userId);
   }
 
@@ -60,13 +63,14 @@ export class WalletController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get wallet balance',
-    description: 'Retrieve wallet balance with available balance',
+    description: 'Sync wallet with blockchain and retrieve live balance',
   })
   @ApiResponse({ status: 200, description: 'Wallet balance' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Wallet not found' })
   async getBalance(@CurrentUser('id') userId: string) {
     const wallet = await this.walletService.getWalletByUserId(userId);
+    await this.walletService.syncWalletIfStale(wallet.id);
     return this.walletService.getWalletBalance(wallet.id);
   }
 
@@ -81,6 +85,7 @@ export class WalletController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getDepositAddress(@CurrentUser('id') userId: string) {
     const wallet = await this.walletService.getWalletByUserId(userId);
+    await this.walletService.syncWalletIfStale(wallet.id);
     return this.walletService.getDepositAddress(wallet.id);
   }
 
@@ -89,12 +94,13 @@ export class WalletController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get wallet transactions',
-    description: 'Retrieve transaction history for user wallet',
+    description: 'Sync wallet with blockchain and retrieve transaction history',
   })
   @ApiResponse({ status: 200, description: 'List of transactions' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async getTransactions(@CurrentUser('id') userId: string) {
     const wallet = await this.walletService.getWalletByUserId(userId);
+    await this.walletService.syncWalletIfStale(wallet.id);
     return this.walletService.getTransactions(wallet.id);
   }
 
@@ -121,7 +127,7 @@ export class WalletController {
   @ApiResponse({ status: 404, description: 'Wallet not found' })
   async syncWallet(@CurrentUser('id') userId: string) {
     const wallet = await this.walletService.getWalletByUserId(userId);
-    return this.walletService.syncWallet(wallet.id);
+    return this.walletService.syncWalletIfStale(wallet.id, true);
   }
 
   @Post('withdraw')

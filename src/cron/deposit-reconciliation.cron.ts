@@ -1,7 +1,7 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue } from 'bullmq';
+
 
 @Injectable()
 export class DepositReconciliationCron {
@@ -9,7 +9,16 @@ export class DepositReconciliationCron {
 
   constructor(@InjectQueue('deposit-reconciler') private depositQueue: Queue) {}
 
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  /**
+   * Deposit reconciliation is intentionally NOT scheduled automatically.
+   * Polling every active wallet on Horizon consumes too much rate-limit budget.
+   * Syncing now happens on-demand: when a user fetches their balance/transactions
+   * or manually presses "Sync" in the UI.
+   *
+   * If you need to trigger a bulk reconciliation manually, call this method
+   * directly or enqueue the job via an admin endpoint.
+   */
+  // @Cron(CronExpression.EVERY_5_MINUTES)
   async handleDepositReconciliation() {
     this.logger.log('Running deposit reconciliation cron job');
 

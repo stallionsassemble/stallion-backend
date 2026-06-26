@@ -24,6 +24,14 @@ import { StellarWalletService } from './stellar-wallet.service';
 import { ensureTrustline, hasTrustline } from './utils/trustline.util';
 import { WalletSigningService } from './wallet-signing.service';
 
+/**
+ * How long (ms) to wait before re-syncing a wallet with the Stellar network.
+ * Requests that arrive within this window return cached DB data instead of
+ * hitting Horizon again. Manual syncs (force=true) always bypass this.
+ * Default: 2 minutes.
+ */
+const SYNC_COOLDOWN_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class WalletService {
   private readonly logger = new Logger(WalletService.name);
@@ -52,21 +60,10 @@ export class WalletService {
       `Retrieved wallet for user ${userId}: walletId=${user.wallet.id}, publicKey=${user.wallet.publicKey}`,
     );
 
-    // Sync wallet with blockchain before returning
-    await this.syncWallet(user.wallet.id);
-
-    // Fetch updated wallet data after sync
-    const updatedWallet = await this.prisma.wallet.findUnique({
-      where: { id: user.wallet.id },
-    });
-
-    return updatedWallet!;
+    return user.wallet;
   }
 
   async getTransactions(walletId: string) {
-    // Sync wallet with blockchain before fetching transactions
-    await this.syncWallet(walletId);
-
     const transactions = await this.prisma.transaction.findMany({
       where: { walletId },
     });
@@ -387,9 +384,6 @@ export class WalletService {
    * Get wallet balance with available balance for all assets
    */
   async getWalletBalance(walletId: string) {
-    // Sync wallet with blockchain first
-    await this.syncWallet(walletId);
-
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
     });
@@ -495,6 +489,45 @@ export class WalletService {
    * - Check activation status
    * - Fetch and sync recent transactions
    */
+  /**
+   * Sync wallet with Stellar, but only if the wallet hasn't been synced
+   * within the cooldown window. Pass force=true to always sync regardless
+   * (used by the manual "Sync" endpoint).
+   */
+  async syncWalletIfStale(
+    walletId: string,
+    force = false,
+  ): Promise<{
+    synced: boolean;
+    activated: boolean;
+    transactionsSynced: number;
+    skipped?: boolean;
+  }> {
+    if (!force) {
+      const wallet = await this.prisma.wallet.findUnique({
+        where: { id: walletId },
+        select: { lastSyncedAt: true },
+      });
+
+      if (wallet?.lastSyncedAt) {
+        const age = Date.now() - wallet.lastSyncedAt.getTime();
+        if (age < SYNC_COOLDOWN_MS) {
+          this.logger.log(
+            `Wallet ${walletId} synced ${Math.round(age / 1000)}s ago — skipping (cooldown: ${SYNC_COOLDOWN_MS / 1000}s)`,
+          );
+          return {
+            synced: false,
+            activated: true,
+            transactionsSynced: 0,
+            skipped: true,
+          };
+        }
+      }
+    }
+
+    return this.syncWallet(walletId);
+  }
+
   async syncWallet(walletId: string): Promise<{
     synced: boolean;
     activated: boolean;
@@ -531,6 +564,12 @@ export class WalletService {
         wallet.publicKey,
       );
 
+      // Stamp the sync time so cooldown checks work correctly
+      await this.prisma.wallet.update({
+        where: { id: walletId },
+        data: { lastSyncedAt: new Date() },
+      });
+
       return {
         synced: true,
         activated: true,
@@ -548,7 +587,13 @@ export class WalletService {
         if (wallet.isActivated) {
           await this.prisma.wallet.update({
             where: { id: walletId },
-            data: { isActivated: false },
+            data: { isActivated: false, lastSyncedAt: new Date() },
+          });
+        } else {
+          // Still stamp sync time even if not yet activated
+          await this.prisma.wallet.update({
+            where: { id: walletId },
+            data: { lastSyncedAt: new Date() },
           });
         }
 
