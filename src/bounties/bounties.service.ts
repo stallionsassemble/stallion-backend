@@ -405,12 +405,16 @@ export class BountiesService {
       );
 
       // Consolidate contract and database details
-      // Contract details take precedence
+      // Contract details take precedence — EXCEPT reward. The contract stores
+      // reward in token base units (adjust_for_decimals: reward * 10^decimals,
+      // e.g. $10 -> 100000000), whereas the DB holds the canonical human
+      // display amount that every other endpoint (list, owner, active) returns.
+      // On-chain reward is immutable (update_bounty never changes it), so the
+      // DB value is authoritative for display. Keep reward from `...dbBounty`.
       const bountyDetails = {
         ...dbBounty,
         title: contractBounty.title,
         token: contractBounty.token,
-        reward: contractBounty.reward.toString(),
         status,
         rewardDistribution: distributionArray,
         submissionDeadline,
