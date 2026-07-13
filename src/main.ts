@@ -6,6 +6,12 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { EnvConfig } from './config/env.config';
+import { configureStellarHttpAgents } from './config/http-agent.config';
+
+// Force fresh connections to Horizon so a keep-alive socket pinned to a bad
+// backend node can't take down every account lookup. Must run before any
+// Stellar SDK client is constructed or used.
+configureStellarHttpAgents();
 
 // BigInt values from Prisma (contract IDs) exceed Number.MAX_SAFE_INTEGER,
 // so we serialize them as strings to avoid precision loss in JSON responses.
