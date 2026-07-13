@@ -30,6 +30,7 @@ import { BountyNotifications } from '../notifications/helpers/notification-helpe
 import { NotificationsService } from '../notifications/notifications.service';
 import { Client as SorobanClient, Status } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
+import { buildSorobanContractOptions } from '../soroban/soroban-rpc.util';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from '../wallet/stellar-wallet.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
@@ -86,12 +87,15 @@ export class BountiesService {
       this.configService.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
       'Test SDF Network ; September 2015';
 
-    // Initialize Soroban client
-    this.sorobanClient = new SorobanClient({
-      contractId: this.contractId,
-      networkPassphrase: this.networkPassphrase,
-      rpcUrl,
-    });
+    // Initialize Soroban client — pin the submit/poll flow to one RPC node and
+    // bid a surge-proof fee.
+    this.sorobanClient = new SorobanClient(
+      buildSorobanContractOptions({
+        contractId: this.contractId,
+        networkPassphrase: this.networkPassphrase,
+        rpcUrl,
+      }),
+    );
 
     this.logger.log('Bounties service initialized');
   }

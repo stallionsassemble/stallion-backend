@@ -11,6 +11,10 @@ import { PrismaService } from '../common/prisma/prisma.service';
 import { EnvConfig } from '../config/env.config';
 import { Client as SorobanClient } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
+import {
+  buildSorobanContractOptions,
+  createSorobanRpcServer,
+} from '../soroban/soroban-rpc.util';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 /**
@@ -40,19 +44,22 @@ export class AdminService {
       EnvConfig.SOROBAN_RPC_URL,
     );
 
-    // Initialize Soroban RPC server
-    this.rpcServer = new StellarSDK.rpc.Server(rpcUrl);
+    // Initialize Soroban RPC server (keep-alive: one node for the whole flow)
+    this.rpcServer = createSorobanRpcServer(rpcUrl);
     this.networkPassphrase =
       network === 'testnet'
         ? 'Test SDF Network ; September 2015'
         : 'Public Global Stellar Network ; September 2015';
 
-    // Initialize Soroban client
-    this.sorobanClient = new SorobanClient({
-      contractId: this.contractId,
-      networkPassphrase: this.networkPassphrase,
-      rpcUrl,
-    });
+    // Initialize Soroban client — pin the submit/poll flow to one RPC node and
+    // bid a surge-proof fee.
+    this.sorobanClient = new SorobanClient(
+      buildSorobanContractOptions({
+        contractId: this.contractId,
+        networkPassphrase: this.networkPassphrase,
+        rpcUrl,
+      }),
+    );
   }
 
   /**

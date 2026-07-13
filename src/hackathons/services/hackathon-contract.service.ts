@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { Client as SorobanClient } from 'src/soroban/contract-bindings';
 import { ContractErrorHandler } from 'src/soroban/contract-error-handler';
+import { buildSorobanContractOptions } from 'src/soroban/soroban-rpc.util';
 import { EnvConfig } from '../../config/env.config';
 import { WalletSigningService } from '../../wallet/wallet-signing.service';
 
@@ -24,11 +25,17 @@ export class HackathonContractService {
       this.configService.get<string>(EnvConfig.SOROBAN_NETWORK_PASSPHRASE) ||
       'Test SDF Network ; September 2015';
 
-    this.sorobanClient = new SorobanClient({
-      contractId: this.contractId,
-      networkPassphrase: this.networkPassphrase,
-      rpcUrl: this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
-    });
+    const rpcUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_RPC_URL,
+    );
+    // Pin the submit/poll flow to one RPC node and bid a surge-proof fee.
+    this.sorobanClient = new SorobanClient(
+      buildSorobanContractOptions({
+        contractId: this.contractId,
+        networkPassphrase: this.networkPassphrase,
+        rpcUrl,
+      }),
+    );
 
     this.logger.log('HackathonContractService initialized');
   }

@@ -5,6 +5,7 @@ import { getTokenAddress } from '../common/utils/supported-currencies';
 import { EnvConfig } from '../config/env.config';
 import { Client, ProjectStatus } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
+import { buildSorobanContractOptions } from '../soroban/soroban-rpc.util';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 @Injectable()
@@ -25,11 +26,17 @@ export class ProjectContractService {
       EnvConfig.SOROBAN_NETWORK_PASSPHRASE,
     );
 
-    this.sorobanClient = new Client({
-      contractId: this.contractId,
-      networkPassphrase: this.networkPassphrase,
-      rpcUrl: this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
-    });
+    const rpcUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_RPC_URL,
+    );
+    // Pin the submit/poll flow to one RPC node and bid a surge-proof fee.
+    this.sorobanClient = new Client(
+      buildSorobanContractOptions({
+        contractId: this.contractId,
+        networkPassphrase: this.networkPassphrase,
+        rpcUrl,
+      }),
+    );
 
     this.logger.log('ProjectContractService initialized');
   }
