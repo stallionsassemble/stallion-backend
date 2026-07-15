@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SocialProvider } from '@prisma/client';
 import { createPublicKey, createVerify } from 'crypto';
+import { normalizeEmail } from '../common/utils/normalization.util';
 import { EnvConfig } from '../config/env.config';
 
 export interface VerifiedSocialToken {
@@ -91,7 +92,7 @@ export class SocialTokenVerifierService {
     return {
       provider: SocialProvider.GOOGLE,
       subject,
-      email: payload.email,
+      email: payload.email ? normalizeEmail(payload.email) : payload.email,
       emailVerified: this.toBoolean(payload.email_verified),
       fullName: payload.name,
       firstName: payload.given_name,
@@ -158,7 +159,7 @@ export class SocialTokenVerifierService {
     return {
       provider: SocialProvider.APPLE,
       subject,
-      email: payload.email,
+      email: payload.email ? normalizeEmail(payload.email) : payload.email,
       emailVerified: this.toBoolean(payload.email_verified),
       fullName: payload.name,
       firstName: payload.given_name,

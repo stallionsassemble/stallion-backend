@@ -27,6 +27,8 @@ model User {
   companyName String? @map("company_name")
   entityName  String? @map("entity_name")
   phoneNumber String? @map("phone_number")
+  // ISO 3166-1 alpha-2 country code used to normalize phoneNumber to E.164
+  country     String? @map("country")
   industry    String?
   companyBio  String? @map("company_bio")
   companyLogo String? @map("company_logo")

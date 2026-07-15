@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsEnum,
+  IsISO31661Alpha2,
   IsObject,
   IsOptional,
   IsString,
@@ -12,6 +13,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { NormalizePhone } from '../../common/decorators/normalize.decorator';
 
 export class CompleteOwnerProfileDto {
   @IsString()
@@ -69,9 +71,22 @@ export class CompleteOwnerProfileDto {
   @ApiProperty({ example: 'Acme Corp LLC' })
   entityName: string;
 
-  @IsString()
-  @ApiProperty({ example: '+1-555-0123' })
+  @NormalizePhone()
+  @ApiProperty({
+    description:
+      'Phone number. Accepts international format (+2349012345678) or a ' +
+      'local number, in which case `country` is used to resolve it. Stored as E.164.',
+    example: '+2349012345678',
+  })
   phoneNumber: string;
+
+  @IsISO31661Alpha2()
+  @ApiProperty({
+    description:
+      'ISO 3166-1 alpha-2 country code (used to normalize the phone number)',
+    example: 'NG',
+  })
+  country: string;
 
   @IsString()
   @ApiProperty({ example: 'Technology' })

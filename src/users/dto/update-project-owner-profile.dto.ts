@@ -1,6 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Gender } from '@prisma/client';
-import { IsArray, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsISO31661Alpha2,
+  IsOptional,
+  IsString,
+  IsUrl,
+} from 'class-validator';
+import { NormalizePhone } from '../../common/decorators/normalize.decorator';
 
 export class UpdateProjectOwnerProfileDto {
   @ApiPropertyOptional({
@@ -53,12 +61,23 @@ export class UpdateProjectOwnerProfileDto {
   entityName?: string;
 
   @ApiPropertyOptional({
-    description: 'Phone number',
-    example: '+1234567890',
+    description:
+      'Phone number. Accepts international format (+2349012345678) or a local ' +
+      'number, in which case `country` is used to resolve it. Stored as E.164.',
+    example: '+2349012345678',
   })
-  @IsString()
   @IsOptional()
+  @NormalizePhone()
   phoneNumber?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'ISO 3166-1 alpha-2 country code (used to normalize the phone number)',
+    example: 'NG',
+  })
+  @IsOptional()
+  @IsISO31661Alpha2()
+  country?: string;
 
   @ApiPropertyOptional({
     description: 'Industry',

@@ -12,7 +12,6 @@ import {
 import { Type } from 'class-transformer';
 import {
   IsBoolean,
-  IsEmail,
   IsEnum,
   IsISO8601,
   IsInt,
@@ -23,6 +22,7 @@ import {
   Length,
   Min,
 } from 'class-validator';
+import { NormalizeEmail } from '../../common/decorators/normalize.decorator';
 
 export class AdminPaginationQueryDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -102,7 +102,7 @@ export class AdminUserQueryDto extends AdminPaginationQueryDto {
 
 export class AdminCreateUserDto {
   @ApiProperty({ example: 'newuser@example.com' })
-  @IsEmail()
+  @NormalizeEmail()
   email: string;
 
   @ApiProperty({ enum: Role, example: Role.CONTRIBUTOR })

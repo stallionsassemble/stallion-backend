@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator';
+import { NormalizeEmail } from '../../common/decorators/normalize.decorator';
 
 export class RegisterPasskeyDto {
   @ApiPropertyOptional({
@@ -40,8 +41,8 @@ export class VerifyPasskeyAuthenticationDto {
     description: 'User email address',
     example: 'user@example.com',
   })
-  @IsString()
   @IsNotEmpty()
+  @NormalizeEmail()
   email: string;
 }
 

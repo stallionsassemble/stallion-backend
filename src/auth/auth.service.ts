@@ -689,6 +689,7 @@ export class AuthService {
         companyName: dto.companyName,
         entityName: dto.entityName,
         phoneNumber: dto.phoneNumber,
+        country: dto.country,
         industry: dto.industry,
         companyBio: dto.companyBio,
         companyLogo: dto.companyLogo,

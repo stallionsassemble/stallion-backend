@@ -1,8 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, Length } from 'class-validator';
+import { IsString, Length } from 'class-validator';
+import { NormalizeEmail } from '../../common/decorators/normalize.decorator';
 
 export class VerifyCodeDto {
-  @IsEmail()
+  @NormalizeEmail()
   @ApiProperty({ example: 'user@example.com' })
   email: string;
 
