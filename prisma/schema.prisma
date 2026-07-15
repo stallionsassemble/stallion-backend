@@ -47,9 +47,14 @@ model User {
   gender           Gender     @default(UNSPECIFIED)
 
   // MFA fields
-  totpSecret  String?  @map("totp_secret")
-  mfaEnabled  Boolean  @default(false) @map("mfa_enabled")
-  backupCodes String[] @default([]) @map("backup_codes")
+  // pendingTotpSecret holds an unconfirmed secret during enrollment. It is only
+  // promoted to totpSecret (and mfaEnabled flipped) once the user verifies a
+  // code, so a half-finished setup can never leave the account in a state where
+  // the authenticator app works but MFA is not actually enforced.
+  totpSecret        String?  @map("totp_secret")
+  pendingTotpSecret String?  @map("pending_totp_secret")
+  mfaEnabled        Boolean  @default(false) @map("mfa_enabled")
+  backupCodes       String[] @default([]) @map("backup_codes")
 
   // Refresh token
   refreshToken String? @map("refreshToken")

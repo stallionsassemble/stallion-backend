@@ -4,7 +4,13 @@ import { User, Wallet } from '@prisma/client';
 export const sanitizeUser = (
   user: User & { wallet?: Partial<Wallet> | null },
 ) => {
-  const { totpSecret, backupCodes, refreshToken, ...sanitizedUser } = user;
+  const {
+    totpSecret,
+    pendingTotpSecret,
+    backupCodes,
+    refreshToken,
+    ...sanitizedUser
+  } = user;
 
   // Sanitize wallet
   if (sanitizedUser.wallet) {

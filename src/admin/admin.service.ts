@@ -477,6 +477,7 @@ export class AdminService {
         data: {
           mfaEnabled: false,
           totpSecret: null,
+          pendingTotpSecret: null,
           backupCodes: [],
         },
       }),

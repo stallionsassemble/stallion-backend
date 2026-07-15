@@ -451,11 +451,13 @@ export class AuthService {
     const totpSecret = authenticator.generateSecret();
     const encryptedTotpSecret = EncryptionUtil.encrypt(totpSecret);
 
-    // Update user
+    // Store the secret as PENDING only. It is not treated as an active MFA
+    // secret (and MFA is not enforced) until the user proves ownership by
+    // verifying a code in verifyTotpSetup.
     await this.prisma.user.update({
       where: { id: userId },
       data: {
-        totpSecret: encryptedTotpSecret,
+        pendingTotpSecret: encryptedTotpSecret,
       },
     });
 
@@ -484,14 +486,14 @@ export class AuthService {
       where: { id: userId },
     });
 
-    if (!user || !user.totpSecret) {
+    if (!user || !user.pendingTotpSecret) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     await this.ensureAccountCanAuthenticate(user);
 
-    // Decrypt and verify TOTP
-    const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
+    // Decrypt and verify against the PENDING secret
+    const decryptedSecret = EncryptionUtil.decrypt(user.pendingTotpSecret);
     const isValid = authenticator.verify({
       token: totpCode,
       secret: decryptedSecret,
@@ -507,10 +509,13 @@ export class AuthService {
       backupCodes.map((code) => argon2.hash(code)),
     );
 
-    // Enable TOTP
+    // Promote the pending secret to the active secret and enable MFA in one
+    // step, so totpSecret is only ever populated on a verified account.
     await this.prisma.user.update({
       where: { id: userId },
       data: {
+        totpSecret: user.pendingTotpSecret,
+        pendingTotpSecret: null,
         mfaEnabled: true,
         backupCodes: hashedBackupCodes,
       },
@@ -559,6 +564,7 @@ export class AuthService {
       data: {
         mfaEnabled: false,
         totpSecret: null,
+        pendingTotpSecret: null,
         backupCodes: [],
       },
     });
