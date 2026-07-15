@@ -14,6 +14,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { calculateUsdValue } from '../../common/utils/token-price.util';
+import { ContributorFundingService } from '../../wallet/contributor-funding.service';
 import { HackathonContractService } from './hackathon-contract.service';
 
 @Injectable()
@@ -23,6 +24,7 @@ export class HackathonJudgingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly contractService: HackathonContractService,
+    private readonly contributorFunding: ContributorFundingService,
   ) {}
 
   private async getHackathonAndVerifyCompany(
@@ -232,6 +234,20 @@ export class HackathonJudgingService {
           );
         }
       }
+
+      // Ensure every winner's account can receive the prize (activated +
+      // trustline for the hackathon currency) before the single distribute
+      // call, otherwise the whole on-chain distribution would fail. Recipients
+      // that need XLM are funded in one batched transaction.
+      await this.contributorFunding.ensurePayoutRecipientsReady(
+        winners
+          .filter((winner) => winner.user.wallet)
+          .map((winner) => ({
+            walletId: winner.user.wallet!.id,
+            publicKey: winner.user.wallet!.publicKey,
+            currency: hackathon.currency,
+          })),
+      );
 
       const distributeResult = await this.contractService.distributePrizes({
         adminPublicKey: adminWallet.publicKey,

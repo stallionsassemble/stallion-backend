@@ -19,6 +19,7 @@ import { calculateUsdValue } from '../common/utils/token-price.util';
 import { ProjectNotifications } from '../notifications/helpers/notification-helper';
 import { NotificationsService } from '../notifications/notifications.service';
 import { SubmitMilestoneDto } from './dto/submit-milestone.dto';
+import { ContributorFundingService } from '../wallet/contributor-funding.service';
 import { ProjectContractService } from './project-contract.service';
 
 @Injectable()
@@ -30,6 +31,7 @@ export class ProjectMilestonesService {
     private contractService: ProjectContractService,
     private activitiesService: ActivitiesService,
     private notificationsService: NotificationsService,
+    private contributorFunding: ContributorFundingService,
   ) {}
 
   async submitMilestone(
@@ -301,6 +303,17 @@ export class ProjectMilestonesService {
       });
 
       try {
+        // Ensure the contributor's account can receive the payout (activated +
+        // trustline for the project currency) before the contract transfers to
+        // them, otherwise the on-chain payment would fail.
+        await this.contributorFunding.ensurePayoutRecipientsReady([
+          {
+            walletId: userMilestone.contributor.wallet.id,
+            publicKey: userMilestone.contributor.wallet.publicKey,
+            currency: userMilestone.milestone.project.currency,
+          },
+        ]);
+
         const paymentResult =
           await this.contractService.releaseMilestonePayment({
             projectId: userMilestone.milestone.project.contractProjectId!,
