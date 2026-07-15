@@ -5,6 +5,7 @@ import { PrismaModule } from '../common/prisma/prisma.module';
 import { PlatformSettingsService } from '../common/services/platform-settings.service';
 import { TwoFactorVerificationService } from '../common/services/two-factor-verification.service';
 import { SorobanModule } from '../soroban/soroban.module';
+import { ContributorFundingService } from './contributor-funding.service';
 import { PayoutMethodsController } from './payout-methods.controller';
 import { PayoutMethodsService } from './payout-methods.service';
 import { StellarWalletService } from './stellar-wallet.service';
@@ -31,6 +32,7 @@ import { WalletService } from './wallet.service';
     PlatformSettingsService,
     PayoutMethodsService,
     TwoFactorVerificationService,
+    ContributorFundingService,
   ],
   exports: [
     WalletService,
@@ -38,6 +40,7 @@ import { WalletService } from './wallet.service';
     WalletSigningService,
     PayoutMethodsService,
     TwoFactorVerificationService,
+    ContributorFundingService,
   ],
 })
 export class WalletModule {}

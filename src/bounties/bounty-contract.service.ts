@@ -5,6 +5,7 @@ import { EnvConfig } from '../config/env.config';
 import { Client as SorobanClient } from '../soroban/contract-bindings';
 import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { buildSorobanContractOptions } from '../soroban/soroban-rpc.util';
+import { ContributorFundingService } from '../wallet/contributor-funding.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class BountyContractService {
   constructor(
     private configService: ConfigService,
     private walletSigning: WalletSigningService,
+    private contributorFunding: ContributorFundingService,
   ) {
     this.contractId = this.configService.getOrThrow<string>(
       EnvConfig.SOROBAN_CONTRACT_ID,
@@ -201,6 +203,11 @@ export class BountyContractService {
       `Applying to bounty ${params.bountyId} for applicant ${params.applicantPublicKey}`,
     );
 
+    await this.contributorFunding.ensureContributorFunded({
+      walletId: params.walletId,
+      publicKey: params.applicantPublicKey,
+    });
+
     this.sorobanClient.options.publicKey = params.applicantPublicKey;
 
     const result = await ContractErrorHandler.wrapContractCall(async () => {
@@ -258,6 +265,13 @@ export class BountyContractService {
     this.logger.log(
       `Updating submission for bounty ${params.bountyId} for applicant ${params.applicantPublicKey}`,
     );
+
+    // Defensive: the applicant was funded when they first applied, but ensure
+    // they still have enough XLM in case something changed in between.
+    await this.contributorFunding.ensureContributorFunded({
+      walletId: params.walletId,
+      publicKey: params.applicantPublicKey,
+    });
 
     this.sorobanClient.options.publicKey = params.applicantPublicKey;
 

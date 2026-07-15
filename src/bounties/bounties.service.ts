@@ -992,11 +992,9 @@ export class BountiesService {
         throw new ForbiddenException('Only contributors can apply to bounties');
       }
 
-      // Validate wallet has sufficient XLM for transaction
-      await validateWalletForTransaction(
-        user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
-      );
+      // Wallet XLM funding is handled just-in-time at the contract-invocation
+      // boundary (BountyContractService auto-funds contributors), so no
+      // throw-first balance validation here.
 
       // Get bounty to validate submission fields
       const bounty = await this.prisma.bounty.findUnique({
@@ -1113,11 +1111,9 @@ export class BountiesService {
         throw new NotFoundException('User or wallet not found');
       }
 
-      // Validate wallet has sufficient XLM for transaction
-      await validateWalletForTransaction(
-        user.wallet.publicKey,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
-      );
+      // Wallet XLM funding is handled just-in-time at the contract-invocation
+      // boundary (BountyContractService auto-funds contributors), so no
+      // throw-first balance validation here.
 
       // Get bounty to validate submission fields
       const bounty = await this.prisma.bounty.findUnique({

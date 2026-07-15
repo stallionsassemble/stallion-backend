@@ -4,6 +4,7 @@ import { Transaction } from '@stellar/stellar-sdk';
 import { getCurrency } from '../../common/utils/supported-currencies';
 import { StellarWalletService } from '../stellar-wallet.service';
 import { WalletSigningService } from '../wallet-signing.service';
+import { withFundingWalletLock } from './funding-lock.util';
 
 // Interface for the wallet signing service methods we need
 interface IWalletSigningService {
@@ -213,30 +214,34 @@ async function fundAccount(
       await stellarWalletService.getWalletById(fundingWalletId);
     const fundingPublicKey = fundingWallet.publicKey;
 
-    // Load funding account
-    const fundingAccount = await server.loadAccount(fundingPublicKey);
+    // Serialize the load-sequence → build → sign → submit cycle so concurrent
+    // funding payments from the shared funding wallet don't collide on sequence.
+    const result = await withFundingWalletLock(async () => {
+      // Load funding account (fresh sequence, inside the lock)
+      const fundingAccount = await server.loadAccount(fundingPublicKey);
 
-    // Build payment transaction
-    const transaction = new StellarSDK.TransactionBuilder(fundingAccount, {
-      fee: StellarSDK.BASE_FEE,
-      networkPassphrase,
-    })
-      .addOperation(
-        StellarSDK.Operation.payment({
-          destination: targetPublicKey,
-          asset: StellarSDK.Asset.native(),
-          amount: amount,
-        }),
-      )
-      .setTimeout(30)
-      .build();
+      // Build payment transaction
+      const transaction = new StellarSDK.TransactionBuilder(fundingAccount, {
+        fee: StellarSDK.BASE_FEE,
+        networkPassphrase,
+      })
+        .addOperation(
+          StellarSDK.Operation.payment({
+            destination: targetPublicKey,
+            asset: StellarSDK.Asset.native(),
+            amount: amount,
+          }),
+        )
+        .setTimeout(30)
+        .build();
 
-    // Sign and submit
-    const signedTx = await walletSigningService.signTransaction(
-      fundingWalletId,
-      transaction,
-    );
-    const result = await server.submitTransaction(signedTx);
+      // Sign and submit
+      const signedTx = await walletSigningService.signTransaction(
+        fundingWalletId,
+        transaction,
+      );
+      return server.submitTransaction(signedTx);
+    });
 
     logger.log(`Account funded successfully: ${result.hash}`);
     return result.hash;
