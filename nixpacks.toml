@@ -10,4 +10,4 @@ cmds = ["pnpm install --frozen-lockfile", "pnpm prisma:generate"]
 cmds = ["pnpm run build"]
 
 [start]
-cmd = "pnpm prisma:push && pnpm start:prod"
+cmd = "pnpm start:prod"
