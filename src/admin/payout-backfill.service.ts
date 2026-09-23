@@ -13,10 +13,20 @@ export class PayoutBackfillService implements OnModuleInit {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async onModuleInit() {
-    await this.backfillBountyWinnerPayouts();
-    await this.backfillMilestonePayouts();
-    await this.backfillHackathonWinnerPayouts();
+  onModuleInit() {
+    this.runBackfills().catch((err) => {
+      this.logger.error('Failed to execute payout backfill in background', err);
+    });
+  }
+
+  private async runBackfills(): Promise<void> {
+    try {
+      await this.backfillBountyWinnerPayouts();
+      await this.backfillMilestonePayouts();
+      await this.backfillHackathonWinnerPayouts();
+    } catch (err) {
+      this.logger.error('Error during background payout backfill', err);
+    }
   }
 
   private async backfillBountyWinnerPayouts(): Promise<void> {
