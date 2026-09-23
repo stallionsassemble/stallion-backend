@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../common/prisma/prisma.module';
 import { PlatformSettingsService } from '../common/services/platform-settings.service';
+import { StepUpModule } from '../common/services/step-up.module';
 import { TwoFactorVerificationService } from '../common/services/two-factor-verification.service';
 import { SorobanModule } from '../soroban/soroban.module';
 import { ContributorFundingService } from './contributor-funding.service';
@@ -19,6 +20,7 @@ import { WalletService } from './wallet.service';
     PrismaModule,
     SorobanModule,
     ConfigModule,
+    StepUpModule,
     BullModule.registerQueue({
       name: 'withdrawal',
     }),

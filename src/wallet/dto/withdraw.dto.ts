@@ -40,9 +40,9 @@ export class WithdrawDto {
 
   @ApiProperty({
     description:
-      'TOTP code from authenticator app (required for 2FA verification)',
-    example: '123456',
+      'Step-up authentication token issued after verifying TOTP or Passkey',
+    example: '4f2b1c8a9e...',
   })
   @IsString()
-  totpCode: string;
+  stepUpToken: string;
 }

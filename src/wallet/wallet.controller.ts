@@ -7,7 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { TwoFactorVerificationService } from '../common/services/two-factor-verification.service';
+import { StepUpService } from '../common/services/step-up.service';
 import { SetupTrustlineDto } from './dto/setup-trustline.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
@@ -17,7 +17,7 @@ import { WalletService } from './wallet.service';
 export class WalletController {
   constructor(
     private readonly walletService: WalletService,
-    private readonly twoFactorVerificationService: TwoFactorVerificationService,
+    private readonly stepUpService: StepUpService,
   ) {}
 
   @Get('supported-currencies')
@@ -136,7 +136,7 @@ export class WalletController {
   @ApiOperation({
     summary: 'Withdraw funds',
     description:
-      'Create a withdrawal request from wallet (requires 2FA verification). Provide either an address or payoutMethodId. If both are provided, address takes precedence. Must include totpCode from your authenticator app for 2FA verification.',
+      'Create a withdrawal request from wallet (requires step-up authentication via TOTP or Passkey). Provide either an address or payoutMethodId. If both are provided, address takes precedence. Must include stepUpToken obtained from /auth/step-up/totp or /auth/step-up/passkey/verify.',
   })
   @ApiResponse({
     status: 201,
@@ -144,19 +144,22 @@ export class WalletController {
   })
   @ApiResponse({
     status: 400,
-    description: 'Insufficient balance or invalid 2FA',
+    description: 'Insufficient balance or invalid withdrawal parameters',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized or invalid 2FA code' })
-  @ApiResponse({ status: 403, description: '2FA required' })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized or invalid token',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Step-up verification required or token expired',
+  })
   async withdraw(
     @CurrentUser('id') userId: string,
     @Body() withdrawDto: WithdrawDto,
   ) {
-    // Verify 2FA before processing withdrawal
-    await this.twoFactorVerificationService.verify2FA(
-      userId,
-      withdrawDto.totpCode,
-    );
+    // Verify step-up authentication before processing withdrawal
+    await this.stepUpService.assertToken(userId, withdrawDto.stepUpToken);
 
     const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.createWithdrawal(

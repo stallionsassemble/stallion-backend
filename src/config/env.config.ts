@@ -62,4 +62,7 @@ export class EnvConfig {
 
   // Admin security
   static readonly ADMIN_STEP_UP_TTL_SECONDS = 'ADMIN_STEP_UP_TTL_SECONDS';
+
+  // User step-up security
+  static readonly STEP_UP_TTL_SECONDS = 'STEP_UP_TTL_SECONDS';
 }

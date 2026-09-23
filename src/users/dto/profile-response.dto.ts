@@ -149,6 +149,12 @@ export class ProfileResponseDto {
   mfaEnabled: boolean;
 
   @ApiProperty({
+    description: 'Whether user has any registered passkeys',
+    example: false,
+  })
+  hasPasskeys: boolean;
+
+  @ApiProperty({
     description: 'Account creation date',
     example: '2024-01-01T00:00:00.000Z',
   })

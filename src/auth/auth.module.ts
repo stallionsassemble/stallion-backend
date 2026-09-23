@@ -7,9 +7,11 @@ import { EmailModule } from '../email/email.module';
 import { PasskeyModule } from '../passkey/passkey.module';
 import { UsersModule } from '../users/users.module';
 import { WalletModule } from '../wallet/wallet.module';
+import { StepUpModule } from '../common/services/step-up.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SocialTokenVerifierService } from './social-token-verifier.service';
+import { StepUpController } from './step-up.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { VerificationCodeStorageService } from './verification-code-storage.service';
 
@@ -20,6 +22,7 @@ import { VerificationCodeStorageService } from './verification-code-storage.serv
     PassportModule,
     ConfigModule,
     EmailModule,
+    StepUpModule,
     forwardRef(() => PasskeyModule),
     forwardRef(() => WalletModule),
     JwtModule.registerAsync({
@@ -33,13 +36,13 @@ import { VerificationCodeStorageService } from './verification-code-storage.serv
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, StepUpController],
   providers: [
     AuthService,
     VerificationCodeStorageService,
     JwtStrategy,
     SocialTokenVerifierService,
   ],
-  exports: [AuthService],
+  exports: [AuthService, StepUpModule],
 })
 export class AuthModule {}

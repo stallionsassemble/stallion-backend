@@ -15,6 +15,7 @@ import * as QRCode from 'qrcode';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EncryptionUtil } from '../common/utils/encryption.util';
+import { hasTOTP } from '../common/utils/mfa.util';
 import { EnvConfig } from '../config/env.config';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
@@ -61,6 +62,7 @@ export class AuthService {
       where: { id: userId },
       include: {
         wallet: true,
+        passkeys: { select: { id: true } },
       },
     });
     if (!user) {
@@ -443,7 +445,7 @@ export class AuthService {
       throw new UnauthorizedException('Email not verified');
     }
 
-    if (user.mfaEnabled) {
+    if (hasTOTP(user)) {
       throw new BadRequestException('MFA already set up');
     }
 
@@ -544,8 +546,23 @@ export class AuthService {
       throw new NotFoundException('User not found');
     }
 
-    if (!user.mfaEnabled || !user.totpSecret) {
+    if (!user.mfaEnabled) {
       throw new BadRequestException('MFA is not enabled for this account');
+    }
+
+    if (!user.totpSecret) {
+      // Inconsistent ghost state: mfaEnabled is true but secret is missing.
+      // Self-heal by resetting MFA fields directly without requiring a code.
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          mfaEnabled: false,
+          totpSecret: null,
+          pendingTotpSecret: null,
+          backupCodes: [],
+        },
+      });
+      return { message: '2FA disabled successfully' };
     }
 
     // Verify the TOTP code before disabling
@@ -556,7 +573,11 @@ export class AuthService {
     });
 
     if (!isValid) {
-      throw new UnauthorizedException('Invalid TOTP code');
+      // Allow using a backup code to disable 2FA
+      const isValidBackup = await this.verifyBackupCode(userId, totpCode);
+      if (!isValidBackup) {
+        throw new UnauthorizedException('Invalid TOTP or backup code');
+      }
     }
 
     await this.prisma.user.update({
@@ -751,7 +772,7 @@ export class AuthService {
 
     return {
       message: 'Verification code sent to your email',
-      mfaEnabled: user.mfaEnabled,
+      mfaEnabled: hasTOTP(user),
     };
   }
 

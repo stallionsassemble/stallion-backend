@@ -2,13 +2,17 @@
 import { User, Wallet } from '@prisma/client';
 
 export const sanitizeUser = (
-  user: User & { wallet?: Partial<Wallet> | null },
+  user: User & {
+    wallet?: Partial<Wallet> | null;
+    passkeys?: { id: string }[] | null;
+  },
 ) => {
   const {
     totpSecret,
     pendingTotpSecret,
     backupCodes,
     refreshToken,
+    passkeys,
     ...sanitizedUser
   } = user;
 
@@ -22,7 +26,11 @@ export const sanitizeUser = (
     };
   }
 
-  return sanitizedUser;
+  return {
+    ...sanitizedUser,
+    mfaEnabled: Boolean(user.mfaEnabled && user.totpSecret),
+    hasPasskeys: (user.passkeys?.length ?? 0) > 0,
+  };
 };
 
 export type SanitizedUser = ReturnType<typeof sanitizeUser>;
