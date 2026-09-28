@@ -39,6 +39,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         return delay;
       },
       maxRetriesPerRequest: 3,
+      // Fail fast instead of hanging requests when Redis is unreachable
+      connectTimeout: 5000,
+      commandTimeout: 5000,
       enableReadyCheck: true,
       enableOfflineQueue: true,
       lazyConnect: false,

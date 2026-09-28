@@ -33,6 +33,7 @@ import { WithdrawalWorker } from './workers/withdrawal.worker';
           password: configService.get<string>(EnvConfig.REDIS_PASSWORD),
           username: configService.get<string>(EnvConfig.REDIS_USERNAME),
           db: configService.get<number>(EnvConfig.REDIS_DB) || 0,
+          connectTimeout: 5000,
         },
       }),
       inject: [ConfigService],

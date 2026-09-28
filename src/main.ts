@@ -5,6 +5,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { EnvConfig } from './config/env.config';
 import { configureStellarHttpAgents } from './config/http-agent.config';
 
@@ -30,6 +31,12 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transform: true,
     }),
+  );
+
+  app.useGlobalInterceptors(
+    new TimeoutInterceptor(
+      Number(configService.get(EnvConfig.REQUEST_TIMEOUT_MS)) || 30000,
+    ),
   );
 
   app.enableCors();

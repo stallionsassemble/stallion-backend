@@ -9,6 +9,7 @@ export class EnvConfig {
   static readonly BASE_URL = 'BASE_URL';
   static readonly FRONTEND_URL = 'FRONTEND_URL';
   static readonly PORT = 'PORT';
+  static readonly REQUEST_TIMEOUT_MS = 'REQUEST_TIMEOUT_MS';
 
   // Database
   static readonly DATABASE_URL = 'DATABASE_URL';

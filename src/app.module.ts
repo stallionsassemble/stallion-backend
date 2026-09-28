@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { BountiesModule } from './bounties/bounties.module';
 import { ChatModule } from './chat/chat.module';
 import { PrismaModule } from './common/prisma/prisma.module';
+import { RedisModule } from './common/redis/redis.module';
 import { CronModule } from './cron/cron.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { DiscussionsModule } from './discussions/discussions.module';
@@ -34,6 +35,7 @@ import { WalletModule } from './wallet/wallet.module';
     }),
     AdminModule,
     PrismaModule,
+    RedisModule,
     UsersModule,
     AuthModule,
     PasskeyModule,

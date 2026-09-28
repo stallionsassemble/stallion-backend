@@ -23,6 +23,10 @@ export class EmailService {
         user: this.configService.getOrThrow<string>(EnvConfig.SMTP_USER),
         pass: this.configService.getOrThrow<string>(EnvConfig.SMTP_PASS),
       },
+      // nodemailer waits up to 2 min to connect and 10 min on an idle socket
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
     });
   }
 
