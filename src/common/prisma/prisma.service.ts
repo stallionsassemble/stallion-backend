@@ -34,6 +34,14 @@ export class PrismaService
       // Server-side cap on a single statement, plus a client-side backstop
       statement_timeout: envInt('DATABASE_STATEMENT_TIMEOUT_MS', 15000),
       query_timeout: envInt('DATABASE_QUERY_TIMEOUT_MS', 20000),
+      // Give up waiting on a locked row/table quickly instead of queueing
+      lock_timeout: envInt('DATABASE_LOCK_TIMEOUT_MS', 5000),
+      // Kill our own sessions left open mid-transaction so they can't hold
+      // locks (and block every other query on the table) indefinitely
+      idle_in_transaction_session_timeout: envInt(
+        'DATABASE_IDLE_IN_TX_TIMEOUT_MS',
+        60000,
+      ),
       keepAlive: true,
     });
     const adapter = new PrismaPg(pool);
