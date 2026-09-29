@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { hasAny2FA } from '../utils/mfa.util';
+import { hasAny2FA, isAdmin2FABypassed } from '../utils/mfa.util';
 
 @Injectable()
 export class MFAGuard implements CanActivate {
@@ -18,6 +18,10 @@ export class MFAGuard implements CanActivate {
 
     if (!user) {
       throw new UnauthorizedException('User not authenticated');
+    }
+
+    if (isAdmin2FABypassed(user.role)) {
+      return true;
     }
 
     // Check if user has any second factor enabled (TOTP or Passkey)

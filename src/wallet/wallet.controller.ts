@@ -11,6 +11,7 @@ import { StepUpService } from '../common/services/step-up.service';
 import { SetupTrustlineDto } from './dto/setup-trustline.dto';
 import { WithdrawDto } from './dto/withdraw.dto';
 import { WalletService } from './wallet.service';
+import { isAdmin2FABypassed } from 'src/common/utils/mfa.util';
 
 @ApiTags('Wallet')
 @Controller('wallet')
@@ -156,10 +157,13 @@ export class WalletController {
   })
   async withdraw(
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
     @Body() withdrawDto: WithdrawDto,
   ) {
     // Verify step-up authentication before processing withdrawal
-    await this.stepUpService.assertToken(userId, withdrawDto.stepUpToken);
+    if (!isAdmin2FABypassed(role)) {
+      await this.stepUpService.assertToken(userId, withdrawDto.stepUpToken);
+    }
 
     const wallet = await this.walletService.getWalletByUserId(userId);
     return this.walletService.createWithdrawal(

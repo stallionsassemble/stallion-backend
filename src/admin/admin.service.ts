@@ -43,6 +43,7 @@ import {
   SuspendUserDto,
 } from './dto/admin.dto';
 import { AdminStepUpService } from './admin-step-up.service';
+import { isAdmin2FABypassed } from 'src/common/utils/mfa.util';
 
 @Injectable()
 export class AdminService {
@@ -62,8 +63,12 @@ export class AdminService {
     private readonly hackathonsService: HackathonsService,
   ) {}
 
+  // Every AdminController route is restricted to Role.ADMIN, so the caller
+  // here is always an admin.
   async verifyTotpStepUp(userId: string, code: string) {
-    await this.twoFactorVerificationService.verify2FA(userId, code);
+    if (!isAdmin2FABypassed('ADMIN')) {
+      await this.twoFactorVerificationService.verify2FA(userId, code);
+    }
     return this.stepUpService.issueStepUpToken(userId);
   }
 
@@ -72,7 +77,9 @@ export class AdminService {
   }
 
   async verifyPasskeyStepUp(userId: string, response: any) {
-    await this.passkeyService.verifyStepUpAuthentication(userId, response);
+    if (!isAdmin2FABypassed('ADMIN')) {
+      await this.passkeyService.verifyStepUpAuthentication(userId, response);
+    }
     return this.stepUpService.issueStepUpToken(userId);
   }
 

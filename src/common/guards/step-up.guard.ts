@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { StepUpService } from '../services/step-up.service';
+import { isAdmin2FABypassed } from '../utils/mfa.util';
 
 /**
  * Guard that validates a step-up token on incoming requests.
@@ -26,6 +27,10 @@ export class StepUpGuard implements CanActivate {
 
     if (!user) {
       throw new UnauthorizedException('User not authenticated');
+    }
+
+    if (isAdmin2FABypassed(user.role)) {
+      return true;
     }
 
     const headerToken = request.headers['x-step-up-token'];

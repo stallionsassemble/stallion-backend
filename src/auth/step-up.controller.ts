@@ -24,6 +24,7 @@ import {
   StepUpTokenResponseDto,
   StepUpTotpDto,
 } from './dto/step-up.dto';
+import { isAdmin2FABypassed } from 'src/common/utils/mfa.util';
 
 @ApiTags('Auth / Security')
 @Controller('auth/step-up')
@@ -52,9 +53,12 @@ export class StepUpController {
   @ApiBadRequestResponse({ description: 'Invalid TOTP code' })
   async verifyTotp(
     @CurrentUser('id') userId: string,
+    @CurrentUser('role') role: string,
     @Body() dto: StepUpTotpDto,
   ): Promise<StepUpTokenResponseDto> {
-    await this.twoFactorVerificationService.verify2FA(userId, dto.code);
+    if (!isAdmin2FABypassed(role)) {
+      await this.twoFactorVerificationService.verify2FA(userId, dto.code);
+    }
     return this.stepUpService.issueToken(userId);
   }
 

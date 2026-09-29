@@ -42,3 +42,14 @@ export function hasPasskeys(
 ): boolean {
   return (user.passkeys?.length ?? 0) > 0;
 }
+
+/**
+ * Returns `true` when 2FA / passkey / step-up checks should be skipped for
+ * this user: admins are exempt unless ADMIN_2FA_BYPASS is set to "false".
+ *
+ * `role` must come from the database (as `request.user.role` does via
+ * JwtStrategy), never from client input.
+ */
+export function isAdmin2FABypassed(role?: string | null): boolean {
+  return role === 'ADMIN' && process.env.ADMIN_2FA_BYPASS !== 'false';
+}

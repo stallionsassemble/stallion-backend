@@ -15,7 +15,7 @@ import * as QRCode from 'qrcode';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { EncryptionUtil } from '../common/utils/encryption.util';
-import { hasTOTP } from '../common/utils/mfa.util';
+import { hasTOTP, isAdmin2FABypassed } from '../common/utils/mfa.util';
 import { EnvConfig } from '../config/env.config';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
@@ -392,8 +392,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired verification code');
     }
 
-    // If user has MFA enabled, verify TOTP
-    if (user.mfaEnabled && user.totpSecret) {
+    // If user has MFA enabled, verify TOTP (admins exempt, see isAdmin2FABypassed)
+    if (user.mfaEnabled && user.totpSecret && !isAdmin2FABypassed(user.role)) {
       if (!totpCode) {
         throw new UnauthorizedException('MFA code required');
       }

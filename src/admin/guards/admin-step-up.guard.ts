@@ -4,6 +4,7 @@ import {
   Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
+import { isAdmin2FABypassed } from 'src/common/utils/mfa.util';
 import { AdminStepUpService } from '../admin-step-up.service';
 
 @Injectable()
@@ -16,6 +17,10 @@ export class AdminStepUpGuard implements CanActivate {
 
     if (!user) {
       throw new UnauthorizedException('User not authenticated');
+    }
+
+    if (isAdmin2FABypassed(user.role)) {
+      return true;
     }
 
     const headerToken = request.headers['x-admin-step-up-token'];
