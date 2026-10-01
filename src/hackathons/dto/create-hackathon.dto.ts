@@ -11,6 +11,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Length,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -52,6 +53,8 @@ export class CreateHackathonDto {
   @ApiProperty({ type: [String] })
   @IsArray()
   @IsString({ each: true })
+  // Each entry may be a full multi-line block of text
+  @Length(1, 5000, { each: true })
   deliverables: string[];
 
   @ApiProperty({ type: [String] })

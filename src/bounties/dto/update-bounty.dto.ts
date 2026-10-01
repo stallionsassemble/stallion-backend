@@ -57,7 +57,8 @@ export class UpdateBountyDto {
   })
   @IsArray()
   @IsString({ each: true })
-  @Length(1, 500, { each: true })
+  // Each entry may be a full multi-line block of text
+  @Length(1, 5000, { each: true })
   @IsOptional()
   requirements?: string[];
 
@@ -72,7 +73,8 @@ export class UpdateBountyDto {
   })
   @IsArray()
   @IsString({ each: true })
-  @Length(1, 500, { each: true })
+  // Each entry may be a full multi-line block of text
+  @Length(1, 5000, { each: true })
   @IsOptional()
   deliverables?: string[];
 
