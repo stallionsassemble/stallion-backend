@@ -368,9 +368,16 @@ export class ContributorFundingService {
           await this.stellarWallet.getWalletById(fundingWalletId);
         let fundingAccount: StellarSDK.Horizon.AccountResponse;
         try {
-          fundingAccount = await server.loadAccount(fundingWallet.publicKey);
+          // Retries across fresh connections: a degraded Horizon node can
+          // return a spurious 404 for an account that exists.
+          fundingAccount = await this.stellarAccount.loadWithRetry(
+            fundingWallet.publicKey,
+          );
         } catch (loadError: any) {
-          if (loadError?.response?.status === 404) {
+          if (
+            loadError instanceof AccountNotFoundError ||
+            loadError?.response?.status === 404
+          ) {
             // The platform's own funding wallet is missing on-chain: an ops
             // problem, not something the contributor can fix.
             this.logger.error(

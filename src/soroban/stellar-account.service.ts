@@ -138,7 +138,7 @@ export class StellarAccountService {
    * account genuinely does not exist and throw AccountNotFoundError.
    * Any other failure is treated as transient and thrown as-is.
    */
-  private async loadWithRetry(pk: string, retries = 4) {
+  async loadWithRetry(pk: string, retries = 4) {
     let lastError: unknown;
 
     for (let i = 0; i < retries; i++) {
