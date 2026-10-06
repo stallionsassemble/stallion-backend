@@ -12,6 +12,7 @@ import {
   getTokenAddress,
   isCurrencySupported,
 } from '../common/utils/supported-currencies';
+import { validateWalletForBountyCreation } from '../bounties/utils/wallet-validator';
 import { EnvConfig } from '../config/env.config';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { GetHackathonsQueryDto } from './dto/get-hackathons-query.dto';
@@ -123,6 +124,18 @@ export class HackathonsService {
     if (existing) {
       throw new BadRequestException('Slug already exists');
     }
+
+    // Fail fast with an actionable message if the admin wallet can't fund the
+    // escrow, instead of a generic on-chain "transaction failed" error.
+    await validateWalletForBountyCreation(
+      adminUser.wallet.publicKey,
+      dto.totalBudget,
+      dto.asset,
+      this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+      this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
+      networkPassphrase,
+      0,
+    );
 
     // Smart Contract Call
     const contractResult = await this.contractService.createHackathon({

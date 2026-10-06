@@ -120,9 +120,12 @@ export class ContractErrorHandler {
 
     // Check for network/Stellar errors
     const errorString = JSON.stringify(error);
+    const detail = this.describeUnderlyingError(error);
     for (const { pattern, message } of NETWORK_ERROR_PATTERNS) {
       if (pattern.test(errorString)) {
-        throw new BadRequestException(`Network error: ${message}`);
+        throw new BadRequestException(
+          `Network error: ${message}${detail ? ` (Details: ${detail})` : ''}`,
+        );
       }
     }
 
@@ -133,7 +136,9 @@ export class ContractErrorHandler {
       // Check network patterns against message
       for (const { pattern, message } of NETWORK_ERROR_PATTERNS) {
         if (pattern.test(errorMessage)) {
-          throw new BadRequestException(`Network error: ${message}`);
+          throw new BadRequestException(
+            `Network error: ${message}${detail ? ` (Details: ${detail})` : ''}`,
+          );
         }
       }
 
@@ -147,6 +152,19 @@ export class ContractErrorHandler {
     throw new BadRequestException(
       `Failed to execute contract operation in ${context}. Please try again or contact support if the issue persists.`,
     );
+  }
+
+  /**
+   * Short, human-readable description of the underlying error, so generic
+   * messages still tell the user what actually went wrong.
+   */
+  private static describeUnderlyingError(error: any): string {
+    const raw =
+      typeof error === 'string'
+        ? error
+        : error?.message || error?.error?.message || '';
+    const text = String(raw).replace(/\s+/g, ' ').trim();
+    return text.length > 300 ? `${text.slice(0, 300)}...` : text;
   }
 
   /**

@@ -43,6 +43,7 @@ export async function validateWalletForBountyCreation(
   rpcUrl: string,
   horizonUrl: string,
   networkPassphrase: string = StellarSDK.Networks.TESTNET,
+  contractFeePercentage: number = CONTRACT_FEE_PERCENTAGE,
 ): Promise<void> {
   const rpcServer = new StellarSDK.rpc.Server(rpcUrl);
   // Use Horizon server for account data
@@ -151,7 +152,7 @@ export async function validateWalletForBountyCreation(
     }
 
     // 3. Calculate required balance
-    const contractFee = rewardAmount * CONTRACT_FEE_PERCENTAGE;
+    const contractFee = rewardAmount * contractFeePercentage;
     const totalRequired = rewardAmount + contractFee;
 
     // Convert token balance to number for comparison
@@ -159,7 +160,7 @@ export async function validateWalletForBountyCreation(
 
     console.log(`[Wallet Validator] Reward amount:`, rewardAmount);
     console.log(
-      `[Wallet Validator] Contract fee (${CONTRACT_FEE_PERCENTAGE * 100}%):`,
+      `[Wallet Validator] Contract fee (${contractFeePercentage * 100}%):`,
       contractFee,
     );
     console.log(`[Wallet Validator] Total required:`, totalRequired);
