@@ -366,9 +366,22 @@ export class ContributorFundingService {
       result = await withFundingWalletLock(async () => {
         const fundingWallet =
           await this.stellarWallet.getWalletById(fundingWalletId);
-        const fundingAccount = await server.loadAccount(
-          fundingWallet.publicKey,
-        );
+        let fundingAccount: StellarSDK.Horizon.AccountResponse;
+        try {
+          fundingAccount = await server.loadAccount(fundingWallet.publicKey);
+        } catch (loadError: any) {
+          if (loadError?.response?.status === 404) {
+            // The platform's own funding wallet is missing on-chain: an ops
+            // problem, not something the contributor can fix.
+            this.logger.error(
+              `Platform funding wallet ${fundingWallet.publicKey} (${fundingWalletId}) does not exist on the network — fund/activate it or fix FUNDING_WALLET_ID / platform settings`,
+            );
+            throw new BadRequestException(
+              `Automatic wallet activation is temporarily unavailable. Please deposit at least ${amount} XLM to your wallet address: ${targetPublicKey}`,
+            );
+          }
+          throw loadError;
+        }
 
         // A payment to an account that doesn't exist yet fails with
         // op_no_destination; new accounts must be created instead.
@@ -398,6 +411,9 @@ export class ContributorFundingService {
         return server.submitTransaction(signedTx);
       });
     } catch (error: any) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       const codes = error?.response?.data?.extras?.result_codes;
       const detail = codes
         ? `${codes.transaction ?? ''} ${(codes.operations ?? []).join(',')}`.trim()
