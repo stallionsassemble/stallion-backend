@@ -3,7 +3,10 @@ import { Role } from '@prisma/client';
 import * as StellarSDK from '@stellar/stellar-sdk';
 import { PrismaService } from '../common/prisma/prisma.service';
 import { PlatformSettingsService } from '../common/services/platform-settings.service';
-import { StellarAccountService } from '../soroban/stellar-account.service';
+import {
+  AccountNotFoundError,
+  StellarAccountService,
+} from '../soroban/stellar-account.service';
 import { StellarWalletService } from './stellar-wallet.service';
 import { withFundingWalletLock } from './utils/funding-lock.util';
 import { hasTrustline, setupTrustline } from './utils/trustline.util';
