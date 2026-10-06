@@ -129,6 +129,51 @@ export class StellarAccountService {
   }
 
   /**
+   * Submit a signed transaction, retrying across FRESH connections when the
+   * failure looks like an infrastructure problem rather than a rejected
+   * transaction.
+   *
+   * A degraded Horizon node can answer POST /transactions with 404/405/5xx or
+   * drop the connection even though the transaction is valid. Re-submitting the
+   * identical signed envelope is safe: Horizon/core dedupe by hash and return
+   * the existing result if it already landed. A 400 (transaction_failed,
+   * tx_bad_seq, ...) is a real rejection and is thrown immediately.
+   */
+  async submitWithRetry(
+    transaction: Parameters<Horizon.Server['submitTransaction']>[0],
+    retries = 4,
+  ) {
+    let lastError: unknown;
+
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await this.createServer().submitTransaction(transaction);
+      } catch (e: any) {
+        lastError = e;
+        const status: number | undefined = e?.response?.status;
+        const transient =
+          status === undefined ||
+          status === 404 ||
+          status === 405 ||
+          status === 408 ||
+          status === 429 ||
+          status >= 500;
+        this.logger.warn(
+          `submitTransaction attempt ${i + 1}/${retries} failed (${
+            status ?? e?.code ?? 'no response'
+          }): ${e instanceof Error ? e.message : 'unknown error'}`,
+        );
+        if (!transient || i === retries - 1) {
+          throw e;
+        }
+        await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
    * Load an account, retrying across FRESH connections on failure.
    *
    * A degraded Horizon node returns 404 for accounts that actually exist, so

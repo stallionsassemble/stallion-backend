@@ -308,7 +308,7 @@ export class ContributorFundingService {
         fundingWalletId,
         transaction,
       );
-      const result = await server.submitTransaction(signedTx);
+      const result = await this.stellarAccount.submitWithRetry(signedTx);
       this.logger.log(
         `Funded ${operations.length} payout recipient(s) in tx ${result.hash}`,
       );
@@ -359,7 +359,6 @@ export class ContributorFundingService {
       `Funding ${targetPublicKey} with ${amount} XLM (${context})`,
     );
 
-    const server = this.stellarAccount.getServer();
     const networkPassphrase = this.stellarAccount.getNetworkPassphrase();
 
     // Serialize the load-sequence → build → sign → submit cycle so concurrent
@@ -418,7 +417,7 @@ export class ContributorFundingService {
           fundingWalletId,
           transaction,
         );
-        return server.submitTransaction(signedTx);
+        return this.stellarAccount.submitWithRetry(signedTx);
       });
     } catch (error: any) {
       if (error instanceof BadRequestException) {
