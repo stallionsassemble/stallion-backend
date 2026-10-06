@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Horizon, Networks } from '@stellar/stellar-sdk';
+import { Horizon, Networks, rpc } from '@stellar/stellar-sdk';
 import { EnvConfig } from 'src/config/env.config';
 
 /**
@@ -138,18 +138,19 @@ export class StellarAccountService {
    * identical signed envelope is safe: Horizon/core dedupe by hash and return
    * the existing result if it already landed. A 400 (transaction_failed,
    * tx_bad_seq, ...) is a real rejection and is thrown immediately.
+   *
+   * If every Horizon attempt fails for infrastructure reasons, the same signed
+   * envelope is submitted through the Soroban RPC endpoint (which accepts
+   * classic transactions too) as a last resort.
    */
   async submitWithRetry(
     transaction: Parameters<Horizon.Server['submitTransaction']>[0],
-    retries = 4,
-  ) {
-    let lastError: unknown;
-
+    retries = 3,
+  ): Promise<{ hash: string }> {
     for (let i = 0; i < retries; i++) {
       try {
         return await this.createServer().submitTransaction(transaction);
       } catch (e: any) {
-        lastError = e;
         const status: number | undefined = e?.response?.status;
         const transient =
           status === undefined ||
@@ -163,14 +164,54 @@ export class StellarAccountService {
             status ?? e?.code ?? 'no response'
           }): ${e instanceof Error ? e.message : 'unknown error'}`,
         );
-        if (!transient || i === retries - 1) {
+        if (!transient) {
           throw e;
         }
-        await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+        if (i < retries - 1) {
+          await new Promise((r) => setTimeout(r, 500 * 2 ** i));
+        }
       }
     }
 
-    throw lastError;
+    this.logger.warn(
+      'Horizon submit kept failing; falling back to Soroban RPC submission',
+    );
+    return this.submitViaRpc(transaction);
+  }
+
+  /** Submit a signed classic transaction via Soroban RPC and wait for it. */
+  private async submitViaRpc(
+    transaction: Parameters<Horizon.Server['submitTransaction']>[0],
+  ): Promise<{ hash: string }> {
+    const rpcUrl = this.configService.getOrThrow<string>(
+      EnvConfig.SOROBAN_RPC_URL,
+    );
+    const server = new rpc.Server(rpcUrl, {
+      allowHttp: rpcUrl.startsWith('http://'),
+    });
+
+    const sent = await server.sendTransaction(transaction as any);
+    if (sent.status === 'ERROR' || sent.status === 'TRY_AGAIN_LATER') {
+      throw new Error(
+        `Soroban RPC rejected transaction (${sent.status}): ${
+          sent.errorResult ? sent.errorResult.toXDR('base64') : 'no detail'
+        }`,
+      );
+    }
+
+    // PENDING or DUPLICATE: poll until it is included in a ledger.
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      const res = await server.getTransaction(sent.hash);
+      if (res.status === rpc.Api.GetTransactionStatus.SUCCESS) {
+        return { hash: sent.hash };
+      }
+      if (res.status === rpc.Api.GetTransactionStatus.FAILED) {
+        throw new Error(`Transaction ${sent.hash} failed on-chain`);
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    throw new Error(`Transaction ${sent.hash} was not confirmed in time`);
   }
 
   /**

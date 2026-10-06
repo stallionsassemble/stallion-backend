@@ -363,7 +363,7 @@ export class ContributorFundingService {
 
     // Serialize the load-sequence → build → sign → submit cycle so concurrent
     // funding payments from the shared funding wallet don't collide on sequence.
-    let result: StellarSDK.Horizon.HorizonApi.SubmitTransactionResponse;
+    let result: { hash: string };
     try {
       result = await withFundingWalletLock(async () => {
         const fundingWallet =
