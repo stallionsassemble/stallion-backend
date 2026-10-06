@@ -107,6 +107,7 @@ export class ContributorFundingService {
         publicKey,
         startingBalance.toFixed(7),
         'activate account',
+        true,
       );
       await this.delay(POST_ACTIVATION_DELAY_MS);
       return { funded: true, fundingTxHash, reason: 'activated' };
@@ -336,6 +337,7 @@ export class ContributorFundingService {
     targetPublicKey: string,
     amount: string,
     context: string,
+    createAccount = false,
   ): Promise<string> {
     const fundingWalletId =
       await this.platformSettings.resolveFundingWalletId();
@@ -359,31 +361,54 @@ export class ContributorFundingService {
 
     // Serialize the load-sequence → build → sign → submit cycle so concurrent
     // funding payments from the shared funding wallet don't collide on sequence.
-    const result = await withFundingWalletLock(async () => {
-      const fundingWallet =
-        await this.stellarWallet.getWalletById(fundingWalletId);
-      const fundingAccount = await server.loadAccount(fundingWallet.publicKey);
+    let result: StellarSDK.Horizon.HorizonApi.SubmitTransactionResponse;
+    try {
+      result = await withFundingWalletLock(async () => {
+        const fundingWallet =
+          await this.stellarWallet.getWalletById(fundingWalletId);
+        const fundingAccount = await server.loadAccount(
+          fundingWallet.publicKey,
+        );
 
-      const transaction = new StellarSDK.TransactionBuilder(fundingAccount, {
-        fee: StellarSDK.BASE_FEE,
-        networkPassphrase,
-      })
-        .addOperation(
-          StellarSDK.Operation.payment({
-            destination: targetPublicKey,
-            asset: StellarSDK.Asset.native(),
-            amount,
-          }),
-        )
-        .setTimeout(30)
-        .build();
+        // A payment to an account that doesn't exist yet fails with
+        // op_no_destination; new accounts must be created instead.
+        const fundingOp = createAccount
+          ? StellarSDK.Operation.createAccount({
+              destination: targetPublicKey,
+              startingBalance: amount,
+            })
+          : StellarSDK.Operation.payment({
+              destination: targetPublicKey,
+              asset: StellarSDK.Asset.native(),
+              amount,
+            });
 
-      const signedTx = await this.walletSigning.signTransaction(
-        fundingWalletId,
-        transaction,
+        const transaction = new StellarSDK.TransactionBuilder(fundingAccount, {
+          fee: StellarSDK.BASE_FEE,
+          networkPassphrase,
+        })
+          .addOperation(fundingOp)
+          .setTimeout(30)
+          .build();
+
+        const signedTx = await this.walletSigning.signTransaction(
+          fundingWalletId,
+          transaction,
+        );
+        return server.submitTransaction(signedTx);
+      });
+    } catch (error: any) {
+      const codes = error?.response?.data?.extras?.result_codes;
+      const detail = codes
+        ? `${codes.transaction ?? ''} ${(codes.operations ?? []).join(',')}`.trim()
+        : error?.message || 'unknown error';
+      this.logger.error(
+        `Failed to ${context} for ${targetPublicKey}: ${detail}`,
       );
-      return server.submitTransaction(signedTx);
-    });
+      throw new BadRequestException(
+        `Could not ${context} for your wallet (${detail}). Please try again or deposit XLM to ${targetPublicKey}.`,
+      );
+    }
 
     this.logger.log(
       `Funded ${targetPublicKey} with ${amount} XLM: ${result.hash}`,
