@@ -160,33 +160,71 @@ export class HackathonsService {
       deadline,
     });
 
-    // Create DB Record
-    const hackathon = await this.prisma.hackathon.create({
-      data: {
-        title: dto.title,
-        slug: dto.slug,
-        description: dto.description,
-        type: dto.type,
-        deliverables: dto.deliverables,
-        tags: dto.tags,
-        deadline,
-        announcementDate,
-        totalBudget: new Prisma.Decimal(dto.totalBudget),
-        token: tokenAddress,
-        asset: dto.asset,
-        currency: dto.asset,
-        prizePool: dto.prizePool as any,
-        documents: dto.documents || {},
-        attachments: dto.attachments || {},
-        teamBased: dto.teamBased,
-        maxTeamSize: dto.teamBased ? dto.maxTeamSize : null,
-        createdById: adminId,
-        companyId: dto.companyId,
-        status: isImmediate ? HackathonStatus.PUBLISHED : HackathonStatus.DRAFT,
-        contractHackathonId: contractResult.contractHackathonId,
-        txHash: contractResult.txHash,
-      },
-    });
+    // Create DB Record. The escrow is already locked on-chain at this point, so if the insert
+    // fails we must refund it instead of leaving the funds orphaned in the contract.
+    let hackathon: Awaited<ReturnType<typeof this.prisma.hackathon.create>>;
+    try {
+      hackathon = await this.prisma.hackathon.create({
+        data: {
+          title: dto.title,
+          slug: dto.slug,
+          description: dto.description,
+          type: dto.type,
+          deliverables: dto.deliverables,
+          tags: dto.tags,
+          deadline,
+          announcementDate,
+          totalBudget: new Prisma.Decimal(dto.totalBudget),
+          token: tokenAddress,
+          asset: dto.asset,
+          currency: dto.asset,
+          prizePool: dto.prizePool as any,
+          documents: dto.documents || {},
+          attachments: dto.attachments || {},
+          teamBased: dto.teamBased,
+          maxTeamSize: dto.teamBased ? dto.maxTeamSize : null,
+          createdById: adminId,
+          companyId: dto.companyId,
+          status: isImmediate
+            ? HackathonStatus.PUBLISHED
+            : HackathonStatus.DRAFT,
+          contractHackathonId: contractResult.contractHackathonId,
+          txHash: contractResult.txHash,
+        },
+      });
+    } catch (dbError) {
+      const reason =
+        dbError instanceof Error ? dbError.message : String(dbError);
+      this.logger.error(
+        `Hackathon DB insert failed AFTER escrow was locked on-chain (contractHackathonId=${contractResult.contractHackathonId}, txHash=${contractResult.txHash}): ${reason}`,
+      );
+      try {
+        const refund = await this.contractService.cancelHackathon({
+          adminPublicKey: adminUser.wallet.publicKey,
+          adminWalletId: adminUser.wallet.id,
+          contractHackathonId: contractResult.contractHackathonId,
+        });
+        this.logger.warn(
+          `Escrow refunded for failed hackathon (contractHackathonId=${contractResult.contractHackathonId}, refund tx ${refund.txHash})`,
+        );
+        throw new BadRequestException(
+          'The hackathon could not be saved, so your escrowed funds were refunded to your admin wallet. Please try again or contact support.',
+        );
+      } catch (refundError) {
+        if (
+          refundError instanceof BadRequestException &&
+          refundError.message.includes('refunded')
+        ) {
+          throw refundError;
+        }
+        this.logger.error(
+          `AUTO-REFUND FAILED for contractHackathonId=${contractResult.contractHackathonId} (txHash=${contractResult.txHash}). Cancel it manually to recover the escrow.`,
+        );
+        throw new BadRequestException(
+          `The hackathon could not be saved and the automatic refund failed. Your escrow is on-chain as hackathon #${contractResult.contractHackathonId} (tx ${contractResult.txHash}). Contact support to recover it.`,
+        );
+      }
+    }
 
     // Schedule Jobs
     if (!isImmediate) {
