@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as argon2 from 'argon2';
-import { authenticator } from 'otplib';
+import { verifyTotpCode } from '../utils/totp.util';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionUtil } from '../utils/encryption.util';
 import { hasAny2FA, hasTOTP } from '../utils/mfa.util';
@@ -50,10 +50,7 @@ export class TwoFactorVerificationService {
     }
 
     const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret!);
-    const isTotpValid = authenticator.verify({
-      token: totpCode,
-      secret: decryptedSecret,
-    });
+    const isTotpValid = verifyTotpCode(totpCode, decryptedSecret);
 
     if (isTotpValid) {
       return { verified: true, method: 'totp' };

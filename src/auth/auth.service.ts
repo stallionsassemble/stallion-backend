@@ -11,6 +11,7 @@ import { Role, SocialProvider, User, UserStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { randomBytes } from 'crypto';
 import { authenticator } from 'otplib';
+import { verifyTotpCode } from '../common/utils/totp.util';
 import * as QRCode from 'qrcode';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -400,10 +401,7 @@ export class AuthService {
 
       // Verify TOTP
       const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
-      const isTotpValid = authenticator.verify({
-        token: totpCode,
-        secret: decryptedSecret,
-      });
+      const isTotpValid = verifyTotpCode(totpCode, decryptedSecret);
 
       if (!isTotpValid) {
         // Try backup codes
@@ -496,10 +494,7 @@ export class AuthService {
 
     // Decrypt and verify against the PENDING secret
     const decryptedSecret = EncryptionUtil.decrypt(user.pendingTotpSecret);
-    const isValid = authenticator.verify({
-      token: totpCode,
-      secret: decryptedSecret,
-    });
+    const isValid = verifyTotpCode(totpCode, decryptedSecret);
 
     if (!isValid) {
       throw new UnauthorizedException('Invalid TOTP code');
@@ -567,10 +562,7 @@ export class AuthService {
 
     // Verify the TOTP code before disabling
     const decryptedSecret = EncryptionUtil.decrypt(user.totpSecret);
-    const isValid = authenticator.verify({
-      token: totpCode,
-      secret: decryptedSecret,
-    });
+    const isValid = verifyTotpCode(totpCode, decryptedSecret);
 
     if (!isValid) {
       // Allow using a backup code to disable 2FA
