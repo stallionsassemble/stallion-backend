@@ -1148,6 +1148,13 @@ export class AdminService {
     );
   }
 
+  async recoverHackathonEscrow(contractHackathonId: string, adminId: string) {
+    return this.hackathonsService.recoverOrphanedEscrow(
+      String(contractHackathonId ?? '').trim(),
+      adminId,
+    );
+  }
+
   async deleteHackathon(hackathonId: string) {
     const hackathon = await this.prisma.hackathon.findUnique({
       where: { id: hackathonId },

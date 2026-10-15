@@ -366,6 +366,32 @@ export class AdminController {
     return this.adminService.createHackathon(dto.ownerId, dto.payload);
   }
 
+  @Post('hackathons/recover-escrow')
+  @UseGuards(AdminStepUpGuard)
+  @ApiOperation({
+    summary:
+      'Cancel an on-chain hackathon that has no database record and refund its escrow to the admin wallet',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['contractHackathonId'],
+      properties: {
+        contractHackathonId: { type: 'string', example: '270721946264535041' },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'Escrow refunded' })
+  recoverHackathonEscrow(
+    @CurrentUser('id') userId: string,
+    @Body() body: { contractHackathonId: string },
+  ) {
+    return this.adminService.recoverHackathonEscrow(
+      body.contractHackathonId,
+      userId,
+    );
+  }
+
   @Patch('hackathons/:id')
   @UseGuards(AdminStepUpGuard)
   @ApiOperation({ summary: 'Update hackathon as admin' })

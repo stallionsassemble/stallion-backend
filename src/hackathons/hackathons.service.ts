@@ -420,6 +420,48 @@ export class HackathonsService {
     });
   }
 
+  /**
+   * Recover escrow for a hackathon that exists on-chain but has no database record
+   * (for example when the DB insert failed after the contract call). Only the on-chain owner
+   * (the admin wallet that created it) can cancel, so this cannot touch anyone else's funds.
+   */
+  async recoverOrphanedEscrow(contractHackathonId: string, adminId: string) {
+    const adminUser = await this.prisma.user.findUnique({
+      where: { id: adminId },
+      include: { wallet: true },
+    });
+    if (!adminUser || adminUser.role !== Role.ADMIN || !adminUser.wallet) {
+      throw new ForbiddenException('Only admins can recover hackathon escrow');
+    }
+
+    let onChainId: bigint;
+    try {
+      onChainId = BigInt(contractHackathonId);
+    } catch {
+      throw new BadRequestException('contractHackathonId must be a number');
+    }
+
+    const existing = await this.prisma.hackathon.findUnique({
+      where: { contractHackathonId: onChainId },
+      select: { id: true, title: true },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        `This hackathon is saved as "${existing.title}". Cancel it from the Hackathons list instead.`,
+      );
+    }
+
+    const refund = await this.contractService.cancelHackathon({
+      adminPublicKey: adminUser.wallet.publicKey,
+      adminWalletId: adminUser.wallet.id,
+      contractHackathonId: onChainId,
+    });
+    this.logger.warn(
+      `Recovered orphaned escrow for contractHackathonId=${contractHackathonId} by admin ${adminId}: refunded ${refund.refundedAmount} (tx ${refund.txHash})`,
+    );
+    return refund;
+  }
+
   async getHackathons(query: GetHackathonsQueryDto) {
     const where: Prisma.HackathonWhereInput = {};
 
