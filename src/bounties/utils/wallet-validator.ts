@@ -138,7 +138,7 @@ export async function validateWalletForBountyCreation(
         } else {
           // Simulation failed - likely no trustline or token not found
           throw new BadRequestException(
-            `No balance found for ${currencyCode}. Please ensure you have added this token to your wallet and have a trustline established.`,
+            `No balance found for ${currencyCode} on wallet ${publicKey}. Add a ${currencyCode} trustline to the wallet and deposit ${currencyCode} before continuing.`,
           );
         }
       } catch (error) {
@@ -168,7 +168,7 @@ export async function validateWalletForBountyCreation(
 
     if (availableBalance < totalRequired) {
       throw new BadRequestException(
-        `Insufficient ${currencyCode} balance. Required: ${totalRequired.toFixed(7)} (Reward: ${rewardAmount}, Contract Fee: ${contractFee.toFixed(7)}). Available: ${availableBalance.toFixed(7)}`,
+        `Insufficient ${currencyCode} balance. Required: ${totalRequired.toFixed(7)} (Amount: ${rewardAmount}, Contract Fee: ${contractFee.toFixed(7)}). Available: ${availableBalance.toFixed(7)}. Deposit at least ${(totalRequired - availableBalance).toFixed(7)} more ${currencyCode} to wallet ${publicKey} and try again.`,
       );
     }
 
@@ -188,7 +188,7 @@ export async function validateWalletForBountyCreation(
 
       if (xlmAvailable < minXlmRequired) {
         throw new BadRequestException(
-          `Insufficient XLM for transaction fees. Required: ${(minXlmRequired / 10000000).toFixed(7)} XLM. Available: ${(xlmAvailable / 10000000).toFixed(7)} XLM`,
+          `Insufficient XLM for transaction fees. Required: ${(minXlmRequired / 10000000).toFixed(7)} XLM. Available: ${(xlmAvailable / 10000000).toFixed(7)} XLM. Deposit XLM to wallet ${publicKey} and try again.`,
         );
       }
     } else {

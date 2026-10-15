@@ -32,6 +32,13 @@ const CONTRACT_ERROR_MESSAGES: Record<number, string> = {
   26: 'Invalid amount specified',
   27: 'The deadline has passed',
   28: 'An internal contract error occurred',
+  29: 'Hackathon not found on the blockchain',
+  30: 'This hackathon is not active',
+  31: 'The hackathon deadline has passed',
+  32: 'Invalid prize pool - positions must be unique and every prize amount must be greater than zero',
+  33: 'The hackathon is not completed yet',
+  34: 'Invalid prize position',
+  35: 'All prize positions must be filled before prizes can be distributed',
 };
 
 /**
@@ -47,6 +54,16 @@ const NETWORK_ERROR_PATTERNS = [
     pattern: /insufficient.*balance|not.*enough.*funds/i,
     message:
       'Insufficient balance to complete this transaction. Please add funds to your account.',
+  },
+  {
+    pattern: /trustline entry is missing|trustline.*missing|missing.*trustline/i,
+    message:
+      'The wallet has no trustline for this token. Add a trustline for the asset (e.g. USDC) to the wallet first.',
+  },
+  {
+    pattern: /balance is not sufficient|not sufficient to spend|insufficient.*(funds|balance)/i,
+    message:
+      'The wallet does not hold enough of this token to cover the amount. Deposit more of the token and try again.',
   },
   {
     pattern: /transaction.*failed|tx.*failed/i,
@@ -174,6 +191,14 @@ export class ContractErrorHandler {
     // Direct error code
     if (typeof error === 'number') {
       return error;
+    }
+
+    // Soroban host error format: "Error(Contract, #32)"
+    const hostMatch = (
+      typeof error === 'string' ? error : String(error?.message ?? '')
+    ).match(/Error\(Contract,\s*#(\d+)\)/);
+    if (hostMatch && hostMatch[1]) {
+      return Number(hostMatch[1]);
     }
 
     // Error object with code property

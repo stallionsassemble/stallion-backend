@@ -127,15 +127,26 @@ export class HackathonsService {
 
     // Fail fast with an actionable message if the admin wallet can't fund the
     // escrow, instead of a generic on-chain "transaction failed" error.
-    await validateWalletForBountyCreation(
-      adminUser.wallet.publicKey,
-      dto.totalBudget,
-      dto.asset,
-      this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
-      this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
-      networkPassphrase,
-      0,
-    );
+    try {
+      await validateWalletForBountyCreation(
+        adminUser.wallet.publicKey,
+        dto.totalBudget,
+        dto.asset,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
+        networkPassphrase,
+        0,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        const detail = error.message;
+        this.logger.warn(`Hackathon wallet pre-check failed: ${detail}`);
+        throw new BadRequestException(
+          `Your admin wallet cannot fund this hackathon. ${detail}`,
+        );
+      }
+      throw error;
+    }
 
     // Smart Contract Call
     const contractResult = await this.contractService.createHackathon({
