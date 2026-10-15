@@ -1119,6 +1119,7 @@ model PlatformSetting {
 enum HackathonType {
   VIRTUAL
   PHYSICAL
+  HYBRID
 }
 
 enum HackathonStatus {
