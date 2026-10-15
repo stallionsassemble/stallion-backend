@@ -62,6 +62,11 @@ const NETWORK_ERROR_PATTERNS = [
       'The wallet has no trustline for this token. Add a trustline for the asset (e.g. USDC) to the wallet first.',
   },
   {
+    pattern: /resulting balance is not within the allowed range/i,
+    message:
+      'The wallet does not have enough balance left after the transfer. Stellar keeps a minimum XLM balance locked in every account, so deposit more of the asset (or XLM) and try again.',
+  },
+  {
     pattern: /balance is not sufficient|not sufficient to spend|insufficient.*(funds|balance)/i,
     message:
       'The wallet does not hold enough of this token to cover the amount. Deposit more of the token and try again.',

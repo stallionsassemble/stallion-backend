@@ -135,7 +135,6 @@ export class HackathonsService {
         this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
         this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
         networkPassphrase,
-        0,
       );
     } catch (error) {
       if (error instanceof BadRequestException) {

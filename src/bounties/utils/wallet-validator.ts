@@ -17,6 +17,24 @@ const ESTIMATED_TX_FEE = 500; // stroops
 const MIN_XLM_RESERVE = 10000000; // stroops (1 XLM)
 
 /**
+ * Headroom for Soroban resource fees on top of the account's minimum balance (0.1 XLM)
+ */
+const SOROBAN_FEE_BUFFER = 1000000; // stroops
+
+/**
+ * Stellar's minimum balance: 0.5 XLM per (2 + subentries + sponsoring - sponsored).
+ */
+function getMinimumXlmBalanceStroops(account: StellarSDK.Horizon.AccountResponse): number {
+  const a = account as unknown as {
+    subentry_count?: number;
+    num_sponsoring?: number;
+    num_sponsored?: number;
+  };
+  const entries = 2 + (a.subentry_count ?? 0) + (a.num_sponsoring ?? 0) - (a.num_sponsored ?? 0);
+  return Math.max(entries, 2) * 5000000;
+}
+
+/**
  * Contract fee percentage (e.g., 5% = 0.05)
  */
 const CONTRACT_FEE_PERCENTAGE = 0.05;
@@ -184,7 +202,10 @@ export async function validateWalletForBountyCreation(
       }
 
       const xlmAvailable = parseFloat(xlmBalance.balance) * 10000000; // Convert to stroops
-      const minXlmRequired = ESTIMATED_TX_FEE + 10000000; // Fee + 1 XLM reserve
+      const minXlmRequired =
+        ESTIMATED_TX_FEE +
+        SOROBAN_FEE_BUFFER +
+        Math.max(MIN_XLM_RESERVE, getMinimumXlmBalanceStroops(accountResponse)); // Fee + account minimum balance
 
       if (xlmAvailable < minXlmRequired) {
         throw new BadRequestException(
@@ -194,12 +215,19 @@ export async function validateWalletForBountyCreation(
     } else {
       // If paying in XLM, ensure enough for both reward and tx fees
       const xlmAvailable = parseFloat(tokenBalance) * 10000000; // Convert to stroops
+      const reserveStroops = Math.max(
+        MIN_XLM_RESERVE,
+        getMinimumXlmBalanceStroops(accountResponse),
+      );
       const totalRequiredStroops =
-        totalRequired * 10000000 + ESTIMATED_TX_FEE + 10000000; // Reward + fees + reserve
+        totalRequired * 10000000 +
+        ESTIMATED_TX_FEE +
+        SOROBAN_FEE_BUFFER +
+        reserveStroops; // Reward + fees + account minimum balance
 
       if (xlmAvailable < totalRequiredStroops) {
         throw new BadRequestException(
-          `Insufficient XLM. Required: ${(totalRequiredStroops / 10000000).toFixed(7)} XLM (includes reward, fees, and reserve). Available: ${(xlmAvailable / 10000000).toFixed(7)} XLM`,
+          `Insufficient XLM. Required: ${(totalRequiredStroops / 10000000).toFixed(7)} XLM (includes the amount, the contract fee, network fees, and the ${(reserveStroops / 10000000).toFixed(1)} XLM minimum balance Stellar keeps locked in the account). Available: ${(xlmAvailable / 10000000).toFixed(7)} XLM. Deposit at least ${((totalRequiredStroops - xlmAvailable) / 10000000).toFixed(7)} more XLM to wallet ${publicKey} and try again.`,
         );
       }
     }
