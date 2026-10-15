@@ -1,4 +1,5 @@
 import { BadRequestException, Logger } from '@nestjs/common';
+import { scValToNative, xdr } from '@stellar/stellar-sdk';
 
 /**
  * Maps contract error codes to user-friendly messages
@@ -115,10 +116,62 @@ export class ContractErrorHandler {
     context: string,
   ): Promise<T> {
     try {
-      return await operation();
+      const sent = await operation();
+      this.assertTransactionSucceeded(sent);
+      return sent;
     } catch (error) {
       this.handleContractError(error, context);
     }
+  }
+
+  /**
+   * A SentTransaction whose on-chain execution failed has no return value, and reading `.result`
+   * crashes inside the SDK ("Cannot read properties of undefined (reading 'switch')").
+   * Detect that here and throw an error carrying the host diagnostics instead, so it maps to a
+   * readable message (insufficient balance, missing trustline, contract error code, ...).
+   */
+  private static assertTransactionSucceeded(sent: any): void {
+    const response = sent?.getTransactionResponse;
+    if (!response || response.status === 'SUCCESS') return;
+
+    const parts: string[] = [`Transaction ${response.status ?? 'FAILED'} on-chain`];
+
+    try {
+      if (response.resultXdr) {
+        const txResult: any = response.resultXdr;
+        const code = txResult.result?.().switch?.().name;
+        if (code) parts.push(code);
+        const inner = txResult.result?.().results?.()?.[0]?.tr?.()?.invokeHostFunctionResult?.()?.switch?.().name;
+        if (inner) parts.push(inner);
+      }
+    } catch {
+      // best effort only
+    }
+
+    try {
+      const events: any[] = response.diagnosticEventsXdr ?? [];
+      for (const ev of events) {
+        const body = (ev as xdr.DiagnosticEvent).event().body().v0();
+        const text = [...body.topics(), body.data()]
+          .map((v) => {
+            try {
+              const native = scValToNative(v);
+              return typeof native === 'bigint' ? native.toString() : JSON.stringify(native);
+            } catch {
+              return '';
+            }
+          })
+          .filter(Boolean)
+          .join(' ');
+        if (text) parts.push(text);
+      }
+    } catch {
+      // best effort only
+    }
+
+    const message = parts.join(' | ').slice(0, 1500);
+    this.logger.error(`Contract transaction failed: ${message}`);
+    throw new Error(message);
   }
 
   /**
@@ -167,7 +220,7 @@ export class ContractErrorHandler {
 
     // Default error message
     throw new BadRequestException(
-      `Failed to execute contract operation in ${context}. Please try again or contact support if the issue persists.`,
+      `Failed to execute contract operation in ${context}.${detail ? ` (Details: ${detail})` : ''} Please try again or contact support if the issue persists.`,
     );
   }
 
