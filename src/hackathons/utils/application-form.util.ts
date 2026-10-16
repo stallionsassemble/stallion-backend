@@ -185,3 +185,133 @@ export function normaliseTracks(input: unknown): string[] {
   }
   return tracks;
 }
+
+export type ApplicationAnswers = Record<string, string | string[]>;
+
+export interface ValidatedApplication {
+  answers: ApplicationAnswers;
+  /** 'NEED_TEAM' or 'EXISTING_TEAM', when the form has a team choice. */
+  teamIntent: 'NEED_TEAM' | 'EXISTING_TEAM' | null;
+  teamName: string | null;
+}
+
+function isVisible(q: ApplicationQuestion, answers: ApplicationAnswers) {
+  if (!q.visibleWhen) return true;
+  const value = answers[q.visibleWhen.questionId];
+  return Array.isArray(value)
+    ? value.includes(q.visibleWhen.equals)
+    : value === q.visibleWhen.equals;
+}
+
+/**
+ * Checks an applicant's answers against the hackathon's form. Answers to hidden questions are
+ * dropped. Throws one BadRequestException listing every problem so the user can fix them at once.
+ */
+export function validateApplicationAnswers(
+  questions: ApplicationQuestion[],
+  rawAnswers: unknown,
+): ValidatedApplication {
+  const input: Record<string, unknown> =
+    rawAnswers && typeof rawAnswers === 'object' && !Array.isArray(rawAnswers)
+      ? (rawAnswers as Record<string, unknown>)
+      : {};
+
+  // Normalise first so visibility rules compare against trimmed values.
+  const normalised: ApplicationAnswers = {};
+  for (const q of questions) {
+    const raw = input[q.id];
+    if (Array.isArray(raw)) {
+      normalised[q.id] = raw
+        .map((v) => (typeof v === 'string' ? v.trim() : ''))
+        .filter(Boolean);
+    } else if (typeof raw === 'string' || typeof raw === 'number') {
+      normalised[q.id] = String(raw).trim();
+    }
+  }
+
+  const problems: string[] = [];
+  const answers: ApplicationAnswers = {};
+
+  for (const q of questions) {
+    if (!isVisible(q, normalised)) continue;
+    const value = normalised[q.id];
+    const empty = Array.isArray(value) ? value.length === 0 : !value;
+
+    if (empty) {
+      if (q.required) problems.push(`"${q.label}" is required`);
+      continue;
+    }
+
+    if (q.type === 'MULTI_CHOICE') {
+      const picked = Array.isArray(value) ? value : [value];
+      if (picked.some((v) => !q.options?.includes(v))) {
+        problems.push(`"${q.label}" has an invalid choice`);
+        continue;
+      }
+      answers[q.id] = picked;
+      continue;
+    }
+
+    if (Array.isArray(value)) {
+      problems.push(`"${q.label}" must be a single answer`);
+      continue;
+    }
+
+    const text = value;
+    if (text.length > 5000) {
+      problems.push(`"${q.label}" is too long`);
+      continue;
+    }
+    if (
+      ['DROPDOWN', 'SINGLE_CHOICE', 'TEAM_MODE'].includes(q.type) &&
+      !q.options?.includes(text)
+    ) {
+      problems.push(`"${q.label}" has an invalid choice`);
+      continue;
+    }
+    if (q.type === 'EMAIL' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text)) {
+      problems.push(`"${q.label}" must be a valid email address`);
+      continue;
+    }
+    if (q.type === 'URL' && !/^https?:\/\/\S+\.\S+$/i.test(text)) {
+      problems.push(`"${q.label}" must be a link starting with https://`);
+      continue;
+    }
+    if (q.type === 'NUMBER' && !Number.isFinite(Number(text))) {
+      problems.push(`"${q.label}" must be a number`);
+      continue;
+    }
+    if (q.type === 'TEAM_NAME' && text.length > 80) {
+      problems.push(`"${q.label}" can be at most 80 characters`);
+      continue;
+    }
+    answers[q.id] = text;
+  }
+
+  if (problems.length > 0) {
+    throw new BadRequestException(
+      `Please fix your application: ${problems.join('; ')}.`,
+    );
+  }
+
+  const modeQuestion = questions.find((q) => q.type === 'TEAM_MODE');
+  const nameQuestion = questions.find((q) => q.type === 'TEAM_NAME');
+  let teamIntent: ValidatedApplication['teamIntent'] = null;
+  if (modeQuestion) {
+    const chosen = answers[modeQuestion.id];
+    if (typeof chosen === 'string' && modeQuestion.options) {
+      teamIntent =
+        chosen === modeQuestion.options[1] ? 'EXISTING_TEAM' : 'NEED_TEAM';
+    }
+  }
+  const nameAnswer = nameQuestion ? answers[nameQuestion.id] : undefined;
+  const teamName = typeof nameAnswer === 'string' ? nameAnswer : null;
+
+  if (teamIntent === 'EXISTING_TEAM' && !teamName) {
+    throw new BadRequestException(
+      'Enter your team name. Everyone on the team must use the exact same name.',
+    );
+  }
+
+  return { answers, teamIntent, teamName };
+}

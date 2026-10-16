@@ -1007,7 +1007,17 @@ model HackathonParticipant {
   teamId String?        @map("team_id")
   team   HackathonTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
 
+  // Application. Rows created before applications existed default to ACCEPTED.
+  status          ApplicationStatus @default(ACCEPTED)
+  applicationData Json?             @map("application_data")
+  lookingForTeam  Boolean           @default(false) @map("looking_for_team")
+  appliedAt       DateTime          @default(now()) @map("applied_at")
+  reviewedAt      DateTime?         @map("reviewed_at")
+  reviewedById    String?           @map("reviewed_by_id")
+  reviewNote      String?           @map("review_note") @db.Text
+
   @@unique([userId, hackathonId])
+  @@index([hackathonId, status])
   @@index([userId])
   @@index([hackathonId])
   @@index([teamId])

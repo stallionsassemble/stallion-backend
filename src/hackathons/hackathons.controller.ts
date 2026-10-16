@@ -17,6 +17,7 @@ import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 
+import { ApplyHackathonDto } from './dto/apply-hackathon.dto';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { CreateSubmissionDto } from './dto/create-submission.dto';
 import { CreateTeamDto } from './dto/create-team.dto';
@@ -27,6 +28,7 @@ import { SelectWinnerDto } from './dto/select-winner.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
 
 import { HackathonsService } from './hackathons.service';
+import { HackathonApplicationsService } from './services/hackathon-applications.service';
 import { HackathonJudgingService } from './services/hackathon-judging.service';
 import { HackathonSubmissionsService } from './services/hackathon-submissions.service';
 import { HackathonTeamsService } from './services/hackathon-teams.service';
@@ -39,6 +41,7 @@ export class HackathonsController {
     private readonly submissionsService: HackathonSubmissionsService,
     private readonly judgingService: HackathonJudgingService,
     private readonly teamsService: HackathonTeamsService,
+    private readonly applicationsService: HackathonApplicationsService,
   ) {}
 
   // --- Admin Endpoints ---
@@ -109,7 +112,33 @@ export class HackathonsController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Join hackathon as participant' })
   participate(@Param() params: IdParamDto, @CurrentUser('id') userId: string) {
-    return this.submissionsService.participate(userId, params.id);
+    // One-click join. Hackathons with an application form must use POST :id/apply.
+    return this.applicationsService.apply(userId, params.id);
+  }
+
+  @Post(':id/apply')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Apply to a hackathon by answering its application form',
+  })
+  apply(
+    @Param() params: IdParamDto,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ApplyHackathonDto,
+  ) {
+    return this.applicationsService.apply(userId, params.id, dto.answers ?? {});
+  }
+
+  @Get(':id/my-application')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: "Get the current user's application and team" })
+  getMyApplication(
+    @Param() params: IdParamDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.applicationsService.getMyApplication(userId, params.id);
   }
 
   @Post(':id/teams')

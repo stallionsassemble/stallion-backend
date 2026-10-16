@@ -171,6 +171,57 @@ export class EmailService {
   }
 
   /**
+   * Tell an applicant their hackathon application was received, accepted or rejected.
+   */
+  async sendHackathonApplicationEmail(
+    to: string,
+    params: {
+      name?: string | null;
+      hackathonTitle: string;
+      status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+      hackathonUrl: string;
+      note?: string | null;
+    },
+  ): Promise<void> {
+    const esc = (v: string) =>
+      v
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    const greeting = `Hi ${esc(params.name?.trim() || 'there')},`;
+    const title = esc(params.hackathonTitle);
+
+    const copy = {
+      PENDING: {
+        subject: `We received your application for ${params.hackathonTitle}`,
+        body: `Thanks for applying to <strong>${title}</strong>. Your application is now being reviewed. We will email you as soon as there is a decision.`,
+      },
+      ACCEPTED: {
+        subject: `You're in! ${params.hackathonTitle}`,
+        body: `Great news. Your application to <strong>${title}</strong> has been accepted. You can now build your project and submit it before the deadline.`,
+      },
+      REJECTED: {
+        subject: `Update on your ${params.hackathonTitle} application`,
+        body: `Thank you for applying to <strong>${title}</strong>. Unfortunately we could not offer you a place this time.`,
+      },
+    }[params.status];
+
+    const note = params.note?.trim()
+      ? `<p style="color:#555;"><em>${esc(params.note.trim())}</em></p>`
+      : '';
+    const message = `
+      <h2 style="color:#333;margin-top:0;">${greeting}</h2>
+      <p style="color:#555;">${copy.body}</p>
+      ${note}
+      <p style="margin:24px 0;">
+        <a href="${esc(params.hackathonUrl)}" style="background:#007aff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">View hackathon</a>
+      </p>`;
+
+    await this.sendEmail(to, copy.subject, 'notification', { message });
+  }
+
+  /**
    * Send generic email with template (queued)
    * Used by notification system
    */

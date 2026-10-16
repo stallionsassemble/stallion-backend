@@ -76,3 +76,78 @@ describe('normaliseTracks', () => {
     ]);
   });
 });
+
+import { validateApplicationAnswers } from './application-form.util';
+
+describe('validateApplicationAnswers', () => {
+  const form = validateApplicationForm([
+    { id: 'name', type: 'SHORT_TEXT', label: 'Full name', required: true },
+    { id: 'email', type: 'EMAIL', label: 'Email', required: true },
+    {
+      id: 'roles',
+      type: 'MULTI_CHOICE',
+      label: 'Roles',
+      required: true,
+      options: ['Frontend', 'Backend'],
+    },
+    {
+      id: 'mode',
+      type: 'TEAM_MODE',
+      label: 'How?',
+      required: true,
+      options: ['I need a team', 'I have a team'],
+    },
+    {
+      id: 'team',
+      type: 'TEAM_NAME',
+      label: 'Team name',
+      required: true,
+      visibleWhen: { questionId: 'mode', equals: 'I have a team' },
+    },
+  ]);
+
+  const base = {
+    name: ' Ada ',
+    email: 'ada@example.com',
+    roles: ['Frontend'],
+  };
+
+  it('accepts a solo applicant and ignores the hidden team name', () => {
+    const r = validateApplicationAnswers(form, {
+      ...base,
+      mode: 'I need a team',
+      team: 'ignored',
+    });
+    expect(r.teamIntent).toBe('NEED_TEAM');
+    expect(r.teamName).toBeNull();
+    expect(r.answers.name).toBe('Ada');
+    expect(r.answers.team).toBeUndefined();
+  });
+
+  it('requires and returns the team name for an existing team', () => {
+    const r = validateApplicationAnswers(form, {
+      ...base,
+      mode: 'I have a team',
+      team: ' The Mares ',
+    });
+    expect(r.teamIntent).toBe('EXISTING_TEAM');
+    expect(r.teamName).toBe('The Mares');
+  });
+
+  it('lists every problem at once', () => {
+    expect(() =>
+      validateApplicationAnswers(form, {
+        name: '',
+        email: 'nope',
+        roles: ['Designer'],
+        mode: 'I have a team',
+      }),
+    ).toThrow(/Full name.*required.*Email.*valid email.*Roles.*invalid/s);
+  });
+
+  it('rejects an existing team without a name', () => {
+    expect(() =>
+      validateApplicationAnswers(form, { ...base, mode: 'I have a team' }),
+    ).toThrow(/Team name.*required/);
+  });
+});

@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { HackathonStatus } from '@prisma/client';
+import { ApplicationStatus, HackathonStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateSubmissionDto } from '../dto/create-submission.dto';
 import { GetSubmissionsQueryDto } from '../dto/get-submissions-query.dto';
@@ -49,6 +49,14 @@ export class HackathonSubmissionsService {
     if (!participant) {
       throw new ForbiddenException(
         'You must join the hackathon before submitting',
+      );
+    }
+
+    if (participant.status !== ApplicationStatus.ACCEPTED) {
+      throw new ForbiddenException(
+        participant.status === ApplicationStatus.REJECTED
+          ? 'Your application was not accepted, so you cannot submit a project'
+          : 'Your application is still being reviewed. You can submit once it is accepted',
       );
     }
 
