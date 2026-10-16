@@ -162,6 +162,7 @@ export class HackathonApplicationsService {
     userId: string,
     hackathon: { title: string; slug: string },
     status: ApplicationStatus,
+    note: string | null = null,
   ) {
     try {
       if (status === ApplicationStatus.WITHDRAWN) return;
@@ -179,6 +180,7 @@ export class HackathonApplicationsService {
         hackathonTitle: hackathon.title,
         status,
         hackathonUrl: `${base.replace(/\/$/, '')}/hackathons/${hackathon.slug}`,
+        note,
       });
     } catch (error) {
       // An email problem must never fail the application itself.
@@ -186,5 +188,214 @@ export class HackathonApplicationsService {
         `Could not send application email: ${error instanceof Error ? error.message : error}`,
       );
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Admin: review applications and match applicants into teams
+  // ---------------------------------------------------------------------------
+
+  async listApplications(
+    hackathonId: string,
+    query: {
+      status?: ApplicationStatus;
+      lookingForTeam?: boolean;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    await this.requireHackathon(hackathonId);
+
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 100);
+    const search = query.search?.trim();
+
+    const where: Prisma.HackathonParticipantWhereInput = {
+      hackathonId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.lookingForTeam ? { lookingForTeam: true, teamId: null } : {}),
+      ...(search
+        ? {
+            user: {
+              OR: [
+                { email: { contains: search, mode: 'insensitive' } },
+                { username: { contains: search, mode: 'insensitive' } },
+                { firstName: { contains: search, mode: 'insensitive' } },
+                { lastName: { contains: search, mode: 'insensitive' } },
+              ],
+            },
+          }
+        : {}),
+    };
+
+    const [items, total, grouped] = await Promise.all([
+      this.prisma.hackathonParticipant.findMany({
+        where,
+        orderBy: { appliedAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              username: true,
+              firstName: true,
+              lastName: true,
+              profilePicture: true,
+            },
+          },
+          team: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.hackathonParticipant.count({ where }),
+      this.prisma.hackathonParticipant.groupBy({
+        by: ['status'],
+        where: { hackathonId },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const counts = { PENDING: 0, ACCEPTED: 0, REJECTED: 0, WITHDRAWN: 0 };
+    for (const g of grouped) counts[g.status] = g._count._all;
+
+    const lookingForTeam = await this.prisma.hackathonParticipant.count({
+      where: { hackathonId, lookingForTeam: true, teamId: null },
+    });
+
+    return {
+      data: items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+      counts: { ...counts, lookingForTeam },
+    };
+  }
+
+  async reviewApplication(
+    hackathonId: string,
+    participantId: string,
+    adminId: string,
+    decision: ApplicationStatus,
+    note?: string,
+  ) {
+    if (
+      decision !== ApplicationStatus.ACCEPTED &&
+      decision !== ApplicationStatus.REJECTED
+    ) {
+      throw new BadRequestException('Decision must be ACCEPTED or REJECTED');
+    }
+    const hackathon = await this.requireHackathon(hackathonId);
+
+    const participant = await this.prisma.hackathonParticipant.findFirst({
+      where: { id: participantId, hackathonId },
+    });
+    if (!participant) throw new NotFoundException('Application not found');
+    if (participant.status === decision) {
+      throw new BadRequestException(`This application is already ${decision}`);
+    }
+
+    const updated = await this.prisma.hackathonParticipant.update({
+      where: { id: participantId },
+      data: {
+        status: decision,
+        reviewedAt: new Date(),
+        reviewedById: adminId,
+        reviewNote: note?.trim() || null,
+        // A rejected applicant should not hold a team seat or sit in the matching pool.
+        ...(decision === ApplicationStatus.REJECTED
+          ? { teamId: null, lookingForTeam: false }
+          : {}),
+      },
+    });
+
+    this.logger.log(
+      `Application ${participantId} for hackathon ${hackathonId} ${decision} by admin ${adminId}`,
+    );
+    void this.sendStatusEmail(
+      participant.userId,
+      hackathon,
+      decision,
+      note?.trim() || null,
+    );
+    return updated;
+  }
+
+  /** Puts unmatched applicants into one new team. The first listed applicant becomes leader. */
+  async groupIntoTeam(
+    hackathonId: string,
+    teamName: string,
+    participantIds: string[],
+  ) {
+    const hackathon = await this.requireHackathon(hackathonId);
+    if (!hackathon.teamBased) {
+      throw new BadRequestException('This hackathon does not support teams');
+    }
+
+    const ids = Array.from(new Set(participantIds));
+    if (ids.length === 0) {
+      throw new BadRequestException('Select at least one applicant');
+    }
+    if (hackathon.maxTeamSize && ids.length > hackathon.maxTeamSize) {
+      throw new BadRequestException(
+        `A team can have at most ${hackathon.maxTeamSize} members`,
+      );
+    }
+
+    const name = teamName.trim();
+    if (!name) throw new BadRequestException('Enter a team name');
+
+    return this.prisma.$transaction(async (tx) => {
+      const participants = await tx.hackathonParticipant.findMany({
+        where: { id: { in: ids }, hackathonId },
+      });
+      if (participants.length !== ids.length) {
+        throw new NotFoundException('Some applicants were not found');
+      }
+      const unavailable = participants.filter(
+        (p) => p.teamId || p.status === ApplicationStatus.REJECTED,
+      );
+      if (unavailable.length > 0) {
+        throw new BadRequestException(
+          'Some applicants already have a team or were rejected. Refresh the list and try again.',
+        );
+      }
+
+      const taken = await tx.hackathonTeam.findFirst({
+        where: { hackathonId, name: { equals: name, mode: 'insensitive' } },
+      });
+      if (taken) {
+        throw new BadRequestException(
+          `A team named "${taken.name}" already exists`,
+        );
+      }
+
+      const leader = ids
+        .map((id) => participants.find((p) => p.id === id))
+        .find(Boolean)!;
+      const team = await tx.hackathonTeam.create({
+        data: { name, hackathonId, leaderId: leader.userId },
+      });
+      await tx.hackathonParticipant.updateMany({
+        where: { id: { in: ids } },
+        data: { teamId: team.id, lookingForTeam: false },
+      });
+
+      this.logger.log(
+        `Admin grouped ${ids.length} applicants into team "${name}" (${team.id}) for hackathon ${hackathonId}`,
+      );
+      return { ...team, memberCount: ids.length };
+    });
+  }
+
+  private async requireHackathon(hackathonId: string) {
+    const hackathon = await this.prisma.hackathon.findUnique({
+      where: { id: hackathonId },
+    });
+    if (!hackathon) throw new NotFoundException('Hackathon not found');
+    return hackathon;
   }
 }

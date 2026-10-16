@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  ApplicationStatus,
   HackathonStatus,
   MilestoneStatus,
   PayoutSourceType,
@@ -26,6 +27,7 @@ import { EmailService } from 'src/email/email.service';
 import { CreateHackathonDto } from 'src/hackathons/dto/create-hackathon.dto';
 import { UpdateHackathonDto } from 'src/hackathons/dto/update-hackathon.dto';
 import { HackathonsService } from 'src/hackathons/hackathons.service';
+import { HackathonApplicationsService } from 'src/hackathons/services/hackathon-applications.service';
 import { PasskeyService } from 'src/passkey/passkey.service';
 import { UpdateProjectDto } from 'src/projects/dto/update-project.dto';
 import { ProjectContractService } from 'src/projects/project-contract.service';
@@ -61,6 +63,7 @@ export class AdminService {
     private readonly projectsService: ProjectsService,
     private readonly projectContractService: ProjectContractService,
     private readonly hackathonsService: HackathonsService,
+    private readonly hackathonApplicationsService: HackathonApplicationsService,
   ) {}
 
   // Every AdminController route is restricted to Role.ADMIN, so the caller
@@ -1152,6 +1155,50 @@ export class AdminService {
     return this.hackathonsService.recoverOrphanedEscrow(
       String(contractHackathonId ?? '').trim(),
       adminId,
+    );
+  }
+
+  listHackathonApplications(
+    hackathonId: string,
+    query: {
+      status?: ApplicationStatus;
+      lookingForTeam?: boolean;
+      search?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    return this.hackathonApplicationsService.listApplications(
+      hackathonId,
+      query,
+    );
+  }
+
+  reviewHackathonApplication(
+    hackathonId: string,
+    participantId: string,
+    adminId: string,
+    decision: ApplicationStatus,
+    note?: string,
+  ) {
+    return this.hackathonApplicationsService.reviewApplication(
+      hackathonId,
+      participantId,
+      adminId,
+      decision,
+      note,
+    );
+  }
+
+  groupHackathonApplicants(
+    hackathonId: string,
+    teamName: string,
+    participantIds: string[],
+  ) {
+    return this.hackathonApplicationsService.groupIntoTeam(
+      hackathonId,
+      teamName,
+      participantIds,
     );
   }
 

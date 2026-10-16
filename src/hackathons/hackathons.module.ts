@@ -34,6 +34,6 @@ import { HackathonSchedulingService } from './services/hackathon-scheduling.serv
     HackathonContractService,
     HackathonSchedulingService,
   ],
-  exports: [HackathonsService],
+  exports: [HackathonsService, HackathonApplicationsService],
 })
 export class HackathonsModule {}

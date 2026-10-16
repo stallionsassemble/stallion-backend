@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ApplicationStatus,
   BountyStatus,
   Gender,
   HackathonStatus,
@@ -9,8 +10,9 @@ import {
   Role,
   UserStatus,
 } from '@prisma/client';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsISO8601,
@@ -335,4 +337,52 @@ export class PaginatedMetaDto {
 
   @ApiProperty({ example: false })
   hasPreviousPage: boolean;
+}
+
+export class AdminApplicationsQueryDto extends AdminPaginationQueryDto {
+  @ApiPropertyOptional({ enum: ApplicationStatus })
+  @IsOptional()
+  @IsEnum(ApplicationStatus)
+  status?: ApplicationStatus;
+
+  @ApiPropertyOptional({
+    description: 'Only applicants still looking for a team',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  lookingForTeam?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  search?: string;
+}
+
+export class AdminReviewApplicationDto {
+  @ApiProperty({ enum: ['ACCEPTED', 'REJECTED'] })
+  @IsEnum(ApplicationStatus)
+  decision: ApplicationStatus;
+
+  @ApiPropertyOptional({ description: 'Optional note included in the email' })
+  @IsOptional()
+  @IsString()
+  @Length(0, 1000)
+  note?: string;
+}
+
+export class AdminGroupTeamDto {
+  @ApiProperty({ description: 'Name for the new team' })
+  @IsString()
+  @Length(1, 80)
+  teamName: string;
+
+  @ApiProperty({
+    type: [String],
+    description:
+      'Participant ids (from the applications list) to put in the team',
+  })
+  @IsArray()
+  @IsString({ each: true })
+  participantIds: string[];
 }

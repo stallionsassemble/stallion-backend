@@ -132,3 +132,106 @@ describe('HackathonApplicationsService.apply', () => {
     expect(p.status).toBe('ACCEPTED');
   });
 });
+
+describe('HackathonApplicationsService admin review and grouping', () => {
+  function adminSetup(participants: Array<Record<string, unknown>> = []) {
+    const hackathon = {
+      id: 'h1',
+      title: 'Hack',
+      slug: 'hack',
+      teamBased: true,
+      maxTeamSize: 3,
+    };
+    const tx = {
+      hackathonParticipant: {
+        findMany: jest.fn().mockResolvedValue(participants),
+        updateMany: jest.fn().mockResolvedValue({ count: participants.length }),
+      },
+      hackathonTeam: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 't-new', name: 'Matched' }),
+      },
+    };
+    const prisma = {
+      hackathon: { findUnique: jest.fn().mockResolvedValue(hackathon) },
+      hackathonParticipant: {
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'p1', userId: 'u1', status: 'PENDING' }),
+        update: jest
+          .fn()
+          .mockImplementation(({ data }) => ({ id: 'p1', ...data })),
+      },
+      user: { findUnique: jest.fn().mockResolvedValue(null) },
+      $transaction: jest.fn((fn) => fn(tx)),
+    };
+    const service = new HackathonApplicationsService(
+      prisma as never,
+      { sendHackathonApplicationEmail: jest.fn() } as never,
+      { get: jest.fn() } as never,
+    );
+    return { service, prisma, tx };
+  }
+
+  it('accepts an application and records who reviewed it', async () => {
+    const { service, prisma } = adminSetup();
+    const result = await service.reviewApplication(
+      'h1',
+      'p1',
+      'admin1',
+      'ACCEPTED' as never,
+      ' welcome ',
+    );
+    expect(result.status).toBe('ACCEPTED');
+    expect(prisma.hackathonParticipant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reviewedById: 'admin1',
+          reviewNote: 'welcome',
+        }),
+      }),
+    );
+  });
+
+  it('clears team seat and matching pool when rejecting', async () => {
+    const { service, prisma } = adminSetup();
+    await service.reviewApplication('h1', 'p1', 'admin1', 'REJECTED' as never);
+    expect(prisma.hackathonParticipant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ teamId: null, lookingForTeam: false }),
+      }),
+    );
+  });
+
+  it('groups unmatched applicants into one team', async () => {
+    const { service, tx } = adminSetup([
+      { id: 'p1', userId: 'u1', teamId: null, status: 'ACCEPTED' },
+      { id: 'p2', userId: 'u2', teamId: null, status: 'ACCEPTED' },
+    ]);
+    const team = await service.groupIntoTeam('h1', 'Matched', ['p1', 'p2']);
+    expect(tx.hackathonTeam.create).toHaveBeenCalledWith({
+      data: { name: 'Matched', hackathonId: 'h1', leaderId: 'u1' },
+    });
+    expect(tx.hackathonParticipant.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['p1', 'p2'] } },
+      data: { teamId: 't-new', lookingForTeam: false },
+    });
+    expect(team.memberCount).toBe(2);
+  });
+
+  it('refuses to group someone who already has a team', async () => {
+    const { service } = adminSetup([
+      { id: 'p1', userId: 'u1', teamId: 'other', status: 'ACCEPTED' },
+    ]);
+    await expect(
+      service.groupIntoTeam('h1', 'Matched', ['p1']),
+    ).rejects.toThrow(/already have a team/);
+  });
+
+  it('refuses a team larger than the hackathon allows', async () => {
+    const { service } = adminSetup();
+    await expect(
+      service.groupIntoTeam('h1', 'Big', ['a', 'b', 'c', 'd']),
+    ).rejects.toThrow(/at most 3/);
+  });
+});

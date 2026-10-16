@@ -33,7 +33,10 @@ import {
   AdminBountyQueryDto,
   AdminCreateHackathonDto,
   AdminCreateUserDto,
+  AdminApplicationsQueryDto,
+  AdminGroupTeamDto,
   AdminHackathonQueryDto,
+  AdminReviewApplicationDto,
   AdminPayoutQueryDto,
   AdminProjectQueryDto,
   AdminUserQueryDto,
@@ -364,6 +367,52 @@ export class AdminController {
   @ApiOkResponse({ description: 'Hackathon created' })
   createHackathon(@Body() dto: AdminCreateHackathonDto) {
     return this.adminService.createHackathon(dto.ownerId, dto.payload);
+  }
+
+  @Get('hackathons/:id/applications')
+  @ApiOperation({
+    summary: 'List applications for a hackathon (with status counts)',
+  })
+  @ApiOkResponse({ description: 'Paginated applications' })
+  listHackathonApplications(
+    @Param() params: IdParamDto,
+    @Query() query: AdminApplicationsQueryDto,
+  ) {
+    return this.adminService.listHackathonApplications(params.id, query);
+  }
+
+  @Post('hackathons/:id/applications/:participantId/review')
+  @UseGuards(AdminStepUpGuard)
+  @ApiOperation({ summary: 'Accept or reject a hackathon application' })
+  @ApiOkResponse({ description: 'Application reviewed' })
+  reviewHackathonApplication(
+    @Param('id') hackathonId: string,
+    @Param('participantId') participantId: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: AdminReviewApplicationDto,
+  ) {
+    return this.adminService.reviewHackathonApplication(
+      hackathonId,
+      participantId,
+      adminId,
+      dto.decision,
+      dto.note,
+    );
+  }
+
+  @Post('hackathons/:id/teams')
+  @UseGuards(AdminStepUpGuard)
+  @ApiOperation({ summary: 'Group unmatched applicants into a new team' })
+  @ApiOkResponse({ description: 'Team created' })
+  groupHackathonApplicants(
+    @Param() params: IdParamDto,
+    @Body() dto: AdminGroupTeamDto,
+  ) {
+    return this.adminService.groupHackathonApplicants(
+      params.id,
+      dto.teamName,
+      dto.participantIds,
+    );
   }
 
   @Post('hackathons/recover-escrow')
