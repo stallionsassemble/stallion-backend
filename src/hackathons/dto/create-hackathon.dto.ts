@@ -26,6 +26,16 @@ export class HackathonPrizeDto {
   @IsNumber()
   @Min(0)
   amount: number;
+
+  @ApiProperty({
+    required: false,
+    description:
+      'Track this prize belongs to. Off-chain only: the contract still sees one flat list of positions.',
+  })
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
+  track?: string;
 }
 
 export class CreateHackathonDto {

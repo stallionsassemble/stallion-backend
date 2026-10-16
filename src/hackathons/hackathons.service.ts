@@ -18,6 +18,7 @@ import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { GetHackathonsQueryDto } from './dto/get-hackathons-query.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
 import {
+  normalisePrizeTracks,
   normaliseTracks,
   validateApplicationForm,
 } from './utils/application-form.util';
@@ -154,6 +155,7 @@ export class HackathonsService {
     // Validate off-chain data BEFORE the escrow is locked, so a bad form never costs a refund.
     const applicationForm = validateApplicationForm(dto.applicationForm);
     const tracks = normaliseTracks(dto.tracks);
+    const prizePool = normalisePrizeTracks(dto.prizePool, tracks);
 
     // Smart Contract Call
     const contractResult = await this.contractService.createHackathon({
@@ -186,7 +188,7 @@ export class HackathonsService {
           token: tokenAddress,
           asset: dto.asset,
           currency: dto.asset,
-          prizePool: dto.prizePool as any,
+          prizePool: prizePool as any,
           documents: dto.documents || {},
           attachments: dto.attachments || {},
           teamBased: dto.teamBased,
@@ -330,7 +332,17 @@ export class HackathonsService {
     if (dto.applicationForm !== undefined) {
       validateApplicationForm(dto.applicationForm);
     }
-    if (dto.tracks !== undefined) normaliseTracks(dto.tracks);
+    const effectiveTracks =
+      dto.tracks !== undefined ? normaliseTracks(dto.tracks) : hackathon.tracks;
+    // Prizes keep their tracks consistent with the hackathon's tracks, whichever of the two changes.
+    const checkedPrizePool = dto.prizePool
+      ? normalisePrizeTracks(dto.prizePool, effectiveTracks)
+      : dto.tracks !== undefined
+        ? normalisePrizeTracks(
+            (hackathon.prizePool as Array<{ track?: string }>) ?? [],
+            effectiveTracks,
+          )
+        : undefined;
 
     if (contractUpdateRequired && hackathon.contractHackathonId !== null) {
       await this.contractService.updateHackathon({
@@ -380,9 +392,9 @@ export class HackathonsService {
     }
     if (tracks !== undefined) dataToUpdate.tracks = normaliseTracks(tracks);
 
-    if (dto.prizePool)
+    if (checkedPrizePool)
       dataToUpdate.prizePool =
-        dto.prizePool as unknown as Prisma.InputJsonValue;
+        checkedPrizePool as unknown as Prisma.InputJsonValue;
 
     const updated = await this.prisma.hackathon.update({
       where: { id: hackathonId },

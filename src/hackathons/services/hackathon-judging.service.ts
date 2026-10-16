@@ -110,6 +110,13 @@ export class HackathonJudgingService {
       throw new NotFoundException('Submission not found');
     }
 
+    // Per-track prizes can only go to a submission entered in that track.
+    if (prize.track && submission.track !== prize.track) {
+      throw new BadRequestException(
+        `This prize is for the "${prize.track}" track, but the submission is in ${submission.track ? `"${submission.track}"` : 'no track'}`,
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
       // Check if another submission holds this position
       const existingWinner = await tx.hackathonWinner.findUnique({

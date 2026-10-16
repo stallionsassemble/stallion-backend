@@ -315,3 +315,40 @@ export function validateApplicationAnswers(
 
   return { answers, teamIntent, teamName };
 }
+
+/**
+ * Prizes can be tied to tracks. The contract only knows flat, unique positions, so each prize
+ * keeps its global position and carries its track as off-chain metadata. Either none of the
+ * prizes have a track (one shared pool) or every prize does.
+ * Returns the prize list with track names normalised to the hackathon's own spelling.
+ */
+export function normalisePrizeTracks<T extends { track?: string }>(
+  prizePool: T[],
+  tracks: string[],
+): T[] {
+  const tagged = prizePool.filter((p) => p.track && p.track.trim()).length;
+  if (tagged === 0) {
+    return prizePool.map((p) => ({ ...p, track: undefined }));
+  }
+  if (tagged !== prizePool.length) {
+    throw new BadRequestException(
+      'Either give every prize a track or none of them',
+    );
+  }
+  if (tracks.length === 0) {
+    throw new BadRequestException(
+      'Add tracks to the hackathon before setting prizes per track',
+    );
+  }
+  return prizePool.map((p) => {
+    const match = tracks.find(
+      (t) => t.toLowerCase() === String(p.track).trim().toLowerCase(),
+    );
+    if (!match) {
+      throw new BadRequestException(
+        `Prize track "${p.track}" is not one of the hackathon's tracks (${tracks.join(', ')})`,
+      );
+    }
+    return { ...p, track: match };
+  });
+}

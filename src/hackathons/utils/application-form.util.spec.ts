@@ -151,3 +151,60 @@ describe('validateApplicationAnswers', () => {
     ).toThrow(/Team name.*required/);
   });
 });
+
+import { normalisePrizeTracks } from './application-form.util';
+
+describe('normalisePrizeTracks', () => {
+  const tracks = ['DeFi', 'Payments'];
+
+  it('leaves a shared pool alone', () => {
+    const pool = [
+      { position: 1, amount: 5 },
+      { position: 2, amount: 3 },
+    ];
+    expect(normalisePrizeTracks(pool, tracks).map((p) => p.track)).toEqual([
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it('keeps global positions and canonicalises track names', () => {
+    const result = normalisePrizeTracks(
+      [
+        { position: 1, amount: 5, track: 'defi' },
+        { position: 2, amount: 3, track: ' DeFi ' },
+        { position: 3, amount: 4, track: 'PAYMENTS' },
+      ],
+      tracks,
+    );
+    expect(result.map((p) => [p.position, p.track])).toEqual([
+      [1, 'DeFi'],
+      [2, 'DeFi'],
+      [3, 'Payments'],
+    ]);
+  });
+
+  it('rejects a mix of tracked and untracked prizes', () => {
+    expect(() =>
+      normalisePrizeTracks(
+        [
+          { position: 1, amount: 1, track: 'DeFi' },
+          { position: 2, amount: 1 },
+        ],
+        tracks,
+      ),
+    ).toThrow(/every prize a track or none/);
+  });
+
+  it('rejects unknown tracks and tracks when the hackathon has none', () => {
+    expect(() =>
+      normalisePrizeTracks(
+        [{ position: 1, amount: 1, track: 'Gaming' }],
+        tracks,
+      ),
+    ).toThrow(/not one of/);
+    expect(() =>
+      normalisePrizeTracks([{ position: 1, amount: 1, track: 'DeFi' }], []),
+    ).toThrow(/Add tracks/);
+  });
+});
