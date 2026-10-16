@@ -139,6 +139,16 @@ export class CreateHackathonDto {
 
   @ApiProperty({
     required: false,
+    type: [Object],
+    description:
+      'Extra questions asked when a project is submitted, e.g. a pitch deck link.',
+  })
+  @IsOptional()
+  @IsArray()
+  submissionForm?: Record<string, unknown>[];
+
+  @ApiProperty({
+    required: false,
     description:
       'When true, applications stay PENDING until an admin accepts them.',
   })

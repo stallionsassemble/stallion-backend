@@ -9,6 +9,10 @@ import { ApplicationStatus, HackathonStatus } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateSubmissionDto } from '../dto/create-submission.dto';
 import { GetSubmissionsQueryDto } from '../dto/get-submissions-query.dto';
+import {
+  ApplicationQuestion,
+  validateApplicationAnswers,
+} from '../utils/application-form.util';
 
 @Injectable()
 export class HackathonSubmissionsService {
@@ -106,6 +110,16 @@ export class HackathonSubmissionsService {
       track = match;
     }
 
+    // Answers to the admin-defined submission questions (pitch deck link and so on).
+    const form = (hackathon.submissionForm ?? []) as unknown as ApplicationQuestion[];
+    let submissionData = dto.submissionData;
+    if (form.length > 0) {
+      const rawAnswers = (dto.submissionData as { answers?: unknown } | undefined)
+        ?.answers;
+      const { answers } = validateApplicationAnswers(form, rawAnswers);
+      submissionData = { ...(dto.submissionData ?? {}), answers };
+    }
+
     this.logger.log(
       `Submission created for hackathon ${hackathon.id} by user ${userId}${teamId ? ` (team ${teamId})` : ''}`,
     );
@@ -114,7 +128,7 @@ export class HackathonSubmissionsService {
         title: dto.title,
         submissionLink: dto.submissionLink,
         description: dto.description,
-        submissionData: dto.submissionData,
+        submissionData,
         projectName: dto.projectName,
         projectUrl: dto.projectUrl,
         repositoryUrl: dto.repositoryUrl,

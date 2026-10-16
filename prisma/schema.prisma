@@ -936,6 +936,7 @@ model Hackathon {
 
   // Application form shown to participants (ordered list of questions) and review mode.
   applicationForm  Json?    @map("application_form")
+  submissionForm   Json?    @map("submission_form")
   requiresApproval Boolean  @default(false) @map("requires_approval")
   tracks           String[] @default([])
 

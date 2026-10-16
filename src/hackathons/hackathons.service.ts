@@ -21,6 +21,7 @@ import {
   normalisePrizeTracks,
   normaliseTracks,
   validateApplicationForm,
+  validateSubmissionForm,
 } from './utils/application-form.util';
 import { HackathonContractService } from './services/hackathon-contract.service';
 import { HackathonSchedulingService } from './services/hackathon-scheduling.service';
@@ -154,6 +155,7 @@ export class HackathonsService {
 
     // Validate off-chain data BEFORE the escrow is locked, so a bad form never costs a refund.
     const applicationForm = validateApplicationForm(dto.applicationForm);
+    const submissionForm = validateSubmissionForm(dto.submissionForm);
     const tracks = normaliseTracks(dto.tracks);
     const prizePool = normalisePrizeTracks(dto.prizePool, tracks);
 
@@ -203,6 +205,10 @@ export class HackathonsService {
           applicationForm:
             applicationForm.length > 0
               ? (applicationForm as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          submissionForm:
+            submissionForm.length > 0
+              ? (submissionForm as unknown as Prisma.InputJsonValue)
               : Prisma.JsonNull,
           requiresApproval: dto.requiresApproval ?? false,
           tracks,
@@ -332,6 +338,9 @@ export class HackathonsService {
     if (dto.applicationForm !== undefined) {
       validateApplicationForm(dto.applicationForm);
     }
+    if (dto.submissionForm !== undefined) {
+      validateSubmissionForm(dto.submissionForm);
+    }
     const effectiveTracks =
       dto.tracks !== undefined ? normaliseTracks(dto.tracks) : hackathon.tracks;
     // Prizes keep their tracks consistent with the hackathon's tracks, whichever of the two changes.
@@ -363,6 +372,7 @@ export class HackathonsService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       asset,
       applicationForm,
+      submissionForm,
       tracks,
       ...restDto
     } = dto;
@@ -386,6 +396,13 @@ export class HackathonsService {
     if (applicationForm !== undefined) {
       const validated = validateApplicationForm(applicationForm);
       dataToUpdate.applicationForm =
+        validated.length > 0
+          ? (validated as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
+    }
+    if (submissionForm !== undefined) {
+      const validated = validateSubmissionForm(submissionForm);
+      dataToUpdate.submissionForm =
         validated.length > 0
           ? (validated as unknown as Prisma.InputJsonValue)
           : Prisma.JsonNull;

@@ -352,3 +352,17 @@ export function normalisePrizeTracks<T extends { track?: string }>(
     return { ...p, track: match };
   });
 }
+
+/**
+ * The extra questions a hackathon asks when a project is submitted (pitch deck link, GitHub,
+ * anything the admin wants). Same shape as the application form, minus the team-matching types.
+ */
+export function validateSubmissionForm(input: unknown): ApplicationQuestion[] {
+  const questions = validateApplicationForm(input);
+  if (questions.some((q) => q.type === 'TEAM_MODE' || q.type === 'TEAM_NAME')) {
+    throw new BadRequestException(
+      'Team questions can only be used in the application form',
+    );
+  }
+  return questions;
+}
