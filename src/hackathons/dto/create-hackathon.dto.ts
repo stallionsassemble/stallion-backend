@@ -117,6 +117,31 @@ export class CreateHackathonDto {
   @Min(1)
   maxTeamSize?: number;
 
+  @ApiProperty({
+    required: false,
+    type: [Object],
+    description:
+      'Application form questions shown to participants. Validated by validateApplicationForm.',
+  })
+  @IsOptional()
+  @IsArray()
+  applicationForm?: Record<string, unknown>[];
+
+  @ApiProperty({
+    required: false,
+    description:
+      'When true, applications stay PENDING until an admin accepts them.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  requiresApproval?: boolean;
+
+  @ApiProperty({ required: false, type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tracks?: string[];
+
   @ApiProperty({ description: 'ID of the Project Owner who will act as judge' })
   @IsString()
   @IsNotEmpty()

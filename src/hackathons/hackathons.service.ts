@@ -17,6 +17,10 @@ import { EnvConfig } from '../config/env.config';
 import { CreateHackathonDto } from './dto/create-hackathon.dto';
 import { GetHackathonsQueryDto } from './dto/get-hackathons-query.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
+import {
+  normaliseTracks,
+  validateApplicationForm,
+} from './utils/application-form.util';
 import { HackathonContractService } from './services/hackathon-contract.service';
 import { HackathonSchedulingService } from './services/hackathon-scheduling.service';
 
@@ -147,6 +151,10 @@ export class HackathonsService {
       throw error;
     }
 
+    // Validate off-chain data BEFORE the escrow is locked, so a bad form never costs a refund.
+    const applicationForm = validateApplicationForm(dto.applicationForm);
+    const tracks = normaliseTracks(dto.tracks);
+
     // Smart Contract Call
     const contractResult = await this.contractService.createHackathon({
       adminPublicKey: adminUser.wallet.publicKey,
@@ -190,6 +198,12 @@ export class HackathonsService {
             : HackathonStatus.DRAFT,
           contractHackathonId: contractResult.contractHackathonId,
           txHash: contractResult.txHash,
+          applicationForm:
+            applicationForm.length > 0
+              ? (applicationForm as unknown as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+          requiresApproval: dto.requiresApproval ?? false,
+          tracks,
         },
       });
     } catch (dbError) {
@@ -312,6 +326,12 @@ export class HackathonsService {
       }));
     }
 
+    // Validate off-chain data before any contract call is made.
+    if (dto.applicationForm !== undefined) {
+      validateApplicationForm(dto.applicationForm);
+    }
+    if (dto.tracks !== undefined) normaliseTracks(dto.tracks);
+
     if (contractUpdateRequired && hackathon.contractHackathonId !== null) {
       await this.contractService.updateHackathon({
         adminPublicKey: adminUser.wallet!.publicKey,
@@ -330,6 +350,8 @@ export class HackathonsService {
       prizePool,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       asset,
+      applicationForm,
+      tracks,
       ...restDto
     } = dto;
 
@@ -348,6 +370,15 @@ export class HackathonsService {
       dataToUpdate.announcementDate = new Date(announcementDate);
     if (totalBudget !== undefined)
       dataToUpdate.totalBudget = new Prisma.Decimal(totalBudget);
+
+    if (applicationForm !== undefined) {
+      const validated = validateApplicationForm(applicationForm);
+      dataToUpdate.applicationForm =
+        validated.length > 0
+          ? (validated as unknown as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
+    }
+    if (tracks !== undefined) dataToUpdate.tracks = normaliseTracks(tracks);
 
     if (dto.prizePool)
       dataToUpdate.prizePool =

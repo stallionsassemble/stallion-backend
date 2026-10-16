@@ -934,6 +934,11 @@ model Hackathon {
   teamBased   Boolean @default(false) @map("team_based")
   maxTeamSize Int?    @map("max_team_size")
 
+  // Application form shown to participants (ordered list of questions) and review mode.
+  applicationForm  Json?    @map("application_form")
+  requiresApproval Boolean  @default(false) @map("requires_approval")
+  tracks           String[] @default([])
+
   status           HackathonStatus @default(DRAFT)
   resultsPublished Boolean         @default(false) @map("results_published")
 
