@@ -1037,6 +1037,7 @@ model HackathonSubmission {
   projectUrl     String? @map("project_url")
   repositoryUrl  String? @map("repository_url")
   videoUrl       String? @map("video_url")
+  track          String? // chosen from the hackathon's tracks, when it has any
 
   status HackathonSubmissionStatus @default(PENDING)
 

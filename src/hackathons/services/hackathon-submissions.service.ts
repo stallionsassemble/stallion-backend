@@ -93,6 +93,19 @@ export class HackathonSubmissionsService {
       }
     }
 
+    // When the hackathon is split into tracks, every submission must pick one of them.
+    let track: string | undefined;
+    if (hackathon.tracks.length > 0) {
+      const wanted = dto.track?.trim().toLowerCase();
+      const match = hackathon.tracks.find((t) => t.toLowerCase() === wanted);
+      if (!match) {
+        throw new BadRequestException(
+          `Choose a track for your project: ${hackathon.tracks.join(', ')}`,
+        );
+      }
+      track = match;
+    }
+
     this.logger.log(
       `Submission created for hackathon ${hackathon.id} by user ${userId}${teamId ? ` (team ${teamId})` : ''}`,
     );
@@ -106,6 +119,7 @@ export class HackathonSubmissionsService {
         projectUrl: dto.projectUrl,
         repositoryUrl: dto.repositoryUrl,
         videoUrl: dto.videoUrl,
+        track,
         teamId,
         userId,
         hackathonId: hackathon.id,

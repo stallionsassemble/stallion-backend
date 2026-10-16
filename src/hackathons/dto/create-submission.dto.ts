@@ -45,6 +45,15 @@ export class CreateSubmissionDto {
   @IsString()
   teamId?: string;
 
+  @ApiProperty({
+    required: false,
+    description:
+      "One of the hackathon's tracks. Required when the hackathon has tracks.",
+  })
+  @IsOptional()
+  @IsString()
+  track?: string;
+
   @IsOptional()
   hackathonId?: string;
 }
