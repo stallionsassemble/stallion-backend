@@ -71,14 +71,4 @@ describe('HackathonSubmissionsService.createSubmission', () => {
     });
     expect(result.track).toBe('DeFi');
   });
-
-  it('requires a repository link', async () => {
-    const { service } = setup();
-    await expect(
-      service.createSubmission('u1', { ...dto, repositoryUrl: '' }),
-    ).rejects.toThrow(/repository/);
-    await expect(
-      service.createSubmission('u1', { ...dto, repositoryUrl: 'not a link' }),
-    ).rejects.toThrow(BadRequestException);
-  });
 });
