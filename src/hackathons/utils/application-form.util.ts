@@ -14,6 +14,8 @@ export const APPLICATION_QUESTION_TYPES = [
   'TEAM_MODE',
   // The exact team name, used to find-or-create the real team.
   'TEAM_NAME',
+  // Image uploads. Only valid in the submission form. The answer is a list of image URLs.
+  'IMAGE_UPLOAD',
 ] as const;
 
 export type ApplicationQuestionType =
@@ -44,7 +46,10 @@ const MAX_OPTIONS = 30;
  * Validates and normalises an admin-defined application form.
  * Throws a BadRequestException that names the offending question.
  */
-export function validateApplicationForm(input: unknown): ApplicationQuestion[] {
+export function validateApplicationForm(
+  input: unknown,
+  rules: { allowImages?: boolean } = {},
+): ApplicationQuestion[] {
   if (input === undefined || input === null) return [];
   if (!Array.isArray(input)) {
     throw new BadRequestException(
@@ -77,6 +82,12 @@ export function validateApplicationForm(input: unknown): ApplicationQuestion[] {
     const type = q.type as ApplicationQuestionType;
     if (!APPLICATION_QUESTION_TYPES.includes(type)) {
       throw new BadRequestException(`Question ${n} has an unknown type`);
+    }
+
+    if (type === 'IMAGE_UPLOAD' && !rules.allowImages) {
+      throw new BadRequestException(
+        `Question ${n} uses image upload, which is only available in the submission form`,
+      );
     }
 
     const label = typeof q.label === 'string' ? q.label.trim() : '';
@@ -242,6 +253,20 @@ export function validateApplicationAnswers(
       continue;
     }
 
+    if (q.type === 'IMAGE_UPLOAD') {
+      const urls = Array.isArray(value) ? value : [value];
+      if (urls.length > 5) {
+        problems.push(`"${q.label}" can have at most 5 images`);
+        continue;
+      }
+      if (urls.some((u) => !/^https?:\/\/\S+$/i.test(u))) {
+        problems.push(`"${q.label}" has an invalid image`);
+        continue;
+      }
+      answers[q.id] = urls;
+      continue;
+    }
+
     if (q.type === 'MULTI_CHOICE') {
       const picked = Array.isArray(value) ? value : [value];
       if (picked.some((v) => !q.options?.includes(v))) {
@@ -358,7 +383,7 @@ export function normalisePrizeTracks<T extends { track?: string }>(
  * anything the admin wants). Same shape as the application form, minus the team-matching types.
  */
 export function validateSubmissionForm(input: unknown): ApplicationQuestion[] {
-  const questions = validateApplicationForm(input);
+  const questions = validateApplicationForm(input, { allowImages: true });
   if (questions.some((q) => q.type === 'TEAM_MODE' || q.type === 'TEAM_NAME')) {
     throw new BadRequestException(
       'Team questions can only be used in the application form',

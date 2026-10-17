@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import {
   normaliseRequirements,
+  validateSubmissionForm,
   normaliseTracks,
   validateApplicationForm,
 } from './application-form.util';
@@ -224,5 +225,32 @@ describe('normaliseRequirements', () => {
   it('rejects non-lists and over-long lines', () => {
     expect(() => normaliseRequirements('nope')).toThrow();
     expect(() => normaliseRequirements(['x'.repeat(301)])).toThrow();
+  });
+});
+
+describe('image upload questions', () => {
+  const form = [
+    { id: 'shots', type: 'IMAGE_UPLOAD', label: 'Screenshots', required: false },
+  ];
+
+  it('is allowed in the submission form but not the application form', () => {
+    expect(validateSubmissionForm(form)).toHaveLength(1);
+    expect(() => validateApplicationForm(form)).toThrow(/image upload/);
+  });
+
+  it('accepts up to five image links and drops nothing else', () => {
+    const questions = validateSubmissionForm(form);
+    const { answers } = validateApplicationAnswers(questions, {
+      shots: ['https://cdn.x/a.png', 'https://cdn.x/b.png'],
+    });
+    expect(answers.shots).toHaveLength(2);
+    expect(() =>
+      validateApplicationAnswers(questions, {
+        shots: Array.from({ length: 6 }, (_, i) => `https://cdn.x/${i}.png`),
+      }),
+    ).toThrow(/at most 5/);
+    expect(() =>
+      validateApplicationAnswers(questions, { shots: ['javascript:alert(1)'] }),
+    ).toThrow(/invalid image/);
   });
 });
