@@ -199,6 +199,7 @@ export class HackathonApplicationsService {
     query: {
       status?: ApplicationStatus;
       lookingForTeam?: boolean;
+      inTeam?: boolean;
       search?: string;
       page?: number;
       limit?: number;
@@ -214,6 +215,7 @@ export class HackathonApplicationsService {
       hackathonId,
       ...(query.status ? { status: query.status } : {}),
       ...(query.lookingForTeam ? { lookingForTeam: true, teamId: null } : {}),
+      ...(query.inTeam ? { teamId: { not: null } } : {}),
       ...(search
         ? {
             user: {
@@ -231,7 +233,10 @@ export class HackathonApplicationsService {
     const [items, total, grouped] = await Promise.all([
       this.prisma.hackathonParticipant.findMany({
         where,
-        orderBy: { appliedAt: 'desc' },
+        // People in the same team stay together, teams in alphabetical order.
+        orderBy: query.inTeam
+          ? [{ team: { name: 'asc' } }, { appliedAt: 'asc' }]
+          : { appliedAt: 'desc' },
         skip: (page - 1) * limit,
         take: limit,
         include: {
@@ -263,6 +268,10 @@ export class HackathonApplicationsService {
       where: { hackathonId, lookingForTeam: true, teamId: null },
     });
 
+    const inTeam = await this.prisma.hackathonParticipant.count({
+      where: { hackathonId, teamId: { not: null } },
+    });
+
     return {
       data: items,
       meta: {
@@ -271,7 +280,7 @@ export class HackathonApplicationsService {
         limit,
         totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      counts: { ...counts, lookingForTeam },
+      counts: { ...counts, lookingForTeam, inTeam },
     };
   }
 

@@ -1183,6 +1183,7 @@ export class AdminService {
     query: {
       status?: ApplicationStatus;
       lookingForTeam?: boolean;
+      inTeam?: boolean;
       search?: string;
       page?: number;
       limit?: number;

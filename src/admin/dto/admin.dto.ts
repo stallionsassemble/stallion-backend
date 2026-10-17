@@ -353,6 +353,14 @@ export class AdminApplicationsQueryDto extends AdminPaginationQueryDto {
   @IsBoolean()
   lookingForTeam?: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Only applicants who are in a team, grouped by team',
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  inTeam?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

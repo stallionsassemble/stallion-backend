@@ -110,6 +110,13 @@ export class HackathonSubmissionsService {
       track = match;
     }
 
+    const repositoryUrl = dto.repositoryUrl?.trim();
+    if (!repositoryUrl || !/^https?:\/\/\S+\.\S+$/i.test(repositoryUrl)) {
+      throw new BadRequestException(
+        'A GitHub (or other code repository) link starting with https:// is required',
+      );
+    }
+
     // Answers to the admin-defined submission questions (pitch deck link and so on).
     const form = (hackathon.submissionForm ?? []) as unknown as ApplicationQuestion[];
     let submissionData = dto.submissionData;
@@ -131,7 +138,7 @@ export class HackathonSubmissionsService {
         submissionData,
         projectName: dto.projectName,
         projectUrl: dto.projectUrl,
-        repositoryUrl: dto.repositoryUrl,
+        repositoryUrl,
         videoUrl: dto.videoUrl,
         track,
         teamId,

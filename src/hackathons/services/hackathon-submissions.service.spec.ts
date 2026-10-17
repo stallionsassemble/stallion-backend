@@ -30,7 +30,12 @@ function setup(
   return { service: new HackathonSubmissionsService(prisma as never), prisma };
 }
 
-const dto = { title: 'T', submissionLink: 'https://x.io', hackathonId: 'h1' };
+const dto = {
+  title: 'T',
+  submissionLink: 'https://x.io',
+  repositoryUrl: 'https://github.com/team/project',
+  hackathonId: 'h1',
+};
 
 describe('HackathonSubmissionsService.createSubmission', () => {
   it('blocks applicants whose application is pending or rejected', async () => {
@@ -65,5 +70,15 @@ describe('HackathonSubmissionsService.createSubmission', () => {
       track: ' defi ',
     });
     expect(result.track).toBe('DeFi');
+  });
+
+  it('requires a repository link', async () => {
+    const { service } = setup();
+    await expect(
+      service.createSubmission('u1', { ...dto, repositoryUrl: '' }),
+    ).rejects.toThrow(/repository/);
+    await expect(
+      service.createSubmission('u1', { ...dto, repositoryUrl: 'not a link' }),
+    ).rejects.toThrow(BadRequestException);
   });
 });
