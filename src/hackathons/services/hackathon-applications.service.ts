@@ -308,7 +308,15 @@ export class HackathonApplicationsService {
         // A rejected applicant should not hold a team seat or sit in the matching pool.
         ...(decision === ApplicationStatus.REJECTED
           ? { teamId: null, lookingForTeam: false }
-          : {}),
+          : // Rejecting clears the flag, so bring it back when the applicant is accepted again.
+            hackathon.teamBased && !participant.teamId
+            ? {
+                lookingForTeam: this.needsTeam(
+                  hackathon.applicationForm,
+                  participant.applicationData,
+                ),
+              }
+            : {}),
       },
     });
 
@@ -322,6 +330,18 @@ export class HackathonApplicationsService {
       note?.trim() || null,
     );
     return updated;
+  }
+
+  /** True when the applicant's saved answers say they are registering without a team. */
+  private needsTeam(form: unknown, answers: unknown): boolean {
+    if (!Array.isArray(form) || !answers || typeof answers !== 'object') {
+      return false;
+    }
+    const mode = (form as ApplicationQuestion[]).find(
+      (q) => q.type === 'TEAM_MODE',
+    );
+    if (!mode?.options) return false;
+    return (answers as Record<string, unknown>)[mode.id] === mode.options[0];
   }
 
   /** Puts unmatched applicants into one new team. The first listed applicant becomes leader. */
