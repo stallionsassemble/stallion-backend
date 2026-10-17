@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+import { AdminJudgingStepUpGuard } from './guards/admin-judging-step-up.guard';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -195,30 +196,33 @@ export class HackathonsController {
 
   @Post(':id/manage/submissions/:sid/review')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.PROJECT_OWNER)
+  @Roles(Role.PROJECT_OWNER, Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Set submission status to IN_REVIEW' })
   reviewSubmission(
     @Param('id') hackathonId: string,
     @Param('sid') submissionId: string,
     @CurrentUser('id') companyId: string,
+    @CurrentUser('role') role: Role,
   ) {
     return this.judgingService.setInReview(
       hackathonId,
       companyId,
       submissionId,
+      role === Role.ADMIN,
     );
   }
 
   @Post(':id/manage/submissions/:sid/select-winner')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.PROJECT_OWNER)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminJudgingStepUpGuard)
+  @Roles(Role.PROJECT_OWNER, Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Select submission as winner' })
   selectWinner(
     @Param('id') hackathonId: string,
     @Param('sid') submissionId: string,
     @CurrentUser('id') companyId: string,
+    @CurrentUser('role') role: Role,
     @Body() dto: SelectWinnerDto,
   ) {
     return this.judgingService.selectWinner(
@@ -227,35 +231,43 @@ export class HackathonsController {
       submissionId,
       dto.position,
       dto.feedback,
+      role === Role.ADMIN,
     );
   }
 
   @Post(':id/manage/submissions/:sid/remove-winner')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.PROJECT_OWNER)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminJudgingStepUpGuard)
+  @Roles(Role.PROJECT_OWNER, Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Remove winner status' })
   removeWinner(
     @Param('id') hackathonId: string,
     @Param('sid') submissionId: string,
     @CurrentUser('id') companyId: string,
+    @CurrentUser('role') role: Role,
   ) {
     return this.judgingService.removeWinner(
       hackathonId,
       companyId,
       submissionId,
+      role === Role.ADMIN,
     );
   }
 
   @Post(':id/manage/publish-results')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.PROJECT_OWNER)
+  @UseGuards(JwtAuthGuard, RolesGuard, AdminJudgingStepUpGuard)
+  @Roles(Role.PROJECT_OWNER, Role.ADMIN)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Publish results and trigger prize distribution' })
   publishResults(
     @Param('id') hackathonId: string,
     @CurrentUser('id') companyId: string,
+    @CurrentUser('role') role: Role,
   ) {
-    return this.judgingService.publishResults(hackathonId, companyId);
+    return this.judgingService.publishResults(
+      hackathonId,
+      companyId,
+      role === Role.ADMIN,
+    );
   }
 }

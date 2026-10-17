@@ -14,6 +14,9 @@ import { HackathonTeamsService } from './services/hackathon-teams.service';
 import { HackathonApplicationsService } from './services/hackathon-applications.service';
 import { HackathonContractService } from './services/hackathon-contract.service';
 import { HackathonSchedulingService } from './services/hackathon-scheduling.service';
+import { AdminStepUpService } from '../admin/admin-step-up.service';
+import { AdminStepUpGuard } from '../admin/guards/admin-step-up.guard';
+import { AdminJudgingStepUpGuard } from './guards/admin-judging-step-up.guard';
 
 @Module({
   imports: [
@@ -33,6 +36,10 @@ import { HackathonSchedulingService } from './services/hackathon-scheduling.serv
     HackathonApplicationsService,
     HackathonContractService,
     HackathonSchedulingService,
+    // Admins judging a hackathon go through the same 2FA step-up as the rest of the admin area.
+    AdminStepUpService,
+    AdminStepUpGuard,
+    AdminJudgingStepUpGuard,
   ],
   exports: [HackathonsService, HackathonApplicationsService],
 })

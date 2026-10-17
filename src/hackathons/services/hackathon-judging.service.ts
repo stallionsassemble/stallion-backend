@@ -30,6 +30,7 @@ export class HackathonJudgingService {
   private async getHackathonAndVerifyCompany(
     hackathonId: string,
     companyId: string,
+    isAdmin = false,
   ) {
     const hackathon = await this.prisma.hackathon.findUnique({
       where: { id: hackathonId },
@@ -40,7 +41,8 @@ export class HackathonJudgingService {
       throw new NotFoundException('Hackathon not found');
     }
 
-    if (hackathon.companyId !== companyId) {
+    // Admins can judge any hackathon. Everyone else must be its assigned Project Owner.
+    if (!isAdmin && hackathon.companyId !== companyId) {
       throw new ForbiddenException('Only the assigned Project Owner can judge');
     }
 
@@ -55,8 +57,9 @@ export class HackathonJudgingService {
     hackathonId: string,
     companyId: string,
     submissionId: string,
+    isAdmin = false,
   ) {
-    await this.getHackathonAndVerifyCompany(hackathonId, companyId);
+    await this.getHackathonAndVerifyCompany(hackathonId, companyId, isAdmin);
 
     const submission = await this.prisma.hackathonSubmission.findUnique({
       where: { id: submissionId },
@@ -87,10 +90,12 @@ export class HackathonJudgingService {
     submissionId: string,
     position: number,
     feedback?: string,
+    isAdmin = false,
   ) {
     const hackathon = await this.getHackathonAndVerifyCompany(
       hackathonId,
       companyId,
+      isAdmin,
     );
 
     // Verify position exists in prize pool
@@ -169,8 +174,9 @@ export class HackathonJudgingService {
     hackathonId: string,
     companyId: string,
     submissionId: string,
+    isAdmin = false,
   ) {
-    await this.getHackathonAndVerifyCompany(hackathonId, companyId);
+    await this.getHackathonAndVerifyCompany(hackathonId, companyId, isAdmin);
 
     const submission = await this.prisma.hackathonSubmission.findUnique({
       where: { id: submissionId },
@@ -199,10 +205,15 @@ export class HackathonJudgingService {
     });
   }
 
-  async publishResults(hackathonId: string, companyId: string) {
+  async publishResults(
+    hackathonId: string,
+    companyId: string,
+    isAdmin = false,
+  ) {
     const hackathon = await this.getHackathonAndVerifyCompany(
       hackathonId,
       companyId,
+      isAdmin,
     );
 
     const prizePool = hackathon.prizePool as any[];
