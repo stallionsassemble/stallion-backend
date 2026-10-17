@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { HackathonType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -161,6 +162,17 @@ export class CreateHackathonDto {
   @IsArray()
   @IsString({ each: true })
   tracks?: string[];
+
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'What participants need to take part, shown on the hackathon page.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsString({ each: true })
+  requirements?: string[];
 
   @ApiProperty({ description: 'ID of the Project Owner who will act as judge' })
   @IsString()

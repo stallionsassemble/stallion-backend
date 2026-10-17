@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  normaliseRequirements,
   normaliseTracks,
   validateApplicationForm,
 } from './application-form.util';
@@ -206,5 +207,22 @@ describe('normalisePrizeTracks', () => {
     expect(() =>
       normalisePrizeTracks([{ position: 1, amount: 1, track: 'DeFi' }], []),
     ).toThrow(/Add tracks/);
+  });
+});
+
+describe('normaliseRequirements', () => {
+  it('trims, drops blanks and duplicates', () => {
+    expect(
+      normaliseRequirements([' Know Rust ', 'know rust', '', 'Have a wallet']),
+    ).toEqual(['Know Rust', 'Have a wallet']);
+  });
+
+  it('treats a missing value as an empty list', () => {
+    expect(normaliseRequirements(undefined)).toEqual([]);
+  });
+
+  it('rejects non-lists and over-long lines', () => {
+    expect(() => normaliseRequirements('nope')).toThrow();
+    expect(() => normaliseRequirements(['x'.repeat(301)])).toThrow();
   });
 });

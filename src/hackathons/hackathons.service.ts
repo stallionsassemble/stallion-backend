@@ -19,6 +19,7 @@ import { GetHackathonsQueryDto } from './dto/get-hackathons-query.dto';
 import { UpdateHackathonDto } from './dto/update-hackathon.dto';
 import {
   normalisePrizeTracks,
+  normaliseRequirements,
   normaliseTracks,
   validateApplicationForm,
   validateSubmissionForm,
@@ -157,6 +158,7 @@ export class HackathonsService {
     const applicationForm = validateApplicationForm(dto.applicationForm);
     const submissionForm = validateSubmissionForm(dto.submissionForm);
     const tracks = normaliseTracks(dto.tracks);
+    const requirements = normaliseRequirements(dto.requirements);
     const prizePool = normalisePrizeTracks(dto.prizePool, tracks);
 
     // Smart Contract Call
@@ -212,6 +214,7 @@ export class HackathonsService {
               : Prisma.JsonNull,
           requiresApproval: dto.requiresApproval ?? false,
           tracks,
+          requirements,
         },
       });
     } catch (dbError) {
@@ -374,6 +377,7 @@ export class HackathonsService {
       applicationForm,
       submissionForm,
       tracks,
+      requirements,
       ...restDto
     } = dto;
 
@@ -408,6 +412,9 @@ export class HackathonsService {
           : Prisma.JsonNull;
     }
     if (tracks !== undefined) dataToUpdate.tracks = normaliseTracks(tracks);
+    if (requirements !== undefined) {
+      dataToUpdate.requirements = normaliseRequirements(requirements);
+    }
 
     if (checkedPrizePool)
       dataToUpdate.prizePool =
@@ -590,6 +597,15 @@ export class HackathonsService {
             companyName: true,
             companyLogo: true,
             companyBio: true,
+          },
+        },
+        createdBy: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            firstName: true,
+            lastName: true,
           },
         },
         _count: {

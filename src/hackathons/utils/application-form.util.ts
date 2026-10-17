@@ -366,3 +366,30 @@ export function validateSubmissionForm(input: unknown): ApplicationQuestion[] {
   }
   return questions;
 }
+
+/** Trims a list of requirement lines, drops blanks and duplicates, and caps their length. */
+export function normaliseRequirements(input: unknown): string[] {
+  if (input === undefined || input === null) return [];
+  if (!Array.isArray(input)) {
+    throw new BadRequestException('requirements must be a list of text lines');
+  }
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const item of input) {
+    const line = typeof item === 'string' ? item.trim() : '';
+    if (!line) continue;
+    if (line.length > 300) {
+      throw new BadRequestException(
+        'A requirement can be at most 300 characters',
+      );
+    }
+    const key = line.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lines.push(line);
+  }
+  if (lines.length > 30) {
+    throw new BadRequestException('A hackathon can have at most 30 requirements');
+  }
+  return lines;
+}

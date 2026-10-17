@@ -939,6 +939,7 @@ model Hackathon {
   submissionForm   Json?    @map("submission_form")
   requiresApproval Boolean  @default(false) @map("requires_approval")
   tracks           String[] @default([])
+  requirements     String[] @default([])
 
   status           HackathonStatus @default(DRAFT)
   resultsPublished Boolean         @default(false) @map("results_published")
