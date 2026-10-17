@@ -199,7 +199,7 @@ export class EmailService {
       },
       ACCEPTED: {
         subject: `You're in! ${params.hackathonTitle}`,
-        body: `Great news. Your application to <strong>${title}</strong> has been accepted. You can now build your project and submit it before the deadline.`,
+        body: `Great news. Your application to <strong>${title}</strong> has been accepted.`,
       },
       REJECTED: {
         subject: `Update on your ${params.hackathonTitle} application`,
