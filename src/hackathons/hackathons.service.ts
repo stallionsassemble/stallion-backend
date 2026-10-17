@@ -532,9 +532,8 @@ export class HackathonsService {
   async getHackathons(query: GetHackathonsQueryDto) {
     const where: Prisma.HackathonWhereInput = {};
 
-    if (query.status) {
-      where.status = query.status;
-    }
+    // Cancelled (deleted) hackathons stay out of listings unless someone asks for them by status.
+    where.status = query.status ?? { not: HackathonStatus.CANCELLED };
     if (query.type) {
       where.type = query.type;
     }
