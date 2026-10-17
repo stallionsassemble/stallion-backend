@@ -72,6 +72,17 @@ export class HackathonSubmissionsService {
         );
       }
       teamId = participant.teamId;
+
+      // One submission per team, made by the team leader. Everyone else sees it once it is in.
+      const team = await this.prisma.hackathonTeam.findUnique({
+        where: { id: participant.teamId },
+        select: { leaderId: true },
+      });
+      if (team && team.leaderId !== userId) {
+        throw new ForbiddenException(
+          'Only your team leader can submit the project for your team',
+        );
+      }
     } else {
       teamId = undefined; // Force undefined if not team based
     }

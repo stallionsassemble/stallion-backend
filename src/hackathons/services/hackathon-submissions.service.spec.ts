@@ -22,6 +22,9 @@ function setup(
     hackathonParticipant: {
       findUnique: jest.fn().mockResolvedValue(participant),
     },
+    hackathonTeam: {
+      findUnique: jest.fn().mockResolvedValue({ leaderId: 'u1' }),
+    },
     hackathonSubmission: {
       findFirst: jest.fn().mockResolvedValue(null),
       create: jest.fn().mockImplementation(({ data }) => data),
@@ -70,5 +73,16 @@ describe('HackathonSubmissionsService.createSubmission', () => {
       track: ' defi ',
     });
     expect(result.track).toBe('DeFi');
+  });
+
+  it('only lets the team leader submit for a team', async () => {
+    const { service } = setup(
+      { teamBased: true },
+      { status: 'ACCEPTED', teamId: 't1' },
+    );
+    await expect(service.createSubmission('u2', dto)).rejects.toThrow(
+      /team leader/,
+    );
+    await expect(service.createSubmission('u1', dto)).resolves.toBeDefined();
   });
 });

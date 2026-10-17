@@ -150,6 +150,9 @@ export class HackathonApplicationsService {
             id: true,
             name: true,
             leaderId: true,
+            leader: {
+              select: { id: true, firstName: true, lastName: true, username: true },
+            },
             _count: { select: { participants: true } },
           },
         },
