@@ -155,7 +155,20 @@ export class HackathonApplicationsService {
         },
       },
     });
-    return { applied: !!participant, application: participant };
+    // One project per person, or per team when the hackathon is team based.
+    const submission = participant
+      ? await this.prisma.hackathonSubmission.findFirst({
+          where: {
+            hackathonId,
+            OR: [
+              { userId },
+              ...(participant.teamId ? [{ teamId: participant.teamId }] : []),
+            ],
+          },
+          select: { id: true, title: true, createdAt: true, track: true },
+        })
+      : null;
+    return { applied: !!participant, application: participant, submission };
   }
 
   private async sendStatusEmail(
