@@ -320,6 +320,8 @@ export class BountyController {
   }
 
   @Get(':id/submissions')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Get detailed bounty submissions',
     description:
@@ -350,8 +352,12 @@ export class BountyController {
       ],
     },
   })
-  async getBountySubmissionsDetailed(@Param() params: BountyIdParamDto) {
-    return this.bountyService.getBountySubmissionsDetailed(params.id);
+  @ApiResponse({ status: 403, description: 'Not the bounty owner or an admin' })
+  async getBountySubmissionsDetailed(
+    @CurrentUser('id') userId: string,
+    @Param() params: BountyIdParamDto,
+  ) {
+    return this.bountyService.getBountySubmissionsDetailed(userId, params.id);
   }
 
   @Get(':id/applicants')

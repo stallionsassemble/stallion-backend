@@ -476,14 +476,24 @@ export class BountiesService {
    * Get detailed bounty submissions from database
    * Includes submission data and user information
    */
-  async getBountySubmissionsDetailed(dbBountyId: string) {
+  async getBountySubmissionsDetailed(userId: string, dbBountyId: string) {
     try {
-      const bounty = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
+      const [bounty, user] = await Promise.all([
+        this.prisma.bounty.findUnique({ where: { id: dbBountyId } }),
+        this.prisma.user.findUnique({
+          where: { id: userId },
+          select: { role: true },
+        }),
+      ]);
 
       if (!bounty) {
         throw new NotFoundException('Bounty not found');
+      }
+
+      if (bounty.ownerId !== userId && user?.role !== Role.ADMIN) {
+        throw new ForbiddenException(
+          'Only the bounty owner or an admin can view submissions',
+        );
       }
 
       const submissions = await this.prisma.bountySubmission.findMany({
