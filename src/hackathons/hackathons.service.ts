@@ -534,6 +534,10 @@ export class HackathonsService {
 
     // Cancelled (deleted) hackathons stay out of listings unless someone asks for them by status.
     where.status = query.status ?? { not: HackathonStatus.CANCELLED };
+    if (query.open) {
+      where.status = HackathonStatus.PUBLISHED;
+      where.deadline = { gt: new Date() };
+    }
     if (query.type) {
       where.type = query.type;
     }

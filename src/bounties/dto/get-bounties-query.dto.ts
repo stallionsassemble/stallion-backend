@@ -3,6 +3,7 @@ import { Bounty, BountyStatus } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -80,6 +81,16 @@ export class GetBountiesQueryDto {
   @IsOptional()
   @IsEnum(BountyStatus)
   status?: BountyStatus;
+
+  @ApiPropertyOptional({
+    description:
+      'Only return bounties still accepting submissions (deadline in the future)',
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  open?: boolean;
 
   @ApiPropertyOptional({
     description: 'Filter by reward currency',

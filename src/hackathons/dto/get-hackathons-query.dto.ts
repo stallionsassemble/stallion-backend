@@ -1,7 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { HackathonStatus, HackathonType } from '@prisma/client';
-import { Type } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class GetHackathonsQueryDto {
   @ApiPropertyOptional({
@@ -34,6 +41,16 @@ export class GetHackathonsQueryDto {
   @IsOptional()
   @IsString()
   companyId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Only return published hackathons still open (deadline in the future)',
+    example: true,
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  open?: boolean;
 
   @ApiPropertyOptional({ description: 'Page number' })
   @IsOptional()

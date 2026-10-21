@@ -114,6 +114,7 @@ export class BountiesService {
       skills?: string[];
       search?: string;
       ownerId?: string;
+      open?: boolean;
       minReward?: string;
       maxReward?: string;
     },
@@ -140,6 +141,11 @@ export class BountiesService {
 
       if (query.status) {
         where.status = query.status as any;
+      }
+
+      if (query.open) {
+        where.status = BountyStatus.ACTIVE;
+        where.submissionDeadline = { gt: new Date() };
       }
 
       if (query.currency) {
