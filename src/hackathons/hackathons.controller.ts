@@ -16,6 +16,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { IdParamDto } from '../common/dto/id-param.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 
 import { ApplyHackathonDto } from './dto/apply-hackathon.dto';
@@ -98,12 +99,18 @@ export class HackathonsController {
   }
 
   @Get(':id/submissions')
-  @ApiOperation({ summary: 'Get submissions for a hackathon' })
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Get submissions for a hackathon (owner/admin; winners are public once results are published)',
+  })
   getSubmissions(
     @Param() params: IdParamDto,
     @Query() query: GetSubmissionsQueryDto,
+    @CurrentUser() user?: { id: string; role: Role } | null,
   ) {
-    return this.submissionsService.getSubmissions(params.id, query);
+    return this.submissionsService.getSubmissions(params.id, query, user);
   }
 
   // --- Participant Endpoints ---

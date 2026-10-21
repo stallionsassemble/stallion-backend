@@ -5,7 +5,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ApplicationStatus, HackathonStatus } from '@prisma/client';
+import {
+  ApplicationStatus,
+  HackathonStatus,
+  Role,
+  HackathonSubmissionStatus,
+} from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CreateSubmissionDto } from '../dto/create-submission.dto';
 import { GetSubmissionsQueryDto } from '../dto/get-submissions-query.dto';
@@ -122,11 +127,13 @@ export class HackathonSubmissionsService {
     }
 
     // Answers to the admin-defined submission questions (pitch deck link and so on).
-    const form = (hackathon.submissionForm ?? []) as unknown as ApplicationQuestion[];
+    const form = (hackathon.submissionForm ??
+      []) as unknown as ApplicationQuestion[];
     let submissionData = dto.submissionData;
     if (form.length > 0) {
-      const rawAnswers = (dto.submissionData as { answers?: unknown } | undefined)
-        ?.answers;
+      const rawAnswers = (
+        dto.submissionData as { answers?: unknown } | undefined
+      )?.answers;
       const { answers } = validateApplicationAnswers(form, rawAnswers);
       submissionData = { ...(dto.submissionData ?? {}), answers };
     }
@@ -152,7 +159,31 @@ export class HackathonSubmissionsService {
     });
   }
 
-  async getSubmissions(hackathonId: string, query: GetSubmissionsQueryDto) {
+  async getSubmissions(
+    hackathonId: string,
+    query: GetSubmissionsQueryDto,
+    viewer?: { id: string; role: Role } | null,
+  ) {
+    const hackathon = await this.prisma.hackathon.findUnique({
+      where: { id: hackathonId },
+      select: { companyId: true, resultsPublished: true },
+    });
+    if (!hackathon) throw new NotFoundException('Hackathon not found');
+
+    // Submissions are private to the hackathon's owner and admins. The only
+    // public view is the winners list, once results are published.
+    const canManage =
+      !!viewer &&
+      (viewer.role === Role.ADMIN || hackathon.companyId === viewer.id);
+    const isPublicWinners =
+      query.status === HackathonSubmissionStatus.WINNER &&
+      hackathon.resultsPublished;
+    if (!canManage && !isPublicWinners) {
+      throw new ForbiddenException(
+        'Only the hackathon owner or an admin can view submissions',
+      );
+    }
+
     const where: any = { hackathonId };
 
     if (query.status) {
