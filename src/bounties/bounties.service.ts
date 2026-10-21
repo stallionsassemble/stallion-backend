@@ -194,6 +194,7 @@ export class BountiesService {
           where,
           include: {
             owner: true,
+            _count: { select: { submissions: true } },
           },
           orderBy: {
             [sortBy]: sortOrder,
@@ -205,7 +206,7 @@ export class BountiesService {
       ]);
 
       const sanitizedBounties = bounties.map((bounty) => ({
-        ...bounty,
+        ...withSubmissionCount(bounty),
         owner: sanitizeUser(bounty.owner),
       }));
 
@@ -279,21 +280,17 @@ export class BountiesService {
         },
         include: {
           owner: true,
+          _count: { select: { submissions: true } },
         },
         orderBy: {
           createdAt: 'desc',
         },
       });
 
-      // Sanitize owner data
-      bounties.map((bounty) => {
-        return {
-          ...bounty,
-          owner: sanitizeUser(bounty.owner),
-        };
-      });
-
-      return bounties;
+      return bounties.map((bounty) => ({
+        ...withSubmissionCount(bounty),
+        owner: sanitizeUser(bounty.owner),
+      })) as any;
     } catch (error) {
       this.logger.error('Failed to get owner bounties', error);
       throw error;
@@ -317,14 +314,17 @@ export class BountiesService {
         },
         include: {
           owner: true,
+          _count: { select: { submissions: true } },
         },
         orderBy: { createdAt: 'desc' },
       });
 
+      const counted = bounties.map(withSubmissionCount);
+
       // If user is authenticated, add applied field
       if (currentUserId) {
         const bountiesWithApplied = await Promise.all(
-          bounties.map(async (bounty) => {
+          counted.map(async (bounty) => {
             const submission = await this.prisma.bountySubmission.findFirst({
               where: {
                 bountyId: bounty.id,
@@ -340,7 +340,7 @@ export class BountiesService {
         return bountiesWithApplied as any;
       }
 
-      return bounties;
+      return counted;
     } catch (error) {
       this.logger.error('Failed to get active bounties', error);
       throw error;
@@ -361,6 +361,7 @@ export class BountiesService {
         where: { id: dbBountyId },
         include: {
           owner: true,
+          _count: { select: { submissions: true } },
         },
       });
 
@@ -412,7 +413,7 @@ export class BountiesService {
       // On-chain reward is immutable (update_bounty never changes it), so the
       // DB value is authoritative for display. Keep reward from `...dbBounty`.
       const bountyDetails = {
-        ...dbBounty,
+        ...withSubmissionCount(dbBounty),
         title: contractBounty.title,
         token: contractBounty.token,
         status,
@@ -1003,6 +1004,16 @@ export class BountiesService {
 
       if (!bounty || bounty.contractBountyId === null) {
         throw new NotFoundException('Bounty not found');
+      }
+
+      if (bounty.status !== BountyStatus.ACTIVE) {
+        throw new BadRequestException(
+          'Bounty is no longer accepting submissions',
+        );
+      }
+
+      if (new Date() > bounty.submissionDeadline) {
+        throw new BadRequestException('Submission deadline has passed');
       }
 
       const contractBountyId = bounty.contractBountyId;
@@ -1627,4 +1638,19 @@ export class BountiesService {
       totalPages: Math.ceil(total / limit),
     };
   }
+}
+
+/**
+ * Flattens Prisma's `_count.submissions` into the `submissionCount` /
+ * `applicationCount` fields the frontend reads.
+ */
+function withSubmissionCount<T extends { _count: { submissions: number } }>(
+  bounty: T,
+): Omit<T, '_count'> & { submissionCount: number; applicationCount: number } {
+  const { _count, ...rest } = bounty;
+  return {
+    ...rest,
+    submissionCount: _count.submissions,
+    applicationCount: _count.submissions,
+  };
 }
