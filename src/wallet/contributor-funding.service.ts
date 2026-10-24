@@ -294,9 +294,27 @@ export class ContributorFundingService {
         await this.stellarWallet.getWalletById(fundingWalletId);
       // Retries across fresh connections: a degraded Horizon node can return
       // a spurious 404 for an account that exists.
-      const fundingAccount = await this.stellarAccount.loadWithRetry(
-        fundingWallet.publicKey,
-      );
+      let fundingAccount: StellarSDK.Horizon.AccountResponse;
+      try {
+        fundingAccount = await this.stellarAccount.loadWithRetry(
+          fundingWallet.publicKey,
+        );
+      } catch (loadError: any) {
+        if (
+          loadError instanceof AccountNotFoundError ||
+          loadError?.response?.status === 404
+        ) {
+          // The platform's own funding wallet is missing on-chain: an ops
+          // problem, not something the owner or winners can fix.
+          this.logger.error(
+            `Platform funding wallet ${fundingWallet.publicKey} (${fundingWalletId}) does not exist on the network — fund/activate it or fix FUNDING_WALLET_ID / platform settings`,
+          );
+          throw new BadRequestException(
+            'Payout recipients need XLM to receive funds, but the platform funding wallet is not activated. Please contact support.',
+          );
+        }
+        throw loadError;
+      }
 
       const builder = new StellarSDK.TransactionBuilder(fundingAccount, {
         fee: StellarSDK.BASE_FEE,
@@ -311,7 +329,26 @@ export class ContributorFundingService {
         fundingWalletId,
         transaction,
       );
-      const result = await this.stellarAccount.submitWithRetry(signedTx);
+      let result: { hash: string };
+      try {
+        result = await this.stellarAccount.submitWithRetry(signedTx);
+      } catch (submitError: any) {
+        // Horizon rejected the funding tx (e.g. tx_insufficient_fee,
+        // op_underfunded). Surface the result codes instead of a bare 500.
+        const codes = submitError?.response?.data?.extras?.result_codes;
+        const detail = codes
+          ? JSON.stringify(codes)
+          : submitError instanceof Error
+            ? submitError.message
+            : 'unknown error';
+        this.logger.error(
+          `Funding payout recipients from ${fundingWallet.publicKey} failed: ${detail}`,
+          submitError,
+        );
+        throw new BadRequestException(
+          `Could not fund payout recipients from the platform funding wallet (${detail}).`,
+        );
+      }
       this.logger.log(
         `Funded ${operations.length} payout recipient(s) in tx ${result.hash}`,
       );
