@@ -20,7 +20,6 @@ import { createHash } from 'crypto';
 import { SanitizedUser, sanitizeUser } from 'src/common/utils/user.util';
 import { EnvConfig } from 'src/config/env.config';
 import { ReputationService } from 'src/reputation/reputation.service';
-import { ensureTrustline } from 'src/wallet/utils/trustline.util';
 import { ActivitiesService } from '../activities/activities.service';
 import { BountyActivities } from '../activities/helpers/activity-helper';
 import { PrismaService } from '../common/prisma/prisma.service';
@@ -33,6 +32,7 @@ import { ContractErrorHandler } from '../soroban/contract-error-handler';
 import { buildSorobanContractOptions } from '../soroban/soroban-rpc.util';
 import { StellarAccountService } from '../soroban/stellar-account.service';
 import { StellarWalletService } from '../wallet/stellar-wallet.service';
+import { ContributorFundingService } from '../wallet/contributor-funding.service';
 import { WalletSigningService } from '../wallet/wallet-signing.service';
 import { BountyContractService } from './bounty-contract.service';
 import { ApplyToBountyDto } from './dto/apply-to-bounty.dto';
@@ -74,6 +74,7 @@ export class BountiesService {
     private stellarWallet: StellarWalletService,
     private activitiesService: ActivitiesService,
     private platformSettingsService: PlatformSettingsService,
+    private contributorFunding: ContributorFundingService,
     private notificationsService: NotificationsService,
     @InjectQueue('bounty-winner') private bountyWinnerQueue: Queue,
   ) {
@@ -1330,57 +1331,20 @@ export class BountiesService {
         );
       }
 
-      // Get bounty currency for trustline validation
-      const bountyForTrustline = await this.prisma.bounty.findUnique({
-        where: { id: dbBountyId },
-      });
-      const rewardCurrency = bountyForTrustline!.rewardCurrency || 'XLM';
-
-      // Ensure all winners have trustlines for the reward currency
-      this.logger.log(
-        `Checking and setting up trustlines for winners for currency: ${rewardCurrency}`,
+      // Ensure every winner's account can receive the prize (activated +
+      // trustline for the reward currency) before the contract pays out.
+      // Brand-new accounts are created and under-funded ones topped up in one
+      // batched transaction from the platform funding wallet.
+      const rewardCurrency = bounty.rewardCurrency || 'XLM';
+      await this.contributorFunding.ensurePayoutRecipientsReady(
+        winnerUsers
+          .filter((winner) => winner.wallet)
+          .map((winner) => ({
+            walletId: winner.wallet!.id,
+            publicKey: winner.wallet!.publicKey,
+            currency: rewardCurrency,
+          })),
       );
-
-      for (const winner of winnerUsers) {
-        if (!winner.wallet) continue;
-
-        const fundingWalletId =
-          await this.platformSettingsService.resolveFundingWalletId();
-
-        try {
-          const result = await ensureTrustline(
-            winner.wallet.id,
-            winner.wallet.publicKey,
-            rewardCurrency,
-            this.networkPassphrase,
-            this.stellarAccount.getServer(),
-            this.walletSigning,
-            this.stellarWallet,
-            fundingWalletId, // Optional funding wallet for account activation
-          );
-
-          if (result.exists) {
-            this.logger.log(
-              `Winner ${winner.id} already has trustline for ${rewardCurrency}`,
-            );
-          } else {
-            const fundingMsg = result.funded
-              ? ` (account funded with ${result.fundingTxHash})`
-              : '';
-            this.logger.log(
-              `Trustline established for winner ${winner.id} for ${rewardCurrency}: ${result.txHash}${fundingMsg}`,
-            );
-          }
-        } catch (error) {
-          this.logger.error(
-            `Failed to ensure trustline for winner ${winner.id}`,
-            error,
-          );
-          throw new BadRequestException(
-            `Failed to setup trustline for winner ${winner.username || winner.id}. ${error instanceof Error ? error.message : 'Please ask them to manually setup a trustline for ' + rewardCurrency + '.'}`,
-          );
-        }
-      }
 
       // Extract public keys in the same order as winner IDs
       const winnerPublicKeys = dto.winners.map((winnerId) => {

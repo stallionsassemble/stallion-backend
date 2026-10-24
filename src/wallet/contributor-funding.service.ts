@@ -287,13 +287,16 @@ export class ContributorFundingService {
       );
     }
 
-    const server = this.stellarAccount.getServer();
     const networkPassphrase = this.stellarAccount.getNetworkPassphrase();
 
     return withFundingWalletLock(async () => {
       const fundingWallet =
         await this.stellarWallet.getWalletById(fundingWalletId);
-      const fundingAccount = await server.loadAccount(fundingWallet.publicKey);
+      // Retries across fresh connections: a degraded Horizon node can return
+      // a spurious 404 for an account that exists.
+      const fundingAccount = await this.stellarAccount.loadWithRetry(
+        fundingWallet.publicKey,
+      );
 
       const builder = new StellarSDK.TransactionBuilder(fundingAccount, {
         fee: StellarSDK.BASE_FEE,
