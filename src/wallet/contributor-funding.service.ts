@@ -356,14 +356,19 @@ export class ContributorFundingService {
     });
   }
 
-  /** Loads an account, returning null if it does not exist on-chain (404). */
+  /**
+   * Loads an account, returning null only if it is confirmed absent on-chain.
+   * A single 404 can't be trusted (degraded Horizon nodes return false 404s),
+   * and treating an existing account as new emits createAccount →
+   * op_already_exists, so retry across fresh connections first.
+   */
   private async loadAccountOrNull(
     publicKey: string,
   ): Promise<StellarSDK.Horizon.AccountResponse | null> {
     try {
-      return await this.stellarAccount.getServer().loadAccount(publicKey);
+      return await this.stellarAccount.loadWithRetry(publicKey);
     } catch (error: any) {
-      if (error?.response?.status === 404) {
+      if (error instanceof AccountNotFoundError) {
         return null;
       }
       // Unexpected Horizon error — surface it rather than silently skipping.
