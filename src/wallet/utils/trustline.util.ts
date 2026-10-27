@@ -16,6 +16,35 @@ interface IWalletSigningService {
 
 const logger = new Logger('TrustlineUtil');
 
+const LOAD_ACCOUNT_RETRIES = 5;
+
+/**
+ * Load an account, retrying on 404. Right after a recipient account is
+ * activated (or when Horizon is degraded) the node can briefly 404 for an
+ * account that exists, which previously surfaced as "Failed to setup
+ * trustline: Not Found". Other errors are thrown immediately.
+ */
+async function loadAccountWithRetry(
+  server: StellarSDK.Horizon.Server,
+  publicKey: string,
+): Promise<StellarSDK.Horizon.AccountResponse> {
+  for (let i = 0; ; i++) {
+    try {
+      return await server.loadAccount(publicKey);
+    } catch (error: any) {
+      const notFound =
+        error?.response?.status === 404 || error?.name === 'NotFoundError';
+      if (!notFound || i >= LOAD_ACCOUNT_RETRIES - 1) {
+        throw error;
+      }
+      logger.warn(
+        `loadAccount 404 for ${publicKey} (attempt ${i + 1}/${LOAD_ACCOUNT_RETRIES}), retrying`,
+      );
+      await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+}
+
 /**
  * Check if an account has a trustline for a specific currency
  */
@@ -92,7 +121,7 @@ export async function setupTrustline(
     }
 
     // Load the account
-    const account = await server.loadAccount(publicKey);
+    const account = await loadAccountWithRetry(server, publicKey);
 
     // Create an asset for the trustline using the issuer address
     const asset = new StellarSDK.Asset(currencyCode, currency.issuer);
