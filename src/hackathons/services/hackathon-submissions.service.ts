@@ -218,10 +218,21 @@ export class HackathonSubmissionsService {
               id: true,
               firstName: true,
               lastName: true,
+              username: true,
               profilePicture: true,
             },
           },
           team: { select: { id: true, name: true } },
+          // Placement, prize and payment status for the winners list. isPaid stays false on
+          // MANUAL hackathons until an admin records the payment.
+          winner: {
+            select: {
+              position: true,
+              prizeAmount: true,
+              isPaid: true,
+              paidAt: true,
+            },
+          },
         },
       }),
       this.prisma.hackathonSubmission.count({ where }),

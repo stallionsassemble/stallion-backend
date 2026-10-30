@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { HackathonType } from '@prisma/client';
+import { HackathonPayoutMode, HackathonType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -166,13 +166,27 @@ export class CreateHackathonDto {
   @ApiProperty({
     required: false,
     type: [String],
-    description: 'What participants need to take part, shown on the hackathon page.',
+    description:
+      'What participants need to take part, shown on the hackathon page.',
   })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(30)
   @IsString({ each: true })
   requirements?: string[];
+
+  @ApiProperty({
+    required: false,
+    enum: HackathonPayoutMode,
+    default: HackathonPayoutMode.CONTRACT,
+    description:
+      'CONTRACT escrows the prize pool on-chain and pays winners on publish. MANUAL skips the contract: winners are paid outside the platform and an admin marks each payout as paid. Cannot be changed after creation.',
+  })
+  @IsOptional()
+  @IsEnum(HackathonPayoutMode, {
+    message: `payoutMode must be one of: ${Object.values(HackathonPayoutMode).join(', ')}`,
+  })
+  payoutMode?: HackathonPayoutMode;
 
   @ApiProperty({ description: 'ID of the Project Owner who will act as judge' })
   @IsString()

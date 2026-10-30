@@ -944,7 +944,9 @@ model Hackathon {
   status           HackathonStatus @default(DRAFT)
   resultsPublished Boolean         @default(false) @map("results_published")
 
-  // Smart contract fields
+  payoutMode HackathonPayoutMode @default(CONTRACT) @map("payout_mode")
+
+  // Smart contract fields (null for MANUAL hackathons)
   contractHackathonId BigInt? @unique @map("contract_hackathon_id")
   txHash              String? @map("tx_hash")
 
@@ -1138,6 +1140,13 @@ enum HackathonType {
   VIRTUAL
   PHYSICAL
   HYBRID
+}
+
+// CONTRACT: prize pool is escrowed in the Soroban contract and distributed on publish.
+// MANUAL: no escrow; winners are paid outside the platform and an admin records each payment.
+enum HackathonPayoutMode {
+  CONTRACT
+  MANUAL
 }
 
 enum HackathonStatus {

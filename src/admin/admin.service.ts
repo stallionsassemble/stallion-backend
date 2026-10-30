@@ -27,6 +27,7 @@ import { EmailService } from 'src/email/email.service';
 import { CreateHackathonDto } from 'src/hackathons/dto/create-hackathon.dto';
 import { UpdateHackathonDto } from 'src/hackathons/dto/update-hackathon.dto';
 import { HackathonsService } from 'src/hackathons/hackathons.service';
+import { HackathonJudgingService } from 'src/hackathons/services/hackathon-judging.service';
 import { HackathonApplicationsService } from 'src/hackathons/services/hackathon-applications.service';
 import { PasskeyService } from 'src/passkey/passkey.service';
 import { UpdateProjectDto } from 'src/projects/dto/update-project.dto';
@@ -64,6 +65,7 @@ export class AdminService {
     private readonly projectContractService: ProjectContractService,
     private readonly hackathonsService: HackathonsService,
     private readonly hackathonApplicationsService: HackathonApplicationsService,
+    private readonly hackathonJudgingService: HackathonJudgingService,
   ) {}
 
   // Every AdminController route is restricted to Role.ADMIN, so the caller
@@ -1141,6 +1143,8 @@ export class AdminService {
       applicationForm: hackathon.applicationForm,
       submissionForm: hackathon.submissionForm,
       requiresApproval: hackathon.requiresApproval,
+      payoutMode: hackathon.payoutMode,
+      resultsPublished: hackathon.resultsPublished,
       companyId: hackathon.companyId,
       totalSubmissions: hackathon._count.submissions,
       createdAt: hackathon.createdAt,
@@ -1168,6 +1172,26 @@ export class AdminService {
       hackathonId,
       hackathon.createdById,
       payload as UpdateHackathonDto,
+    );
+  }
+
+  listHackathonWinners(hackathonId: string) {
+    return this.hackathonJudgingService.listWinnersForPayout(hackathonId);
+  }
+
+  markHackathonWinnerPaid(
+    hackathonId: string,
+    winnerId: string,
+    adminId: string,
+    txHash?: string,
+    note?: string,
+  ) {
+    return this.hackathonJudgingService.markWinnerPaid(
+      hackathonId,
+      winnerId,
+      adminId,
+      txHash,
+      note,
     );
   }
 

@@ -27,6 +27,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import { IdParamDto } from 'src/common/dto/id-param.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { MarkWinnerPaidDto } from 'src/hackathons/dto/mark-winner-paid.dto';
 import { UpdateProjectDto } from 'src/projects/dto/update-project.dto';
 import { AdminService } from './admin.service';
 import {
@@ -412,6 +413,38 @@ export class AdminController {
       params.id,
       dto.teamName,
       dto.participantIds,
+    );
+  }
+
+  @Get('hackathons/:id/winners')
+  @ApiOperation({
+    summary:
+      'List winners with wallet addresses and payout status (for paying MANUAL hackathons)',
+  })
+  @ApiOkResponse({ description: 'Winners and payout status' })
+  listHackathonWinners(@Param() params: IdParamDto) {
+    return this.adminService.listHackathonWinners(params.id);
+  }
+
+  @Post('hackathons/:id/winners/:winnerId/mark-paid')
+  @UseGuards(AdminStepUpGuard)
+  @ApiOperation({
+    summary:
+      'Record that a MANUAL hackathon winner was paid (transaction hash or payment reference)',
+  })
+  @ApiOkResponse({ description: 'Winner marked as paid' })
+  markHackathonWinnerPaid(
+    @Param('id') hackathonId: string,
+    @Param('winnerId') winnerId: string,
+    @CurrentUser('id') adminId: string,
+    @Body() dto: MarkWinnerPaidDto,
+  ) {
+    return this.adminService.markHackathonWinnerPaid(
+      hackathonId,
+      winnerId,
+      adminId,
+      dto.txHash,
+      dto.note,
     );
   }
 

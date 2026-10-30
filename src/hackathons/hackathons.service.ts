@@ -6,7 +6,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HackathonStatus, HackathonType, Prisma, Role } from '@prisma/client';
+import {
+  HackathonPayoutMode,
+  HackathonStatus,
+  HackathonType,
+  Prisma,
+  Role,
+} from '@prisma/client';
 import { PrismaService } from '../common/prisma/prisma.service';
 import {
   getTokenAddress,
@@ -48,7 +54,17 @@ export class HackathonsService {
       throw new ForbiddenException('Only admins can create hackathons');
     }
 
-    if (!adminUser.wallet || !adminUser.wallet.publicKey) {
+    // The admin payload is not class-validated, so check the mode here too.
+    const payoutMode = dto.payoutMode ?? HackathonPayoutMode.CONTRACT;
+    if (!Object.values(HackathonPayoutMode).includes(payoutMode)) {
+      throw new BadRequestException(
+        `Invalid payout mode: ${String(payoutMode)}. Expected one of: ${Object.values(HackathonPayoutMode).join(', ')}`,
+      );
+    }
+    const usesContract = payoutMode === HackathonPayoutMode.CONTRACT;
+
+    // Only contract hackathons escrow funds from the admin wallet.
+    if (usesContract && (!adminUser.wallet || !adminUser.wallet.publicKey)) {
       throw new BadRequestException('Admin must have an active wallet');
     }
 
@@ -134,24 +150,13 @@ export class HackathonsService {
 
     // Fail fast with an actionable message if the admin wallet can't fund the
     // escrow, instead of a generic on-chain "transaction failed" error.
-    try {
-      await validateWalletForBountyCreation(
-        adminUser.wallet.publicKey,
+    if (usesContract) {
+      await this.assertAdminWalletCanFund(
+        adminUser.wallet!.publicKey,
         dto.totalBudget,
         dto.asset,
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
-        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
         networkPassphrase,
       );
-    } catch (error) {
-      if (error instanceof BadRequestException) {
-        const detail = error.message;
-        this.logger.warn(`Hackathon wallet pre-check failed: ${detail}`);
-        throw new BadRequestException(
-          `Your admin wallet cannot fund this hackathon. ${detail}`,
-        );
-      }
-      throw error;
     }
 
     // Validate off-chain data BEFORE the escrow is locked, so a bad form never costs a refund.
@@ -161,18 +166,20 @@ export class HackathonsService {
     const requirements = normaliseRequirements(dto.requirements);
     const prizePool = normalisePrizeTracks(dto.prizePool, tracks);
 
-    // Smart Contract Call
-    const contractResult = await this.contractService.createHackathon({
-      adminPublicKey: adminUser.wallet.publicKey,
-      adminWalletId: adminUser.wallet.id,
-      token: tokenAddress,
-      totalBudget: dto.totalBudget.toString(),
-      prizePool: dto.prizePool.map((p) => ({
-        position: p.position,
-        amount: p.amount.toString(),
-      })),
-      deadline,
-    });
+    // Smart Contract Call (CONTRACT mode only)
+    const contractResult = usesContract
+      ? await this.contractService.createHackathon({
+          adminPublicKey: adminUser.wallet!.publicKey,
+          adminWalletId: adminUser.wallet!.id,
+          token: tokenAddress,
+          totalBudget: dto.totalBudget.toString(),
+          prizePool: dto.prizePool.map((p) => ({
+            position: p.position,
+            amount: p.amount.toString(),
+          })),
+          deadline,
+        })
+      : null;
 
     // Create DB Record. The escrow is already locked on-chain at this point, so if the insert
     // fails we must refund it instead of leaving the funds orphaned in the contract.
@@ -202,8 +209,9 @@ export class HackathonsService {
           status: isImmediate
             ? HackathonStatus.PUBLISHED
             : HackathonStatus.DRAFT,
-          contractHackathonId: contractResult.contractHackathonId,
-          txHash: contractResult.txHash,
+          payoutMode,
+          contractHackathonId: contractResult?.contractHackathonId ?? null,
+          txHash: contractResult?.txHash ?? null,
           applicationForm:
             applicationForm.length > 0
               ? (applicationForm as unknown as Prisma.InputJsonValue)
@@ -218,6 +226,9 @@ export class HackathonsService {
         },
       });
     } catch (dbError) {
+      // Nothing was escrowed, so there is nothing to refund.
+      if (!contractResult) throw dbError;
+
       const reason =
         dbError instanceof Error ? dbError.message : String(dbError);
       this.logger.error(
@@ -225,8 +236,8 @@ export class HackathonsService {
       );
       try {
         const refund = await this.contractService.cancelHackathon({
-          adminPublicKey: adminUser.wallet.publicKey,
-          adminWalletId: adminUser.wallet.id,
+          adminPublicKey: adminUser.wallet!.publicKey,
+          adminWalletId: adminUser.wallet!.id,
           contractHackathonId: contractResult.contractHackathonId,
         });
         this.logger.warn(
@@ -260,8 +271,37 @@ export class HackathonsService {
     }
     this.schedulingService.scheduleDeadline(hackathon.id, deadline);
 
-    this.logger.log(`Hackathon created: ${hackathon.id} by Admin ${adminId}`);
+    this.logger.log(
+      `Hackathon created: ${hackathon.id} (${payoutMode}) by Admin ${adminId}`,
+    );
     return hackathon;
+  }
+
+  private async assertAdminWalletCanFund(
+    publicKey: string,
+    totalBudget: number,
+    asset: string,
+    networkPassphrase: string,
+  ) {
+    try {
+      await validateWalletForBountyCreation(
+        publicKey,
+        totalBudget,
+        asset,
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_RPC_URL),
+        this.configService.getOrThrow<string>(EnvConfig.SOROBAN_HORIZON_URL),
+        networkPassphrase,
+      );
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        const detail = error.message;
+        this.logger.warn(`Hackathon wallet pre-check failed: ${detail}`);
+        throw new BadRequestException(
+          `Your admin wallet cannot fund this hackathon. ${detail}`,
+        );
+      }
+      throw error;
+    }
   }
 
   async updateHackathon(
@@ -298,6 +338,15 @@ export class HackathonsService {
     if (dto.type && !Object.values(HackathonType).includes(dto.type)) {
       throw new BadRequestException(
         `Invalid hackathon type: ${dto.type}. Expected one of: ${Object.values(HackathonType).join(', ')}`,
+      );
+    }
+
+    // The admin payload is untyped, so guard against switching modes: a CONTRACT
+    // hackathon has funds in escrow and a MANUAL one has none.
+    const requestedMode = (dto as { payoutMode?: unknown }).payoutMode;
+    if (requestedMode !== undefined && requestedMode !== hackathon.payoutMode) {
+      throw new BadRequestException(
+        'Payout mode cannot be changed after creation',
       );
     }
 
@@ -378,8 +427,10 @@ export class HackathonsService {
       submissionForm,
       tracks,
       requirements,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      payoutMode,
       ...restDto
-    } = dto;
+    } = dto as UpdateHackathonDto & { payoutMode?: unknown };
 
     if (dto.asset && dto.asset !== hackathon.asset) {
       throw new BadRequestException(

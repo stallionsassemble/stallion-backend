@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  HackathonPayoutMode,
   HackathonStatus,
   HackathonSubmissionStatus,
   PayoutSourceType,
@@ -228,17 +229,21 @@ export class HackathonJudgingService {
       );
     }
 
-    // Call smart contract to distribute prizes
-    const adminWallet = hackathon.createdBy.wallet;
-    if (!adminWallet) {
-      throw new BadRequestException(
-        'Admin wallet not found for contract execution',
-      );
-    }
-
     let distributeTxHash: string | undefined;
 
-    if (hackathon.contractHackathonId !== null) {
+    // CONTRACT hackathons pay out on-chain now. MANUAL ones (and any without a
+    // contract record) only get pending payouts that an admin marks paid later.
+    if (
+      hackathon.payoutMode === HackathonPayoutMode.CONTRACT &&
+      hackathon.contractHackathonId !== null
+    ) {
+      const adminWallet = hackathon.createdBy.wallet;
+      if (!adminWallet) {
+        throw new BadRequestException(
+          'Admin wallet not found for contract execution',
+        );
+      }
+
       const contractWinners = winners.map((w) => ({
         position: w.position,
         winnerAddress: w.user.wallet?.publicKey,
@@ -280,6 +285,11 @@ export class HackathonJudgingService {
 
     // Create Payout records for each winner
     const now = new Date();
+    const paidOnChain = distributeTxHash !== undefined;
+    const payoutStatus = paidOnChain
+      ? PayoutStatus.COMPLETED
+      : PayoutStatus.PENDING_APPROVAL;
+    const completedAt = paidOnChain ? now : null;
     await Promise.all(
       winners.map(async (winner) => {
         const usdValue = await calculateUsdValue(
@@ -300,9 +310,9 @@ export class HackathonJudgingService {
             token: hackathon.currency,
             amount: winner.prizeAmount,
             usdAmount: usdValue,
-            status: PayoutStatus.COMPLETED,
+            status: payoutStatus,
             requestedAt: winner.createdAt,
-            completedAt: now,
+            completedAt,
             txHash: distributeTxHash,
             contributorId: winner.userId,
             hackathonId: hackathon.id,
@@ -317,8 +327,8 @@ export class HackathonJudgingService {
             token: hackathon.currency,
             amount: winner.prizeAmount,
             usdAmount: usdValue,
-            status: PayoutStatus.COMPLETED,
-            completedAt: now,
+            status: payoutStatus,
+            completedAt,
             txHash: distributeTxHash,
             contributorId: winner.userId,
             hackathonId: hackathon.id,
@@ -332,14 +342,16 @@ export class HackathonJudgingService {
         });
 
         // Also update the HackathonWinner record to keep it in sync
-        await this.prisma.hackathonWinner.update({
-          where: { id: winner.id },
-          data: {
-            isPaid: true,
-            paidAt: now,
-            txHash: distributeTxHash,
-          },
-        });
+        if (paidOnChain) {
+          await this.prisma.hackathonWinner.update({
+            where: { id: winner.id },
+            data: {
+              isPaid: true,
+              paidAt: now,
+              txHash: distributeTxHash,
+            },
+          });
+        }
       }),
     );
 
@@ -351,5 +363,141 @@ export class HackathonJudgingService {
         resultsPublished: true,
       },
     });
+  }
+
+  /**
+   * Winners with where to pay them and payout status, for admins settling a MANUAL hackathon.
+   */
+  async listWinnersForPayout(hackathonId: string) {
+    const hackathon = await this.prisma.hackathon.findUnique({
+      where: { id: hackathonId },
+      select: {
+        id: true,
+        payoutMode: true,
+        currency: true,
+        resultsPublished: true,
+      },
+    });
+    if (!hackathon) {
+      throw new NotFoundException('Hackathon not found');
+    }
+
+    const winners = await this.prisma.hackathonWinner.findMany({
+      where: { hackathonId },
+      orderBy: { position: 'asc' },
+      include: {
+        payout: {
+          select: { id: true, status: true, txHash: true, metadata: true },
+        },
+        submission: { select: { id: true, track: true } },
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            wallet: { select: { publicKey: true } },
+            payoutMethods: {
+              select: { name: true, publicKey: true, isDefault: true },
+            },
+          },
+        },
+      },
+    });
+
+    return { hackathon, winners };
+  }
+
+  /**
+   * Record that a winner of a MANUAL hackathon was paid outside the platform.
+   * Admin only; the payout created on publish moves from PENDING_APPROVAL to COMPLETED.
+   */
+  async markWinnerPaid(
+    hackathonId: string,
+    winnerId: string,
+    adminId: string,
+    txHash?: string,
+    note?: string,
+  ) {
+    if (!txHash && !note) {
+      throw new BadRequestException(
+        'Provide the transaction hash or a payment reference',
+      );
+    }
+
+    const winner = await this.prisma.hackathonWinner.findUnique({
+      where: { id: winnerId },
+      include: { hackathon: true, payout: true },
+    });
+
+    if (!winner || winner.hackathonId !== hackathonId) {
+      throw new NotFoundException('Winner not found');
+    }
+
+    const { hackathon } = winner;
+    if (
+      hackathon.payoutMode === HackathonPayoutMode.CONTRACT &&
+      hackathon.contractHackathonId !== null
+    ) {
+      throw new BadRequestException(
+        'This hackathon pays winners through the contract',
+      );
+    }
+    if (!hackathon.resultsPublished || !winner.payout) {
+      throw new BadRequestException(
+        'Publish the results before marking winners as paid',
+      );
+    }
+    if (winner.isPaid) {
+      throw new BadRequestException('This winner is already marked as paid');
+    }
+
+    const now = new Date();
+    const usdValue = await calculateUsdValue(
+      winner.prizeAmount.toString(),
+      hackathon.currency,
+    );
+    const metadata = {
+      ...((winner.payout.metadata as Prisma.JsonObject | null) ?? {}),
+      manual: true,
+      markedPaidBy: adminId,
+      ...(note ? { paymentNote: note } : {}),
+    } as Prisma.InputJsonValue;
+
+    const payoutId = winner.payout.id;
+    const updatedWinner = await this.prisma.$transaction(async (tx) => {
+      // Conditional update so two admins marking the same winner can't both succeed.
+      const { count } = await tx.hackathonWinner.updateMany({
+        where: { id: winner.id, isPaid: false },
+        data: {
+          isPaid: true,
+          paidAt: now,
+          txHash: txHash ?? null,
+          usdValueAtCompletion: usdValue,
+        },
+      });
+      if (count === 0) {
+        throw new BadRequestException('This winner is already marked as paid');
+      }
+
+      await tx.payout.update({
+        where: { id: payoutId },
+        data: {
+          status: PayoutStatus.COMPLETED,
+          completedAt: now,
+          txHash: txHash ?? null,
+          usdAmount: usdValue,
+          metadata,
+        },
+      });
+
+      return tx.hackathonWinner.findUniqueOrThrow({
+        where: { id: winner.id },
+      });
+    });
+
+    this.logger.log(
+      `Hackathon ${hackathonId} winner ${winnerId} marked paid by admin ${adminId}${txHash ? ` (tx ${txHash})` : ''}`,
+    );
+    return updatedWinner;
   }
 }

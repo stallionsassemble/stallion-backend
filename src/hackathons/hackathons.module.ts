@@ -41,6 +41,10 @@ import { AdminJudgingStepUpGuard } from './guards/admin-judging-step-up.guard';
     AdminStepUpGuard,
     AdminJudgingStepUpGuard,
   ],
-  exports: [HackathonsService, HackathonApplicationsService],
+  exports: [
+    HackathonsService,
+    HackathonApplicationsService,
+    HackathonJudgingService,
+  ],
 })
 export class HackathonsModule {}
