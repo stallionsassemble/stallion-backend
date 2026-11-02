@@ -10,6 +10,7 @@ import { ProjectsModule } from 'src/projects/projects.module';
 import { WalletModule } from 'src/wallet/wallet.module';
 import { AdminController } from './admin.controller';
 import { AdminStepUpService } from './admin-step-up.service';
+import { AdminReportService } from './admin-report.service';
 import { AdminService } from './admin.service';
 import { AdminStepUpGuard } from './guards/admin-step-up.guard';
 import { PayoutBackfillService } from './payout-backfill.service';
@@ -27,6 +28,7 @@ import { PayoutBackfillService } from './payout-backfill.service';
   controllers: [AdminController],
   providers: [
     AdminService,
+    AdminReportService,
     AdminStepUpService,
     AdminStepUpGuard,
     PlatformSettingsService,

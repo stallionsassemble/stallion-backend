@@ -29,6 +29,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { MarkWinnerPaidDto } from 'src/hackathons/dto/mark-winner-paid.dto';
 import { UpdateProjectDto } from 'src/projects/dto/update-project.dto';
+import { AdminReportService } from './admin-report.service';
 import { AdminService } from './admin.service';
 import {
   AdminBountyQueryDto,
@@ -39,6 +40,7 @@ import {
   AdminHackathonQueryDto,
   AdminReviewApplicationDto,
   AdminPayoutQueryDto,
+  AdminReportQueryDto,
   AdminProjectQueryDto,
   AdminUserQueryDto,
   AdminActionResponseDto,
@@ -61,7 +63,10 @@ import { AdminStepUpGuard } from './guards/admin-step-up.guard';
 @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT token' })
 @ApiForbiddenResponse({ description: 'Admin role required' })
 export class AdminController {
-  constructor(private readonly adminService: AdminService) {}
+  constructor(
+    private readonly adminService: AdminService,
+    private readonly adminReportService: AdminReportService,
+  ) {}
 
   @Post('security/step-up/totp')
   @ApiOperation({ summary: 'Verify TOTP for admin step-up token' })
@@ -139,6 +144,16 @@ export class AdminController {
   })
   clearFundingWallet(@CurrentUser('id') userId: string) {
     return this.adminService.clearFundingWallet(userId);
+  }
+
+  @Get('reports')
+  @ApiOperation({
+    summary:
+      'Activity report for a date range: summary plus users, bounties, projects, hackathons and payouts',
+  })
+  @ApiOkResponse({ description: 'Report for the requested range' })
+  getReport(@Query() query: AdminReportQueryDto) {
+    return this.adminReportService.getReport(query.from, query.to);
   }
 
   @Get('dashboard')

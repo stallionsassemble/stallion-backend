@@ -204,6 +204,22 @@ export class AdminProjectQueryDto extends AdminPaginationQueryDto {
   isFeatured?: boolean;
 }
 
+export class AdminReportQueryDto {
+  @ApiProperty({
+    description: 'Start of the range (inclusive), ISO 8601',
+    example: '2026-10-01T00:00:00.000Z',
+  })
+  @IsISO8601()
+  from: string;
+
+  @ApiProperty({
+    description: 'End of the range (exclusive), ISO 8601',
+    example: '2026-11-01T00:00:00.000Z',
+  })
+  @IsISO8601()
+  to: string;
+}
+
 export class AdminPayoutQueryDto extends AdminPaginationQueryDto {
   @ApiPropertyOptional({ enum: PayoutStatus })
   @IsOptional()
