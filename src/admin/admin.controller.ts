@@ -146,6 +146,13 @@ export class AdminController {
     return this.adminService.clearFundingWallet(userId);
   }
 
+  @Get('reports/summary')
+  @ApiOperation({ summary: 'Activity totals for a date range' })
+  @ApiOkResponse({ description: 'Summary for the requested range' })
+  getReportSummary(@Query() query: AdminReportQueryDto) {
+    return this.adminReportService.getSummary(query.from, query.to);
+  }
+
   @Get('reports')
   @ApiOperation({
     summary:

@@ -43,6 +43,16 @@ export class AdminReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getReport(fromIso: string, toIso: string) {
+    return this.build(fromIso, toIso, MAX_ROWS);
+  }
+
+  /** Only the totals for the range, for the dashboard's period stats. */
+  async getSummary(fromIso: string, toIso: string) {
+    const { range, summary } = await this.build(fromIso, toIso, 0);
+    return { range, summary };
+  }
+
+  private async build(fromIso: string, toIso: string, maxRows: number) {
     const from = new Date(fromIso);
     const to = new Date(toIso);
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
@@ -72,7 +82,7 @@ export class AdminReportService {
         this.prisma.user.findMany({
           where: createdInRange,
           orderBy: { createdAt: 'asc' },
-          take: MAX_ROWS,
+          take: maxRows,
           select: {
             id: true,
             firstName: true,
@@ -89,7 +99,7 @@ export class AdminReportService {
         this.prisma.bounty.findMany({
           where: createdInRange,
           orderBy: { createdAt: 'asc' },
-          take: MAX_ROWS,
+          take: maxRows,
           select: {
             id: true,
             title: true,
@@ -105,7 +115,7 @@ export class AdminReportService {
         this.prisma.project.findMany({
           where: createdInRange,
           orderBy: { createdAt: 'asc' },
-          take: MAX_ROWS,
+          take: maxRows,
           select: {
             id: true,
             title: true,
@@ -121,7 +131,7 @@ export class AdminReportService {
         this.prisma.hackathon.findMany({
           where: createdInRange,
           orderBy: { createdAt: 'asc' },
-          take: MAX_ROWS,
+          take: maxRows,
           select: {
             id: true,
             title: true,
@@ -138,7 +148,7 @@ export class AdminReportService {
         this.prisma.payout.findMany({
           where: payoutWhere,
           orderBy: { requestedAt: 'asc' },
-          take: MAX_ROWS,
+          take: maxRows,
           select: {
             id: true,
             sourceType: true,
