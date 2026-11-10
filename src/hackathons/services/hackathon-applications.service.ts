@@ -15,6 +15,15 @@ import {
   validateApplicationForm,
 } from '../utils/application-form.util';
 
+/**
+ * Hackathons whose application intake is closed by hand, while the hackathon itself stays
+ * live (PUBLISHED) and accepted participants keep submitting. Temporary measure in lieu of
+ * a dedicated schema field; remove an id here to reopen applications.
+ */
+const APPLICATIONS_CLOSED_HACKATHON_IDS = new Set<string>([
+  'cmvxtv3xe000l0klnb8go9zly', // EmpowerHer: Building the Agent Economy
+]);
+
 @Injectable()
 export class HackathonApplicationsService {
   private readonly logger = new Logger(HackathonApplicationsService.name);
@@ -38,7 +47,8 @@ export class HackathonApplicationsService {
 
     if (
       hackathon.status === HackathonStatus.COMPLETED ||
-      hackathon.status === HackathonStatus.CANCELLED
+      hackathon.status === HackathonStatus.CANCELLED ||
+      APPLICATIONS_CLOSED_HACKATHON_IDS.has(hackathon.id)
     ) {
       throw new BadRequestException(
         'This hackathon is no longer accepting applications',

@@ -69,6 +69,16 @@ describe('HackathonApplicationsService.apply', () => {
     expect(p.teamId).toBeNull();
   });
 
+  it('rejects applications for a hackathon on the closed-intake list', async () => {
+    const { service } = setup({ id: 'cmvxtv3xe000l0klnb8go9zly' });
+    await expect(
+      service.apply('u1', 'cmvxtv3xe000l0klnb8go9zly', {
+        name: 'Ada',
+        mode: 'Need team',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('keeps the application pending when approval is required', async () => {
     const { service } = setup({ requiresApproval: true });
     const p = await service.apply('u1', 'h1', {
